@@ -1,0 +1,13 @@
+{
+  "name": "schedule-app",
+  "version": "1.0.0",
+  "description": "视频排班汇总 - 多人协作版",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

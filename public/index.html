@@ -1,0 +1,3351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频排班汇总</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+/* ========================= 主题系统 ========================= */
+:root, [data-theme="pink"] {
+  --bg: #fff0f5; --bg2: #fff5f7; --card: #fff; --border: #f8c8d8;
+  --text: #4a1d2f; --text2: #8a5a6a; --primary: #ff6b9d; --primary-hover: #ff4785;
+  --danger: #e74c6f; --danger-bg: #fff0f5; --success: #5dba7b; --warning: #f0a040;
+  --thead-bg: linear-gradient(180deg, #fff5f7, #fde4ec);
+  --thead-border: #f8c8d8; --cell-border: #f8c8d8; --cell-hover-bg: #fff5f7;
+  --cell-hover-bd: #ffb3c6; --cell-select-bg: #fff0f5; --cell-select-bd: #ffb3c6;
+  --cell-active-bg: #ffe0ea; --section-bg: linear-gradient(90deg, #fff5f7, #fde4ec, #fff5f7);
+  --topbar-bg: linear-gradient(135deg, #ffb6c1, #ff9eb5, #ffb3c6);
+  --topbar-border: #ff8fab; --tag-bg: #fff5f7; --name-col-bg: #fffafc;
+  --external-name-col-bg: #fffde7; --external-row-bg: #fffef5;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04);
+  --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+}
+[data-theme="blue"] {
+  --bg: #eff6ff; --bg2: #f5f9ff; --card: #fff; --border: #bfdbfe;
+  --text: #1e3a5f; --text2: #5a7a9a; --primary: #3b82f6; --primary-hover: #2563eb;
+  --danger: #ef4444; --danger-bg: #fef2f2; --success: #10b981; --warning: #f59e0b;
+  --thead-bg: linear-gradient(180deg, #f0f7ff, #dbeafe);
+  --thead-border: #bfdbfe; --cell-border: #dbeafe; --cell-hover-bg: #eff6ff;
+  --cell-hover-bd: #93c5fd; --cell-select-bg: #eff6ff; --cell-select-bd: #93c5fd;
+  --cell-active-bg: #dbeafe; --section-bg: linear-gradient(90deg, #f0f7ff, #dbeafe, #f0f7ff);
+  --topbar-bg: linear-gradient(135deg, #3b82f6, #2563eb, #4f8ff7);
+  --topbar-border: #1d4ed8; --tag-bg: #eff6ff; --name-col-bg: #f8faff;
+  --external-name-col-bg: #fefce8; --external-row-bg: #fffbeb;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04);
+  --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #0f172a; --bg2: #1e293b; --card: #1e293b; --border: #334155;
+  --text: #e2e8f0; --text2: #94a3b8; --primary: #60a5fa; --primary-hover: #3b82f6;
+  --danger: #f87171; --danger-bg: #3b1520; --success: #34d399; --warning: #fbbf24;
+  --thead-bg: linear-gradient(180deg, #1e293b, #0f172a);
+  --thead-border: #334155; --cell-border: #334155; --cell-hover-bg: #1e293b;
+  --cell-hover-bd: #475569; --cell-select-bg: #1e293b; --cell-select-bd: #60a5fa;
+  --cell-active-bg: #1e3a5f; --section-bg: linear-gradient(90deg, #1e293b, #0f172a, #1e293b);
+  --topbar-bg: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
+  --topbar-border: #334155; --tag-bg: #1e293b; --name-col-bg: #1e293b;
+  --external-name-col-bg: #2d2410; --external-row-bg: #1e1a10;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.2), 0 1px 8px rgba(0,0,0,0.15);
+  --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+}
+[data-theme="mint"] {
+  --bg: #ecfdf5; --bg2: #f0fdf6; --card: #fff; --border: #a7f3d0;
+  --text: #064e3b; --text2: #5a8a7a; --primary: #10b981; --primary-hover: #059669;
+  --danger: #ef4444; --danger-bg: #fef2f2; --success: #10b981; --warning: #f59e0b;
+  --thead-bg: linear-gradient(180deg, #f0fdf6, #d1fae5);
+  --thead-border: #a7f3d0; --cell-border: #d1fae5; --cell-hover-bg: #ecfdf5;
+  --cell-hover-bd: #6ee7b7; --cell-select-bg: #ecfdf5; --cell-select-bd: #6ee7b7;
+  --cell-active-bg: #d1fae5; --section-bg: linear-gradient(90deg, #ecfdf5, #d1fae5, #ecfdf5);
+  --topbar-bg: linear-gradient(135deg, #10b981, #059669, #34d399);
+  --topbar-border: #047857; --tag-bg: #ecfdf5; --name-col-bg: #f8fdf9;
+  --external-name-col-bg: #fefce8; --external-row-bg: #fffbeb;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04);
+  --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text); line-height: 1.6; min-height: 100vh;
+  font-size: 14px; user-select: none;
+}
+
+.topbar {
+  background: var(--topbar-bg); border-bottom: 2px solid var(--topbar-border);
+  padding: 0 24px; height: 52px; display: flex; align-items: center;
+  justify-content: space-between; box-shadow: var(--shadow);
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-l { display: flex; align-items: center; gap: 20px; }
+.logo {
+  font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+  color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.logo-dot {
+  width: 8px; height: 8px; background: #fff; border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255,255,255,0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.week-nav {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,0.25); backdrop-filter: blur(8px);
+  border-radius: 20px; padding: 3px 6px; border: 1px solid rgba(255,255,255,0.4);
+}
+.week-nav .btn-g { color: #fff; border-color: transparent; }
+.week-nav .btn-g:hover { background: rgba(255,255,255,0.2); }
+.week-nav #weekLabel { color: #fff; }
+
+.topbar-r { display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 7px 16px;
+  border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--card); color: var(--text);
+  transition: all .2s; font-family: inherit; white-space: nowrap;
+}
+.btn:hover { background: var(--cell-hover-bg); transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn-p {
+  background: var(--primary); color: #fff; border-color: transparent;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.btn-p:hover { background: var(--primary-hover); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+.btn-g { border-color: transparent; background: transparent; }
+.btn-g:hover { background: var(--cell-hover-bg); }
+
+.main { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+.group-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.gtab {
+  padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--card);
+  color: var(--text2); transition: all .2s; font-family: inherit; position: relative;
+}
+.gtab:hover { border-color: var(--primary); color: var(--text); transform: translateY(-1px); box-shadow: var(--shadow); }
+.gtab.active { background: var(--primary); color: #fff; border-color: transparent; box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+.gtab .cnt { font-size: 11px; opacity: .8; margin-left: 4px; }
+.gtab-add { padding: 8px 12px; border-radius: 22px; font-size: 14px; cursor: pointer;
+  border: 1.5px dashed #ffb3c6; background: transparent; color: var(--text2);
+  transition: all .2s; font-family: inherit; margin-left: 4px; }
+.gtab-add:hover { border-color: var(--primary); color: var(--primary); background: var(--cell-hover-bg); }
+
+.hint-bar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 12px; color: var(--text2);
+  font-weight: 500;
+}
+.hint-bar kbd {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 5px;
+  padding: 2px 8px; font-size: 11px; font-family: inherit; font-weight: 600;
+  color: var(--primary);
+}
+.hint-spacer { flex: 1; }
+
+.table-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden; position: relative;
+  border: 1.5px solid var(--border);
+}
+.table-wrap {
+  overflow-x: auto; max-height: calc(100vh - 230px); overflow-y: auto;
+  position: relative;
+}
+.schedule-table {
+  width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; min-width: 800px;
+}
+.schedule-table thead th {
+  background: var(--thead-bg);
+  font-weight: 700; font-size: 12px; color: var(--text2);
+  text-align: center; padding: 12px 6px; border-bottom: 2px solid var(--thead-border);
+  position: sticky; top: 0; z-index: 3;
+}
+.schedule-table thead th:first-child { width: 120px; text-align: left; padding-left: 16px; z-index: 4; }
+.schedule-table tbody td {
+  border: 1px solid var(--cell-border); padding: 1px; text-align: center;
+  vertical-align: top; height: 56px;
+}
+.schedule-table tbody td:first-child {
+  font-weight: 600; text-align: center; padding: 6px 8px; background: var(--name-col-bg);
+  position: sticky; left: 0; z-index: 2; color: var(--text); font-size: 14px;
+  border-right: 2px solid var(--cell-border); vertical-align: middle;
+}
+.row-del {
+  display: none; margin-left: 6px; cursor: pointer; color: #d4a0b0;
+  font-size: 16px; font-weight: 400; line-height: 1; vertical-align: middle;
+}
+.schedule-table tr:hover .row-del { display: inline; }
+.row-del:hover { color: var(--danger); }
+.schedule-table tr.row-external td:first-child { background: var(--external-name-col-bg); }
+.schedule-table tr.row-external td { background: var(--external-row-bg); }
+
+.cell {
+  height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+  border-radius: 6px; cursor: cell; font-size: 13px; font-weight: 500;
+  transition: all .15s; border: 2px solid transparent;
+  word-break: break-word; white-space: pre-wrap; padding: 4px 6px;
+  flex-direction: column; box-sizing: border-box;
+}
+.cell:hover { background: var(--cell-hover-bg); border-color: var(--cell-hover-bd); }
+.cell-empty { color: #e8c8d4; height: 100%; display: flex; align-items: center; justify-content: center; }
+.cell-empty:hover { color: var(--text2); }
+
+.cell.selected {
+  background: var(--cell-select-bg) !important;
+  border-color: var(--cell-select-bd) !important;
+  z-index: 1;
+}
+.cell.active-cell {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(59,130,246,.2);
+  z-index: 2;
+}
+.cell.active-cell.selected {
+  border-color: var(--primary) !important;
+  background: var(--cell-active-bg) !important;
+}
+
+.cell.editing {
+  border-color: var(--primary) !important;
+  background: var(--card) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.2);
+  z-index: 5; cursor: text; padding: 2px;
+}
+.cell.editing textarea {
+  flex: 1; width: 100%; border: none; background: transparent;
+  text-align: center; font-size: 13px; font-weight: 500; font-family: inherit;
+  outline: none; padding: 4px; color: var(--text); resize: vertical;
+  word-break: break-word; white-space: pre-wrap;
+}
+.cell.editing textarea::placeholder { color: #e8c8d4; font-weight: 400; }
+
+.cell .conflict-dot {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; background: #ff4777; color: #fff;
+  border-radius: 50%; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; pointer-events: none;
+  box-shadow: 0 1px 4px rgba(255,71,119,0.4);
+}
+
+.fill-handle {
+  position: absolute;
+  width: 10px; height: 10px;
+  background: var(--primary);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  cursor: crosshair;
+  z-index: 10;
+  display: none;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(255,107,157,0.4);
+}
+
+.stats-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.stat {
+  flex: 1; background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 16px 18px; text-align: center;
+  border: 1.5px solid var(--border);
+}
+.stat-val { font-size: 26px; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 12px; color: var(--text2); margin-top: 2px; font-weight: 500; }
+.stat.danger .stat-val { color: var(--danger); }
+.stat.success .stat-val { color: #6db888; }
+
+.cell-ov-edit {
+  height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+  cursor: grab; word-break: break-word;
+  white-space: normal; padding: 4px 6px;
+}
+.cell-ov-edit span {
+  text-align: center; width: 100%;
+}
+.cell-ov-edit:hover {
+  box-shadow: inset 0 0 0 2px #ffb3c6;
+}
+
+.cell-ov-conflict {
+  color: var(--danger); background: var(--danger-bg); text-align: center;
+  border: 2px solid var(--danger) !important; font-weight: 600; cursor: pointer;
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  word-break: break-word;
+}
+.cell-ov-conflict:hover { opacity: 0.85; }
+
+.conflict-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.conflict-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px; background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); box-shadow: var(--shadow); font-size: 13px;
+}
+.conflict-item .ci-name { color: var(--danger); font-weight: 700; }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.35); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; animation: fadeIn .2s;
+}
+.modal {
+  background: var(--card); border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.15); padding: 28px;
+  max-width: 540px; width: 92%; animation: slideUp .2s;
+  border: 1.5px solid var(--border);
+}
+.modal h3 { font-size: 16px; margin-bottom: 20px; font-weight: 700; }
+.modal-section { margin-bottom: 20px; }
+.modal-section h4 { font-size: 13px; color: var(--text2); font-weight: 600; margin-bottom: 10px; }
+.modal-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.modal-row input { flex: 1; padding: 8px 14px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 13px; outline: none; font-family: inherit;
+  background: var(--card); color: var(--text); }
+.modal-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px;
+  background: var(--tag-bg); border: 1.5px solid var(--border); border-radius: 18px; font-size: 13px; font-weight: 500; }
+.tag .tag-act { cursor: pointer; color: var(--text2); font-size: 14px; line-height: 1; padding: 0 2px; }
+.tag .tag-act:hover { color: var(--danger); }
+
+/* 管理弹窗标签页 */
+.manage-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-shrink:0; }
+.mtab {
+  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--card);
+  color: var(--text2); transition: all .15s; font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.mtab:hover { border-color: var(--primary); color: var(--primary); background: var(--cell-hover-bg); }
+.mtab.active { background: var(--primary); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+
+/* 条件规则列表 */
+.cond-rule {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  border-radius: 8px; font-size: 13px; margin-top: 6px;
+  border: 1.5px solid var(--border);
+}
+#conditionRulesList { max-height: 200px; overflow-y: auto; padding-right: 2px; }
+.manage-panel { max-height: 60vh; overflow-y: auto; }
+.cond-rule .cond-text { flex: 1; font-weight: 600; color: var(--text); }
+.cond-rule .cond-act { cursor: pointer; color: var(--text2); font-size: 14px; padding: 0 4px; }
+.cond-rule .cond-act:hover { color: var(--primary); }
+.cond-rule .cond-act.del:hover { color: var(--danger); }
+
+/* 条件格式单元格深底白字 */
+.cell-ov-edit[style*="color"] {
+  font-weight: 700 !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.resolve-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.resolve-opt { display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border: 1.5px solid var(--border); border-radius: 10px;
+  cursor: pointer; transition: all .2s; }
+.resolve-opt:hover { border-color: var(--primary); background: var(--cell-hover-bg); }
+.resolve-opt.selected { border-color: var(--primary); background: var(--cell-select-bg); }
+.resolve-gname { font-weight: 700; font-size: 14px; }
+.resolve-note { font-size: 12px; color: var(--text2); }
+
+.toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  background: var(--primary); color: #fff; padding: 10px 28px; border-radius: 22px;
+  font-size: 13px; z-index: 300; animation: fadeIn .2s; pointer-events: none;
+  transition: opacity .3s; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+}
+
+.schedule-table tr.add-row td {
+  height: 28px; padding: 4px; border: 1px dashed var(--cell-border);
+  transition: background .15s; cursor: pointer;
+}
+.schedule-table tr.add-row td:hover { background: var(--cell-hover-bg); }
+.schedule-table tr.add-row .add-hint {
+  font-size: 12px; color: var(--primary); font-weight: 600;
+}
+.schedule-table:hover tr.add-row .add-hint,
+.schedule-table tr.add-row:hover .add-hint {
+  display: inline;
+}
+
+.schedule-table tr.section-row td {
+  background: var(--section-bg); font-weight: 700; color: var(--primary);
+}
+
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+</style></head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="logo"><span class="logo-dot"></span>🎀 视频排班汇总</div>
+    <div class="week-nav">
+      <button class="btn btn-g" onclick="prevWeek()" style="padding:2px 8px;font-size:14px;">◀</button>
+      <span id="weekLabel" style="font-size:13px;font-weight:500;min-width:110px;text-align:center;cursor:pointer;" onclick="document.getElementById('weekDateInput').showPicker()" title="点击选择日期"></span>
+      <span id="weekBadge" style="font-size:10px;background:#ff6b9d;color:#fff;padding:1px 6px;border-radius:8px;font-weight:600;display:none;">排班周</span>
+      <input type="date" id="weekDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" onchange="jumpToWeek(this.value)">
+      <button class="btn btn-g" onclick="nextWeek()" style="padding:2px 8px;font-size:14px;">▶</button>
+    </div>
+  </div>
+  <div class="topbar-r">
+    <span id="undoHint" style="font-size:12px;color:var(--text2);margin-right:8px;"></span>
+    <button class="btn btn-g" onclick="openManageModal()">⚙ 管理</button>
+    <button class="btn" onclick="exportImage()">🖼 导出图片</button>
+    <button class="btn" onclick="copyImageToClipboard()">📋 复制图片</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="group-tabs" id="groupTabs"></div>
+
+  <div id="editPanel">
+    <div class="hint-bar">
+      <span>点击选中 · 拖拽选区域 · 双击编辑</span>
+      <kbd>Ctrl+C</kbd> 复制 <kbd>Ctrl+V</kbd> 粘贴 <kbd>Ctrl+D</kbd> 填充
+      <kbd>Delete</kbd> 清空 <kbd>Ctrl+Z</kbd> 撤销 <kbd>Ctrl+Y</kbd> 重做
+      <span class="hint-spacer"></span>
+      <button class="btn" style="font-size:12px;padding:3px 10px;" onclick="clearGroup()">清空当前组</button>
+    </div>
+    <div class="table-card" id="tableCard">
+      <div class="fill-handle" id="fillHandle"></div>
+      <div class="table-wrap">
+        <table class="schedule-table" id="editTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <div id="overviewPanel" style="display:none">
+    <div class="stats-row" id="statsRow"></div>
+    <div id="overviewColors" style="margin-bottom:8px;font-size:12px;color:var(--text2)"></div>
+    <div id="overviewModeToggle" style="margin-bottom:8px;display:none;">
+      <button class="btn" id="ovModeBtn" onclick="toggleOverviewMode()" style="font-size:11px;padding:4px 12px;">🎨 按条件着色</button>
+    </div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table class="schedule-table" id="overviewTable"></table>
+      </div>
+    </div>
+    <div id="conflictSection" style="display:none">
+      <div style="font-weight:600;margin:16px 0 8px;font-size:14px;">
+        待解决冲突 <span style="color:var(--danger)" id="conflictBadge"></span>
+      </div>
+      <div class="conflict-list" id="conflictList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 管理弹窗 -->
+<div class="modal-overlay" id="manageModal" style="display:none">
+  <div class="modal" style="max-width:600px;">
+    <h3>管理</h3>
+    <div class="manage-tabs" id="manageTabs">
+      <button class="mtab active" onclick="switchManageTab('people')">👤 人员</button>
+      <button class="mtab" onclick="switchManageTab('groups')">👥 小组</button>
+      <button class="mtab" onclick="switchManageTab('conditions')">🎨 条件</button>
+      <button class="mtab" onclick="switchManageTab('theme')">🖌 主题</button>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:12px;" id="manageHint">常用人员模板，新周初始化用；不影响已有各周。</p>
+
+    <!-- Tab: 人员 -->
+    <div class="manage-panel" id="panelPeople">
+      <div class="modal-section">
+        <h4>内部人员</h4>
+        <div class="modal-row">
+          <input type="text" id="newInternalInput" placeholder="输入姓名，回车添加" onkeydown="if(event.key==='Enter' && !event.isComposing)addPerson('internal')">
+          <button class="btn btn-p" onclick="addPerson('internal')">添加</button>
+        </div>
+        <div class="tag-row" id="manageInternalTags"></div>
+      </div>
+      <div class="modal-section">
+        <h4>外协人员</h4>
+        <div class="modal-row">
+          <input type="text" id="newExternalInput" placeholder="输入姓名，回车添加" onkeydown="if(event.key==='Enter' && !event.isComposing)addPerson('external')">
+          <button class="btn btn-p" onclick="addPerson('external')">添加</button>
+        </div>
+        <div class="tag-row" id="manageExternalTags"></div>
+      </div>
+    </div>
+
+    <!-- Tab: 小组 -->
+    <div class="manage-panel" id="panelGroups" style="display:none">
+      <div class="modal-section">
+        <div class="modal-row">
+          <input type="text" id="newGroupInput" placeholder="输入小组名，回车添加" onkeydown="if(event.key==='Enter' && !event.isComposing)addGroup()">
+          <button class="btn btn-p" onclick="addGroup()">添加</button>
+        </div>
+        <div class="tag-row" id="manageGroupTags"></div>
+      </div>
+    </div>
+
+    <!-- Tab: 条件格式 -->
+    <div class="manage-panel" id="panelConditions" style="display:none">
+      <p style="font-size:11px;color:var(--text2);margin-bottom:10px;">内容包含指定文字时自动着色。总览和小组表均生效。</p>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <input type="text" id="newCondText" placeholder="包含文字" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter' && !event.isComposing)addConditionRule()">
+        <button class="btn btn-p" onclick="addConditionRule()" style="flex-shrink:0;">添加</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="display:flex;gap:4px;flex-shrink:0;" id="colorSeriesBtns"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;flex:1;" id="presetColors"></div>
+        <div style="position:relative;flex-shrink:0;">
+          <button id="condColorBtn" style="width:30px;height:30px;border-radius:6px;background:#ef4444;border:1.5px solid var(--border);cursor:pointer;padding:0;" onclick="toggleCondColorPicker(event)" title="更多颜色"></button>
+          <div id="condColorPicker" style="display:none;position:absolute;top:36px;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:300;min-width:180px;">
+            <div id="condColorGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px;"></div>
+            <button class="btn btn-p" style="width:100%;font-size:12px;padding:4px 0;" onclick="closeCondColorPicker()">完成</button>
+          </div>
+
+        </div>
+      </div>
+      <div id="conditionRulesList"></div>
+    </div>
+
+    <!-- Tab: 主题 -->
+    <div class="manage-panel" id="panelTheme" style="display:none">
+      <p style="font-size:11px;color:var(--text2);margin-bottom:12px;">选择界面配色和字体</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="themeOptions"></div>
+    </div>
+
+    <div style="text-align:right;margin-top:16px;"><button class="btn" onclick="closeManageModal()">关闭</button></div>
+  </div>
+</div>
+
+<!-- 裁决弹窗 -->
+<div class="modal-overlay" id="resolveModal" style="display:none">
+  <div class="modal">
+    <h3>解决排班冲突</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="resolveInfo"></p>
+    <div class="resolve-options" id="resolveOptions"></div>
+    <div style="text-align:right"><button class="btn" onclick="closeResolveModal()">取消</button></div>
+  </div>
+</div>
+
+<!-- 总览拖拽操作弹窗 -->
+<div class="modal-overlay" id="ovActionModal" style="display:none">
+  <div class="modal">
+    <h3>目标位置已有内容</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="ovActionInfo"></p>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button class="btn btn-p" onclick="ovActionSwap()">🔄 交换</button>
+      <button class="btn btn-p" style="background:linear-gradient(135deg,#f59e0b,#f59e0b);" onclick="ovActionJoin()">➕ 加入</button>
+      <button class="btn" onclick="ovActionCancel()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================= 数据（本地+远程同步） =========================
+const STORAGE_KEY = 'schedule_v4';
+const API_BASE = window.location.origin;
+const COLORS = ['#4f46e5','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316'];
+const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日'];
+
+let data = defaultData();
+let serverUpdated = 0;
+let pollingTimer = null;
+let currentWeek = getMonday(new Date(Date.now() + 7*86400000)); // 默认下一周
+let activeGroupId = null;
+let weekActiveGroup = {}; // 记每周围活跃小组，切回来时恢复
+let resolveTarget = null;
+let ovConditionMode = false; // 总览表着色模式：false=按小组, true=按条件
+
+// 选区
+let sel = null;        // { r1, c1, r2, c2 }  主选区
+let selAnchor = null;
+let selDragging = false;
+let activeCell = null;
+let selExtra = new Set();  // Ctrl+点击追加的单元格 "r,c"
+
+// 编辑
+let editing = null;    // { personId, dateStr, el }
+
+// 内部剪贴板
+let clipData = null;   // { rows, cols, data: [[val,...],...] }
+
+// 撤销/重做
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 100;
+
+// 填充柄
+let fillDragging = false;
+let fillStart = null;
+let fillEnd = null;
+
+function defaultData() {
+  return {
+    internalPeople: [],
+    externalPeople: [],
+    groups: [
+      { id:'g1', name:'一组' }, { id:'g2', name:'二组' },
+      { id:'g3', name:'三组' }, { id:'g4', name:'四组' },
+    ],
+    conditionRules: [],
+    schedules: {},
+    resolutions: {},
+  };
+}
+
+async function loadData() {
+  // 先读本地缓存
+  try {
+    const r = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (r) {
+      if (r.people && !r.internalPeople) { r.internalPeople = r.people; r.externalPeople = []; delete r.people; }
+      if (!r.internalPeople) r.internalPeople = defaultData().internalPeople;
+      if (!r.externalPeople) r.externalPeople = defaultData().externalPeople;
+      if (!r.conditionRules) r.conditionRules = [];
+      data = r;
+    }
+  } catch(e) { data = defaultData(); }
+
+  // 尝试从服务器加载
+  try {
+    const res = await fetch(`${API_BASE}/api/state`);
+    if (res.ok) {
+      const d = await res.json();
+      serverUpdated = d._updated || 0;
+      // 合并本地新增字段，防止服务器覆盖
+      if (!d.conditionRules && data.conditionRules) d.conditionRules = data.conditionRules;
+      if (!d.weekPeople && data.weekPeople) d.weekPeople = data.weekPeople;
+      data = d;
+      saveLocal();
+    }
+  } catch(e) { /* 离线模式 */ }
+  startPolling();
+}
+
+function saveData() {
+  
+  saveLocal();
+  pushToServer();
+}
+
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+async function pushToServer() {
+  try {
+    const payload = { ...data };
+    const res = await fetch(`${API_BASE}/api/state`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const r = await res.json();
+      serverUpdated = r._updated || Date.now();
+    }
+  } catch(e) {}
+}
+
+function startPolling() {
+  if (pollingTimer) clearInterval(pollingTimer);
+  pollingTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/ping`);
+      if (res.ok) {
+        const { _updated } = await res.json();
+        if (_updated > serverUpdated) {
+          const full = await fetch(`${API_BASE}/api/state`);
+          if (full.ok) {
+            const fresh = await full.json();
+            serverUpdated = fresh._updated || _updated;
+            // 合并本地新增字段
+            if (!fresh.conditionRules && data.conditionRules) fresh.conditionRules = data.conditionRules;
+            if (!fresh.weekPeople && data.weekPeople) fresh.weekPeople = data.weekPeople;
+            data = fresh;
+            saveLocal();
+            renderAll();
+          }
+        }
+      }
+    } catch(e) {}
+  }, 3000);
+}
+
+// ========================= 工具 =========================
+function getMonday(d) {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() - day + (day===0?-6:1));
+  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+}
+function fmtDate(d) { return `${d.getMonth()+1}/${d.getDate()}`; }
+function fmtFull(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function weekDates(monday) {
+  const ds = [];
+  for (let i=0;i<7;i++) { const d=new Date(monday); d.setDate(monday.getDate()+i); ds.push(d); }
+  return ds;
+}
+function wsKey() { return fmtFull(currentWeek); }
+function skey(personId, dateStr) { return `${personId}_${dateStr}`; }
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// 默认人员（常用模板），管理弹窗里编辑，新周首次打开自动拷贝
+function allPeople() {
+  return [
+    ...data.internalPeople.map(p => ({...p, _cat: 'internal'})),
+    ...data.externalPeople.map(p => ({...p, _cat: 'external'})),
+  ];
+}
+
+// 当前周的人员列表 —— 每周独立
+// 锁规则：有排班数据 或 被增删改过 → 锁定，不再从模板同步
+// 如果人员列表与模板完全一致且无排班数据 → 不锁定，每次切过来重新从模板拿最新
+function weekPeople() {
+  const ws = wsKey();
+  if (!data.weekPeople) data.weekPeople = {};
+  if (!data.weekPeopleLocked) data.weekPeopleLocked = {};
+
+  if (data.weekPeople[ws]) {
+    // 已锁定 → 保持不变
+    if (data.weekPeopleLocked[ws]) return data.weekPeople[ws];
+    // 有排班数据 → 自动锁定
+    if (hasWeekData(ws)) {
+      data.weekPeopleLocked[ws] = true;
+      return data.weekPeople[ws];
+    }
+    // 未锁定且无数据 → 重新从模板同步
+    data.weekPeople[ws] = buildPeopleFromTemplate();
+    return data.weekPeople[ws];
+  }
+
+  // 首次访问
+  data.weekPeople[ws] = buildPeopleFromTemplate();
+  return data.weekPeople[ws];
+}
+
+function buildPeopleFromTemplate() {
+  return [
+    ...data.internalPeople.map(p => ({ id: p.id, name: p.name, _cat: 'internal' })),
+    ...data.externalPeople.map(p => ({ id: p.id, name: p.name, _cat: 'external' })),
+  ];
+}
+
+function hasWeekData(ws) {
+  if (!data.schedules[ws]) return false;
+  return Object.values(data.schedules[ws]).some(g => Object.keys(g).length > 0);
+}
+
+// 标记当前周已锁定（增删改人员时调用）
+function lockWeekPeople() {
+  if (!data.weekPeopleLocked) data.weekPeopleLocked = {};
+  data.weekPeopleLocked[wsKey()] = true;
+  saveData();
+}
+
+// ========================= 每周期小组（模板拷贝） =========================
+function weekGroups() {
+  const ws = wsKey();
+  if (!data.weekGroups) data.weekGroups = {};
+  if (!data.weekGroupLocked) data.weekGroupLocked = {};
+  const scheduleWeek = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+
+  if (data.weekGroups[ws]) {
+    // 历史周 → 永久锁定，不跟模板
+    if (ws < scheduleWeek) {
+      data.weekGroupLocked[ws] = true;
+      return data.weekGroups[ws];
+    }
+    // 排班周/未来周：已锁定或有数据 → 保持
+    if (data.weekGroupLocked[ws]) return data.weekGroups[ws];
+    if (hasWeekData(ws)) { data.weekGroupLocked[ws] = true; return data.weekGroups[ws]; }
+    // 未锁定 → 从模板同步
+    data.weekGroups[ws] = data.groups.map(g => ({ ...g }));
+    return data.weekGroups[ws];
+  }
+  // 首次访问
+  data.weekGroups[ws] = data.groups.map(g => ({ ...g }));
+  // 历史周首次即锁定
+  if (ws < scheduleWeek) data.weekGroupLocked[ws] = true;
+  return data.weekGroups[ws];
+}
+
+function lockWeekGroups() {
+  if (!data.weekGroupLocked) data.weekGroupLocked = {};
+  data.weekGroupLocked[wsKey()] = true;
+  saveData();
+}
+
+// 在所有列表（默认+各周）中查找人员信息
+function findPersonInAll(id) {
+  // 默认人员
+  let p = data.internalPeople.find(x => x.id === id);
+  if (p) return { name: p.name, cat: 'internal' };
+  p = data.externalPeople.find(x => x.id === id);
+  if (p) return { name: p.name, cat: 'external' };
+  // 各周数据
+  if (data.weekPeople) {
+    for (const ws of Object.keys(data.weekPeople)) {
+      p = data.weekPeople[ws].find(x => x.id === id);
+      if (p) return { name: p.name, cat: p._cat };
+    }
+  }
+  return null;
+}
+
+function findPersonList(id) {
+  // 先在当前周找
+  const wp = weekPeople();
+  const wpFound = wp.find(p => p.id === id);
+  if (wpFound) return { list: wp, cat: wpFound._cat, weekPeople: true };
+
+  // 再在默认人员中找
+  if (data.internalPeople.find(p => p.id === id)) return { list: data.internalPeople, cat: 'internal' };
+  if (data.externalPeople.find(p => p.id === id)) return { list: data.externalPeople, cat: 'external' };
+  return null;
+}
+
+function getCell(personId, dateStr) {
+  const ws = wsKey();
+  if (!data.schedules[ws] || !data.schedules[ws][activeGroupId]) return null;
+  return data.schedules[ws][activeGroupId][skey(personId, dateStr)] || null;
+}
+
+function setCellValue(personId, dateStr, val) {
+  const ws = wsKey();
+  if (!data.schedules[ws]) data.schedules[ws] = {};
+  if (!data.schedules[ws][activeGroupId]) data.schedules[ws][activeGroupId] = {};
+  const key = skey(personId, dateStr);
+  if (val) {
+    data.schedules[ws][activeGroupId][key] = { note: val };
+  } else {
+    delete data.schedules[ws][activeGroupId][key];
+  }
+}
+
+function clearResolution(personId, dateStr) {
+  const ws = wsKey();
+  if (data.resolutions[ws]) {
+    delete data.resolutions[ws][skey(personId, dateStr)];
+  }
+}
+
+// 检查某个小组是否被采纳（裁决后）
+function isGroupAdopted(personId, dateStr, groupId) {
+  const ws = wsKey();
+  const res = data.resolutions[ws] || {};
+  const key = skey(personId, dateStr);
+  if (!res[key]) return null; // 无裁决
+  const resolved = Array.isArray(res[key]) ? res[key] : [res[key]];
+  return resolved.includes(groupId);
+}
+
+// ========================= Toast =========================
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 1500);
+}
+
+// ========================= 撤销/重做 =========================
+function pushUndo(changes) {
+  if (changes.length === 0) return;
+  undoStack.push({ changes, groupId: activeGroupId, week: wsKey() });
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+  updateUndoHint();
+}
+
+function undo() {
+  if (editing) commitEdit();
+  if (undoStack.length === 0) { toast('没有可撤销的操作'); return; }
+  const action = undoStack.pop();
+  redoStack.push(action);
+
+  // 切到对应组和周
+  const needRerender = (action.groupId !== activeGroupId || action.week !== wsKey());
+  if (action.week !== wsKey()) {
+    currentWeek = new Date(action.week + 'T00:00:00');
+    updateWeekUI();
+  }
+  if (action.groupId !== activeGroupId) {
+    activeGroupId = action.groupId;
+  }
+
+  action.changes.forEach(ch => {
+    if (ch.groupId) {
+      setGroupCell(ch.groupId, ch.personId, ch.dateStr, ch.oldVal);
+    } else {
+      setCellValue(ch.personId, ch.dateStr, ch.oldVal);
+    }
+  });
+  saveData();
+  clearSelection();
+  updateUndoHint();
+  if (needRerender) renderAll(); else if (activeGroupId === '__overview__') renderOverview(); else renderEditTable();
+  toast('已撤销');
+}
+
+function redo() {
+  if (editing) commitEdit();
+  if (redoStack.length === 0) { toast('没有可重做的操作'); return; }
+  const action = redoStack.pop();
+  undoStack.push(action);
+
+  const needRerender = (action.groupId !== activeGroupId || action.week !== wsKey());
+  if (action.week !== wsKey()) {
+    currentWeek = new Date(action.week + 'T00:00:00');
+    updateWeekUI();
+  }
+  if (action.groupId !== activeGroupId) {
+    activeGroupId = action.groupId;
+  }
+
+  action.changes.forEach(ch => {
+    if (ch.groupId) {
+      setGroupCell(ch.groupId, ch.personId, ch.dateStr, ch.newVal);
+    } else {
+      setCellValue(ch.personId, ch.dateStr, ch.newVal);
+    }
+  });
+  saveData();
+  clearSelection();
+  updateUndoHint();
+  if (needRerender) renderAll(); else if (activeGroupId === '__overview__') renderOverview(); else renderEditTable();
+  toast('已重做');
+}
+
+function updateUndoHint() {
+  const el = document.getElementById('undoHint');
+  el.textContent = undoStack.length > 0 ? `可撤销 ${undoStack.length} 步` : '';
+}
+
+// ========================= 选区 =========================
+function clearSelection() {
+  sel = null; selAnchor = null; activeCell = null; selExtra = new Set();
+  updateFillHandle();
+}
+
+function selectCell(r, c) {
+  sel = { r1: r, c1: c, r2: r, c2: c };
+  selAnchor = { r, c };
+  activeCell = { r, c };
+}
+
+function selectRange(r, c) {
+  if (!selAnchor) { selAnchor = { r, c }; }
+  sel = {
+    r1: Math.min(selAnchor.r, r), c1: Math.min(selAnchor.c, c),
+    r2: Math.max(selAnchor.r, r), c2: Math.max(selAnchor.c, c),
+  };
+}
+
+function isSelected(r, c) {
+  if (selExtra.has(`${r},${c}`)) return true;
+  if (!sel) return false;
+  return r >= sel.r1 && r <= sel.r2 && c >= sel.c1 && c <= sel.c2;
+}
+
+function getSelectedCells() {
+  const people = weekPeople();
+  const cells = [];
+  const added = new Set();
+
+  // 主选区
+  if (sel) {
+    for (let r = sel.r1; r <= sel.r2; r++) {
+      for (let c = sel.c1; c <= sel.c2; c++) {
+        if (r < people.length && c < 7) {
+          cells.push({ r, c, person: people[r], dateStr: fmtFull(weekDates(currentWeek)[c]) });
+          added.add(`${r},${c}`);
+        }
+      }
+    }
+  }
+  // Ctrl+点击追加的格子
+  selExtra.forEach(key => {
+    if (!added.has(key)) {
+      const [r, c] = key.split(',').map(Number);
+      if (r < people.length && c < 7) {
+        cells.push({ r, c, person: people[r], dateStr: fmtFull(weekDates(currentWeek)[c]) });
+      }
+    }
+  });
+  return cells;
+}
+
+// ========================= 总览表选区 =========================
+function highlightOverviewSelection() {
+  const table = document.getElementById('overviewTable');
+  if (!table) return;
+  table.querySelectorAll('.cell.selected').forEach(el => el.classList.remove('selected'));
+  if (!sel) return;
+  for (let r = sel.r1; r <= sel.r2; r++) {
+    for (let c = sel.c1; c <= sel.c2; c++) {
+      const el = table.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+      if (el) el.classList.add('selected');
+    }
+  }
+  selExtra.forEach(key => {
+    const [r, c] = key.split(',').map(Number);
+    const el = table.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+    if (el) el.classList.add('selected');
+  });
+}
+
+function getOverviewSelectedCells() {
+  const people = weekPeople();
+  const dates = weekDates(currentWeek);
+  const cells = [];
+  const added = new Set();
+  const table = document.getElementById('overviewTable');
+  if (!table) return cells;
+  if (sel) {
+    for (let r = sel.r1; r <= sel.r2; r++) {
+      for (let c = sel.c1; c <= sel.c2; c++) {
+        if (r < people.length && c < 7) {
+          const el = table.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+          const gid = el ? el.dataset.gid : '';
+          cells.push({ r, c, person: people[r], dateStr: fmtFull(dates[c]), gid });
+          added.add(`${r},${c}`);
+        }
+      }
+    }
+  }
+  selExtra.forEach(key => {
+    if (!added.has(key)) {
+      const [r, c] = key.split(',').map(Number);
+      if (r < people.length && c < 7) {
+        const el = table.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+        const gid = el ? el.dataset.gid : '';
+        cells.push({ r, c, person: people[r], dateStr: fmtFull(dates[c]), gid });
+      }
+    }
+  });
+  return cells;
+}
+
+// ========================= 剪贴板 =========================
+function copySelection() {
+  const isOv = activeGroupId === '__overview__';
+  if (isOv) return copyOverviewSelection();
+
+  const cells = getSelectedCells();
+  if (cells.length === 0) return;
+
+  // 计算选中区域的包围盒
+  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+  cells.forEach(({ r, c }) => {
+    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+    minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+  });
+
+  const rows = maxR - minR + 1;
+  const cols = maxC - minC + 1;
+  const d = Array.from({ length: rows }, () => Array(cols).fill(''));
+
+  cells.forEach(({ r, c, person }) => {
+    const entry = getCell(person.id, fmtFull(weekDates(currentWeek)[c]));
+    d[r - minR][c - minC] = entry ? entry.note : '';
+  });
+
+  clipData = { rows, cols, data: d };
+  toast(`已复制 ${cells.length} 个单元格`);
+}
+
+function copyOverviewSelection() {
+  const cells = getOverviewSelectedCells();
+  if (cells.length === 0) return;
+  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+  cells.forEach(({ r, c }) => { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); });
+  const rows = maxR - minR + 1, cols = maxC - minC + 1;
+  const d = Array.from({ length: rows }, () => Array(cols).fill(''));
+  cells.forEach(({ r, c, person, dateStr }) => {
+    const info = getScheduleInfo(person.id, dateStr);
+    const note = (info.note) || '';
+    d[r - minR][c - minC] = note;
+  });
+  clipData = { rows, cols, data: d };
+  toast(`已复制 ${cells.length} 个单元格`);
+}
+
+async function pasteToSelection() {
+  const isOv = activeGroupId === '__overview__';
+  if (isOv) return pasteOverviewSelection();
+
+  const dates = weekDates(currentWeek);
+  let pasteRows, pasteCols, pasteData;
+
+  // 优先用内部剪贴板
+  if (clipData) {
+    pasteRows = clipData.rows;
+    pasteCols = clipData.cols;
+    pasteData = clipData.data;
+  } else {
+    // 尝试从系统剪贴板读取
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+      pasteData = lines.map(l => l.split('\t'));
+      pasteRows = pasteData.length;
+      pasteCols = Math.max(...pasteData.map(r => r.length));
+      // 填充短行
+      pasteData.forEach(r => { while (r.length < pasteCols) r.push(''); });
+      clipData = { rows: pasteRows, cols: pasteCols, data: pasteData };
+    } catch(e) {
+      return;
+    }
+  }
+
+  if (!pasteData || pasteRows === 0) return;
+
+  // 获取所有选中的单元格
+  const selected = getSelectedCells();
+  const people = weekPeople();
+
+  if (selected.length > 0) {
+    // 有选中格子 → 粘贴到每个选中的格子
+    const isSingle = pasteRows === 1 && pasteCols === 1;
+    const changes = [];
+    let pi = 0;
+    selected.forEach(({ person, dateStr }) => {
+      let newVal;
+      if (isSingle) {
+        // 单值：全部填入相同内容（保留换行格式）
+        newVal = pasteData[0][0];
+      } else {
+        const dr = pi % pasteRows;
+        const dc = pi % pasteCols;
+        newVal = (pasteData[dr] && pasteData[dr][dc]) ? pasteData[dr][dc] : '';
+      }
+      const oldEntry = getCell(person.id, dateStr);
+      const oldVal = oldEntry ? oldEntry.note : '';
+
+      if (oldVal !== newVal) {
+        setCellValue(person.id, dateStr, newVal);
+        changes.push({ personId: person.id, dateStr, oldVal, newVal });
+      }
+      pi++;
+    });
+
+    if (changes.length > 0) {
+      changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+      pushUndo(changes);
+      saveData();
+    }
+    renderEditTable();
+    toast(`已粘贴到 ${changes.length} 个单元格`);
+    return;
+  }
+
+  // 无选中 → 网格粘贴
+  let startR, startC;
+  if (activeCell) { startR = activeCell.r; startC = activeCell.c; }
+  else if (sel) { startR = sel.r1; startC = sel.c1; }
+  else { startR = 0; startC = 0; }
+
+  const changes = [];
+  for (let dr = 0; dr < pasteRows; dr++) {
+    for (let dc = 0; dc < pasteCols; dc++) {
+      const r = startR + dr;
+      const c = startC + dc;
+      if (r >= people.length || c >= 7) continue;
+
+      const personId = people[r].id;
+      const dateStr = fmtFull(dates[c]);
+      const oldEntry = getCell(personId, dateStr);
+      const oldVal = oldEntry ? oldEntry.note : '';
+      const newVal = (pasteData[dr] && pasteData[dr][dc]) ? pasteData[dr][dc].trim() : '';
+
+      if (oldVal !== newVal) {
+        setCellValue(personId, dateStr, newVal);
+        changes.push({ personId, dateStr, oldVal, newVal });
+      }
+    }
+  }
+
+  if (changes.length > 0) {
+    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+    pushUndo(changes);
+    saveData();
+  }
+}
+
+async function pasteOverviewSelection() {
+  let pasteRows, pasteCols, pasteData;
+  if (clipData) { pasteRows = clipData.rows; pasteCols = clipData.cols; pasteData = clipData.data; }
+  else {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+      pasteData = lines.map(l => l.split('\t'));
+      pasteRows = pasteData.length; pasteCols = Math.max(...pasteData.map(r => r.length));
+      pasteData.forEach(r => { while (r.length < pasteCols) r.push(''); });
+      clipData = { rows: pasteRows, cols: pasteCols, data: pasteData };
+    } catch(e) { return; }
+  }
+  if (!pasteData || pasteRows === 0) return;
+
+  const selected = getOverviewSelectedCells();
+  if (selected.length === 0) return;
+  const isSingle = pasteRows === 1 && pasteCols === 1;
+  const changes = [];
+  const ws = wsKey();
+
+  selected.forEach(({ person, dateStr, gid }, i) => {
+    const newVal = isSingle ? pasteData[0][0] : (pasteData[i % pasteRows] && pasteData[i % pasteRows][i % pasteCols]) || '';
+    const oldEntry = getGroupCell(gid || (weekGroups()[0] ? weekGroups()[0].id : ''), person.id, dateStr);
+    const oldVal = oldEntry ? oldEntry.note : '';
+    if (oldVal !== newVal) {
+      const groupId = gid || (weekGroups()[0] ? weekGroups()[0].id : '');
+      if (!data.schedules[ws]) data.schedules[ws] = {};
+      if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
+      const key = skey(person.id, dateStr);
+      if (newVal) data.schedules[ws][groupId][key] = { note: newVal };
+      else delete data.schedules[ws][groupId][key];
+      changes.push({ personId: person.id, dateStr, oldVal, newVal });
+    }
+  });
+  if (changes.length > 0) {
+    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+    pushUndo(changes);
+    saveData();
+    renderAll();
+    toast(`已粘贴 ${changes.length} 个单元格`);
+    // 恢复选区高亮
+    highlightOverviewSelection();
+  }
+}
+
+// ========================= 填充 =========================
+function fillDown() {
+  if (!sel || (sel.r2 - sel.r1 === 0 && sel.c2 - sel.c1 === 0)) return;
+
+  const dates = weekDates(currentWeek);
+  const changes = [];
+
+  const people = weekPeople();
+  // 对每一列，用该列第一行的值填充到下面所有行
+  for (let c = sel.c1; c <= sel.c2; c++) {
+    if (sel.r1 >= people.length) break;
+    const srcEntry = getCell(people[sel.r1].id, fmtFull(dates[c]));
+    const srcVal = srcEntry ? srcEntry.note : '';
+    const dateStr = fmtFull(dates[c]);
+
+    for (let r = sel.r1 + 1; r <= sel.r2; r++) {
+      if (r >= people.length) break;
+      const personId = people[r].id;
+      const oldEntry = getCell(personId, dateStr);
+      const oldVal = oldEntry ? oldEntry.note : '';
+      if (oldVal !== srcVal) {
+        setCellValue(personId, dateStr, srcVal);
+        changes.push({ personId, dateStr, oldVal, newVal: srcVal });
+      }
+    }
+  }
+
+  if (changes.length > 0) {
+    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+    pushUndo(changes);
+    saveData();
+    renderEditTable();
+    toast('已填充');
+  }
+}
+
+// 填充柄拖拽填充
+function startFillDrag(e) {
+  if (!sel) return;
+  fillDragging = true;
+  fillStart = { r: sel.r2, c: sel.c2 };
+  fillEnd = null;
+  e.preventDefault();
+}
+
+function updateFillDrag(e) {
+  if (!fillDragging) return;
+
+  // 根据鼠标位置估算目标行列
+  let cellEl = document.elementFromPoint(e.clientX, e.clientY);
+  if (!cellEl) cellEl = estimateCellFromPoint(e.clientX, e.clientY);
+  if (!cellEl) return;
+
+  const endR = parseInt(cellEl.dataset.r);
+  const endC = parseInt(cellEl.dataset.c);
+
+  // 限制在有效范围内
+  const people = weekPeople();
+  const clampedR = Math.max(0, Math.min(people.length - 1, endR));
+  const clampedC = Math.max(0, Math.min(6, endC));
+
+  fillEnd = { r: clampedR, c: clampedC };
+
+  // 预览高亮整个目标区域
+  renderEditTable();
+  const pr1 = Math.min(sel.r1, fillEnd.r);
+  const pc1 = Math.min(sel.c1, fillEnd.c);
+  const pr2 = Math.max(sel.r2, fillEnd.r);
+  const pc2 = Math.max(sel.c2, fillEnd.c);
+  if (pr2 > sel.r2 || pr1 < sel.r1 || pc2 > sel.c2 || pc1 < sel.c1) {
+    highlightFillPreview(pr1, pc1, pr2, pc2);
+  }
+}
+
+function endFillDrag() {
+  if (!fillDragging || !fillEnd) {
+    fillDragging = false; fillStart = null; fillEnd = null;
+    renderEditTable();
+    return;
+  }
+
+  const dates = weekDates(currentWeek);
+  const changes = [];
+  const people = weekPeople();
+  const maxR = people.length - 1;
+
+  // 填充范围（支持四向）
+  const fr1 = Math.min(sel.r1, fillEnd.r);
+  const fc1 = Math.min(sel.c1, fillEnd.c);
+  const fr2 = Math.max(sel.r2, fillEnd.r);
+  const fc2 = Math.max(sel.c2, fillEnd.c);
+
+  for (let r = fr1; r <= fr2; r++) {
+    for (let c = fc1; c <= fc2; c++) {
+      // 跳过原选区内的格子
+      if (r >= sel.r1 && r <= sel.r2 && c >= sel.c1 && c <= sel.c2) continue;
+      if (r > maxR || c > 6) continue;
+
+      // 源：按原选区循环映射
+      const srcR = sel.r1 + (((r - sel.r1) % (sel.r2 - sel.r1 + 1)) + (sel.r2 - sel.r1 + 1)) % (sel.r2 - sel.r1 + 1);
+      const srcC = sel.c1 + (((c - sel.c1) % (sel.c2 - sel.c1 + 1)) + (sel.c2 - sel.c1 + 1)) % (sel.c2 - sel.c1 + 1);
+
+      if (srcR > maxR || srcC > 6) continue;
+
+      const srcEntry = getCell(people[srcR].id, fmtFull(dates[srcC]));
+      const srcVal = srcEntry ? srcEntry.note : '';
+
+      const personId = people[r].id;
+      const dateStr = fmtFull(dates[c]);
+      const oldEntry = getCell(personId, dateStr);
+      const oldVal = oldEntry ? oldEntry.note : '';
+
+      if (oldVal !== srcVal) {
+        setCellValue(personId, dateStr, srcVal);
+        changes.push({ personId, dateStr, oldVal, newVal: srcVal });
+      }
+    }
+  }
+
+  if (changes.length > 0) {
+    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+    pushUndo(changes);
+    saveData();
+    toast(`已填充 ${changes.length} 个单元格`);
+  }
+
+  fillDragging = false; fillStart = null; fillEnd = null;
+  sel = { r1: fr1, c1: fc1, r2: fr2, c2: fc2 };
+  activeCell = { r: fr1, c: fc1 };
+  renderEditTable();
+}
+
+function highlightFillPreview(r1, c1, r2, c2) {
+  // 高亮填充预览范围（排除原选区）
+  const els = document.querySelectorAll('#editTable [data-r]');
+  els.forEach(el => {
+    const r = parseInt(el.dataset.r);
+    const c = parseInt(el.dataset.c);
+    // 在预览范围内但不在原选区内
+    if (r >= r1 && r <= r2 && c >= c1 && c <= c2 &&
+        !(r >= sel.r1 && r <= sel.r2 && c >= sel.c1 && c <= sel.c2)) {
+      el.classList.add('selected');
+      el.style.opacity = '0.5';
+    }
+  });
+}
+
+function updateFillHandle() {
+  const handle = document.getElementById('fillHandle');
+  if (!sel || (sel.r1 === sel.r2 && sel.c1 === sel.c2 && !sel)) {
+    handle.style.display = 'none';
+    return;
+  }
+
+  // 找右下角单元格
+  const cellEl = document.querySelector(`#editTable [data-r="${sel.r2}"][data-c="${sel.c2}"]`);
+  if (!cellEl) { handle.style.display = 'none'; return; }
+
+  const tableWrap = document.querySelector('.table-wrap');
+  const wrapRect = tableWrap.getBoundingClientRect();
+  const cellRect = cellEl.getBoundingClientRect();
+
+  handle.style.display = 'block';
+  handle.style.left = (cellRect.right - wrapRect.left - 4) + 'px';
+  handle.style.top = (cellRect.bottom - wrapRect.top - 4) + 'px';
+}
+
+// ========================= 渲染编辑表格 =========================
+function renderEditTable() {
+  const group = weekGroups().find(g => g.id === activeGroupId);
+  if (!group) return;
+
+  const gi = weekGroups().findIndex(g => g.id === activeGroupId);
+  const color = COLORS[gi % COLORS.length];
+  const dates = weekDates(currentWeek);
+
+  const people = weekPeople();
+  let html = '<thead><tr><th>姓名</th>';
+  dates.forEach((d, i) => html += `<th>${fmtDate(d)}<br><small>${DAY_NAMES[i]}</small></th>`);
+  html += '</tr></thead><tbody>';
+
+  if (people.length === 0) {
+    html += '<tr><td colspan="8" style="padding:40px;color:var(--text2);text-align:center;">暂无人员，点击下方添加</td></tr>';
+    html += `<tr class="add-row" onclick="quickAddPerson('internal')">
+      <td colspan="8" style="padding:4px;text-align:center;color:var(--text2);cursor:pointer;border:none;">
+        <span class="add-hint">+ 添加内部人员</span>
+      </td>
+    </tr>`;
+    html += `<tr class="add-row" onclick="quickAddPerson('external')">
+      <td colspan="8" style="padding:4px;text-align:center;color:var(--text2);cursor:pointer;border:none;background:#fefce8;">
+        <span class="add-hint">+ 添加外协人员</span>
+      </td>
+    </tr>`;
+  } else {
+    let lastCat = null;
+    people.forEach((person, r) => {
+      // 分类分隔行
+      if (person._cat !== lastCat) {
+        const label = person._cat === 'internal' ? '内部人员' : '外协人员';
+        html += `<tr class="section-row"><td colspan="8" style="padding:8px 16px;background:#f3f4f6;font-size:12px;font-weight:600;color:var(--text2);text-align:left;border-bottom:2px solid var(--border);">${label}</td></tr>`;
+        lastCat = person._cat;
+      }
+      html += `<tr class="${person._cat === 'external' ? 'row-external' : ''}"><td>${esc(person.name)}<span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${person.id}')" title="从本周移除">×</span></td>`;
+      dates.forEach((date, c) => {
+        const ds = fmtFull(date);
+        const entry = getCell(person.id, ds);
+        const val = entry ? entry.note : '';
+        const selClass = isSelected(r, c) ? ' selected' : '';
+        const activeClass = (activeCell && activeCell.r === r && activeCell.c === c) ? ' active-cell' : '';
+        const isEdit = editing && editing.personId === person.id && editing.dateStr === ds;
+        const editClass = isEdit ? ' editing' : '';
+        const emptyClass = (!val && !isEdit) ? ' cell-empty' : '';
+
+        // 检测与其他组的冲突
+        let conflictTooltip = '';
+        let isConflict = false;
+        let isOverridden = false; // 该组被裁决否决
+        if (val && !isEdit) {
+          const ws = wsKey();
+          const sched = data.schedules[ws] || {};
+          const key = skey(person.id, ds);
+          const conflicts = [];
+          weekGroups().forEach(g => {
+            if (g.id !== activeGroupId && sched[g.id] && sched[g.id][key]) {
+              conflicts.push(`${esc(g.name)}: ${esc(sched[g.id][key].note)}`);
+            }
+          });
+          if (conflicts.length > 0) {
+            // 检查裁决状态
+            const adopted = isGroupAdopted(person.id, ds, activeGroupId);
+            if (adopted === true) {
+              // 当前组被采用 → 不显示冲突
+            } else if (adopted === false) {
+              // 当前组未被采用，有其他组被采用 → 显示灰色（已覆盖）
+              isOverridden = true;
+              conflictTooltip = `裁决未采纳，已采用其他小组的安排`;
+            } else {
+              // 无裁决
+              isConflict = true;
+              conflictTooltip = `冲突: ${conflicts.join('; ')}`;
+            }
+          }
+        }
+
+        const condColor = getConditionColor(val);
+        const cellStyle = val && !isEdit
+          ? (isOverridden ? `color:#9ca3af;background:#f3f4f6;text-decoration:line-through;`
+              : condColor ? `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:700;`
+              : `color:${color};background:${color}15;`)
+          : '';
+        html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}"
+          data-r="${r}" data-c="${c}" data-pid="${person.id}" data-date="${ds}"
+          title="${esc(conflictTooltip)}"
+          style="position:relative;${cellStyle}">`;
+        if (isEdit) {
+          html += `<textarea placeholder="输入任务" id="editInput"></textarea>`;
+        } else {
+          html += esc(val || '-');
+          if (isConflict) {
+            html += `<span class="conflict-dot" title="${esc(conflictTooltip)}">!</span>`;
+          }
+        }
+        html += '</div></td>';
+      });
+      html += '</tr>';
+    });
+    // 底部始终显示两个添加按钮
+    html += `<tr class="add-row" onclick="quickAddPerson('internal')">
+      <td colspan="8" style="padding:4px;text-align:center;color:var(--text2);cursor:pointer;border:none;">
+        <span class="add-hint">+ 添加内部人员</span>
+      </td>
+    </tr>`;
+    html += `<tr class="add-row" onclick="quickAddPerson('external')">
+      <td colspan="8" style="padding:4px;text-align:center;color:var(--text2);cursor:pointer;border:none;background:#fefce8;">
+        <span class="add-hint">+ 添加外协人员</span>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody>';
+
+  document.getElementById('editTable').innerHTML = html;
+  updateFillHandle();
+
+  if (editing) {
+    const ta = document.getElementById('editInput');
+    if (ta) {
+      const entry = getCell(editing.personId, editing.dateStr);
+      ta.value = entry ? entry.note : '';
+      ta.focus();
+      ta.selectionStart = ta.value.length;
+    }
+  }
+
+  // 重新绑定填充柄事件
+  const handle = document.getElementById('fillHandle');
+  handle.onmousedown = startFillDrag;
+  handle.onmouseup = endFillDrag;
+}
+
+// ========================= 鼠标交互 =========================
+let clickTimer = null;
+let mouseDownCell = null;     // { r, c, personId, dateStr, el }
+let mouseMoved = false;
+let lastClickCell = null;
+
+// 拖拽移动
+let cellDrag = null;          // { personId, dateStr, r, c, val, sourceEl }
+let dragStarted = false;
+const DRAG_THRESHOLD = 5;
+const GRAB_EDGE = 6;          // 边缘多少像素内不算中心区
+
+// 判断鼠标是否在单元格中心区域（非边缘）
+function isInGrabZone(cellEl, e) {
+  const rect = cellEl.getBoundingClientRect();
+  const nearEdge =
+    e.clientX - rect.left < GRAB_EDGE ||
+    rect.right - e.clientX < GRAB_EDGE ||
+    e.clientY - rect.top < GRAB_EDGE ||
+    rect.bottom - e.clientY < GRAB_EDGE;
+  return !nearEdge;
+}
+
+function findCellAtPoint(x, y) {
+  // 使用 elementsFromPoint 获取该坐标上的所有元素（包括被 overflow 裁剪的）
+  const els = document.elementsFromPoint(x, y);
+  for (const el of els) {
+    const cell = el.closest('[data-r]');
+    if (cell) return cell;
+  }
+  return null;
+}
+
+// 当鼠标在表格外时，估算最近的有效行列
+function estimateCellFromPoint(x, y) {
+  const tableEl = document.getElementById('editTable');
+  if (!tableEl) return null;
+  const rect = tableEl.getBoundingClientRect();
+  const people = weekPeople();
+
+  let r, c;
+  // 估算行：计算相对于表格顶部的偏移
+  if (y < rect.top) {
+    r = 0;
+  } else if (y > rect.bottom) {
+    r = people.length - 1;
+  } else {
+    // 在表格内但找不到 data-r（可能在名字列或分隔行），用 y 比例估算
+    const theadH = tableEl.querySelector('thead')?.getBoundingClientRect().height || 40;
+    const rowH = 62; // 估算行高
+    r = Math.floor((y - rect.top - theadH) / rowH);
+    r = Math.max(0, Math.min(people.length - 1, r));
+  }
+
+  // 估算列：计算相对于表格左边的偏移
+  if (x < rect.left + 90) {
+    c = 0; // 名字列左侧 → 第一列
+  } else if (x > rect.right) {
+    c = 6; // 表格右侧 → 最后一列
+  } else {
+    const colW = (rect.width - 90) / 7;
+    c = Math.floor((x - rect.left - 90) / colW);
+    c = Math.max(0, Math.min(6, c));
+  }
+
+  // 查找对应单元格
+  const cellEl = tableEl.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+  return cellEl;
+}
+
+// 全局 mousemove：检测抓手区域 + 拖拽/选区
+document.addEventListener('mousemove', function(e) {
+  // 总览拖拽
+  if (ovDrag) {
+    if (!ovDrag._startX) { ovDrag._startX = e.clientX; ovDrag._startY = e.clientY; return; }
+    const dx = e.clientX - ovDrag._startX;
+    const dy = e.clientY - ovDrag._startY;
+
+    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+
+    if (!ovDragStarted && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      ovDragStarted = true;
+      ovDrag.sourceEl.style.opacity = '0.3';
+      ovDrag.sourceEl.style.border = '2px dashed var(--primary)';
+    }
+
+    if (ovDragStarted) {
+      document.querySelectorAll('#overviewTable .drag-target').forEach(el => {
+        el.classList.remove('drag-target'); el.style.background = ''; el.style.border = '';
+      });
+      const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+      if (targetEl) {
+        const cell = targetEl.closest('#overviewTable [data-pid]');
+        if (cell && cell !== ovDrag.sourceEl) {
+          cell.classList.add('drag-target');
+          cell.style.background = '#eef2ff';
+          cell.style.border = '2px dashed var(--primary)';
+        }
+      }
+    }
+    return;
+  }
+
+  if (editing) return;
+  if (fillDragging) { updateFillDrag(e); return; }
+
+  // === 拖拽移动进行中 ===
+  if (cellDrag && mouseDownCell) {
+    if (!cellDrag._startX) {
+      cellDrag._startX = e.clientX;
+      cellDrag._startY = e.clientY;
+      return;
+    }
+
+    const dx = e.clientX - cellDrag._startX;
+    const dy = e.clientY - cellDrag._startY;
+
+    if (!dragStarted && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+      dragStarted = true;
+      cellDrag.sourceEl.style.opacity = '0.3';
+      cellDrag.sourceEl.style.border = '2px dashed var(--primary)';
+      cellDrag.sourceEl.style.cursor = 'grabbing';
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+    }
+
+    if (dragStarted) {
+      document.querySelectorAll('#editTable [data-r].drag-target').forEach(el => {
+        el.classList.remove('drag-target');
+        el.style.background = '';
+        el.style.border = '';
+      });
+      const targetEl = findCellAtPoint(e.clientX, e.clientY);
+      if (targetEl && targetEl !== cellDrag.sourceEl) {
+        targetEl.classList.add('drag-target');
+        targetEl.style.background = '#eef2ff';
+        targetEl.style.border = '2px dashed var(--primary)';
+      }
+    }
+    return;
+  }
+
+  // === 空闲状态：检测抓手区域 ===
+  if (!mouseDownCell && !cellDrag) {
+    const cellEl = e.target.closest('#editTable [data-r]');
+    // 先清除上一个抓手格子的样式
+    document.querySelectorAll('#editTable [data-r].grab-zone').forEach(el => {
+      el.classList.remove('grab-zone');
+      el.style.cursor = '';
+    });
+
+    if (cellEl) {
+      const entry = getCell(cellEl.dataset.pid, cellEl.dataset.date);
+      if (entry && entry.note && isInGrabZone(cellEl, e)) {
+        cellEl.classList.add('grab-zone');
+        cellEl.style.cursor = 'grab';
+      }
+    }
+    return;
+  }
+
+  // === 选区拖拽 ===
+  if (!mouseDownCell) return;
+  let cellEl = findCellAtPoint(e.clientX, e.clientY);
+  if (!cellEl) cellEl = estimateCellFromPoint(e.clientX, e.clientY);
+  if (!cellEl) return;
+  const r = parseInt(cellEl.dataset.r);
+  const c = parseInt(cellEl.dataset.c);
+  if (r !== mouseDownCell.r || c !== mouseDownCell.c) {
+    mouseMoved = true;
+    selectRange(r, c);
+    updateSelectionVisual();
+  }
+});
+
+document.addEventListener('mousedown', function(e) {
+  if (fillDragging) return;
+  if (e.target.closest('#fillHandle') || e.target.closest('.fill-handle')) return;
+  if (editing) return;
+  if (e.target.closest('#overviewTable textarea')) return;
+
+  // ===== 总览表单元格 =====
+  const ovCell = e.target.closest('#overviewTable [data-pid]');
+  if (ovCell && activeGroupId === '__overview__') {
+    const pid = ovCell.dataset.pid;
+    const date = ovCell.dataset.date;
+    const gid = ovCell.dataset.gid;
+    if (!pid || !date) return;
+    const r = parseInt(ovCell.dataset.r);
+    const c = parseInt(ovCell.dataset.c);
+
+    mouseDownCell = { r, c, personId: pid, dateStr: date, el: ovCell };
+    lastClickCell = { ...mouseDownCell };
+    mouseMoved = false;
+    dragStarted = false;
+    cellDrag = null;
+
+    // Ctrl+点击 → 追加选区
+    if (e.ctrlKey || e.metaKey) {
+      const key = `${r},${c}`;
+      if (selExtra.has(key)) selExtra.delete(key); else selExtra.add(key);
+      activeCell = { r, c };
+      if (!sel) sel = { r1: r, c1: c, r2: r, c2: c };
+      highlightOverviewSelection();
+      return;
+    }
+
+    // 普通点击 → 立刻选中
+    selExtra = new Set();
+    sel = { r1: r, c1: c, r2: r, c2: c };
+    activeCell = { r, c };
+    highlightOverviewSelection();
+
+    // 有内容 → 准备拖拽（mousemove 超过阈值才真正开始）
+    const info = getScheduleInfo(pid, date);
+    if (info.type !== 'empty' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      ovDrag = {
+        personId: pid, dateStr: date, groupId: gid, r, c,
+        val: info.note || '', sourceEl: ovCell
+      };
+    }
+    return;
+  }
+
+  // ===== 小组表单元格 =====
+  const cellEl = e.target.closest('#editTable [data-r]');
+  if (!cellEl) return;
+
+  const r = parseInt(cellEl.dataset.r);
+  const c = parseInt(cellEl.dataset.c);
+  const personId = cellEl.dataset.pid;
+  const dateStr = cellEl.dataset.date;
+  mouseDownCell = { r, c, personId, dateStr, el: cellEl };
+  lastClickCell = { ...mouseDownCell };
+  mouseMoved = false;
+  dragStarted = false;
+  cellDrag = null;
+
+  const entry = getCell(personId, dateStr);
+  const hasContent = entry && entry.note;
+
+  // 更新选区状态
+  if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    selExtra = new Set();
+    selectCell(r, c);
+    updateSelectionVisual();
+  }
+
+  // 仅在「抓手区域」（鼠标在格子中心 + 有内容）时才激活拖拽移动
+  if (hasContent && !e.shiftKey && !e.ctrlKey && !e.metaKey && isInGrabZone(cellEl, e)) {
+    cellDrag = {
+      personId, dateStr, r, c,
+      val: entry.note,
+      sourceEl: cellEl,
+    };
+    cellEl.style.cursor = 'grabbing';
+  }
+});
+
+document.addEventListener('mouseup', function(e) {
+  if (fillDragging) { endFillDrag(); return; }
+  
+
+  // 总览拖拽移动释放
+  if (ovDrag && ovDragStarted) {
+    // 如果操作弹窗已打开，说明用户正在选择操作（交换/加入/取消），不清理拖拽状态
+    if (document.getElementById('ovActionModal').style.display === 'flex') {
+      return;
+    }
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+    if (targetEl) {
+      const targetCell = targetEl.closest('#overviewTable [data-pid]');
+      if (targetCell && targetCell !== ovDrag.sourceEl) {
+        const tPid = targetCell.dataset.pid;
+        const tDate = targetCell.dataset.date;
+        if (tPid && tDate) {
+          const tInfo = getScheduleInfo(tPid, tDate);
+          const targetHasContent = tInfo.type !== 'empty';
+          if (targetHasContent) {
+            ovDrag._targetPid = tPid;
+            ovDrag._targetDate = tDate;
+            ovDrag._targetInfo = tInfo;
+            document.getElementById('ovActionInfo').textContent =
+              `目标位置已有内容「${tInfo.type === 'conflict' ? '冲突' : (tInfo.note || '已排班')}」`;
+            document.getElementById('ovActionModal').style.display = 'flex';
+            return;
+          } else {
+            const srcGid = ovDrag.groupId || (weekGroups()[0]?weekGroups()[0].id:'');
+            const changes = [];
+            setGroupCell(srcGid, tPid, tDate, ovDrag.val);
+            changes.push({ personId: tPid, dateStr: tDate, oldVal: '', newVal: ovDrag.val, groupId: srcGid });
+            setGroupCell(srcGid, ovDrag.personId, ovDrag.dateStr, '');
+            changes.push({ personId: ovDrag.personId, dateStr: ovDrag.dateStr, oldVal: ovDrag.val, newVal: '', groupId: srcGid });
+            changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+            pushUndo(changes);
+            saveData();
+          }
+        }
+      }
+    }
+    cleanupOvDrag();
+    renderAll();
+    mouseDownCell = null;
+    return;
+  }
+
+  // 拖拽移动释放
+  if (cellDrag && dragStarted) {
+    const targetEl = findCellAtPoint(e.clientX, e.clientY);
+    if (targetEl && targetEl !== cellDrag.sourceEl) {
+      const tr = parseInt(targetEl.dataset.r);
+      const tc = parseInt(targetEl.dataset.c);
+      const tPid = targetEl.dataset.pid;
+      const tDate = targetEl.dataset.date;
+
+      const tEntry = getCell(tPid, tDate);
+      const tVal = tEntry ? tEntry.note : '';
+
+      const changes = [];
+      setCellValue(tPid, tDate, cellDrag.val);
+      changes.push({ personId: tPid, dateStr: tDate, oldVal: tVal, newVal: cellDrag.val });
+      setCellValue(cellDrag.personId, cellDrag.dateStr, '');
+      changes.push({ personId: cellDrag.personId, dateStr: cellDrag.dateStr, oldVal: cellDrag.val, newVal: '' });
+
+      changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+      pushUndo(changes);
+      saveData();
+    }
+    clearSelection();
+    cleanupDrag();
+    mouseDownCell = null;
+    renderEditTable();
+    return;
+  }
+
+  // 总览鼠标按住但没有拖拽（仅选中），只清变量不渲染，避免冲掉 dblclick
+  if (ovDrag && !ovDragStarted) {
+    ovDrag = null;
+    ovDragStarted = false;
+  }
+
+  if (cellDrag) {
+    cleanupDrag();
+  }
+  mouseDownCell = null;
+});
+
+function cleanupDrag() {
+  cellDrag = null;
+  dragStarted = false;
+  document.querySelectorAll('#editTable [data-r].drag-target').forEach(el => {
+    el.classList.remove('drag-target');
+    el.style.background = '';
+    el.style.border = '';
+  });
+  document.querySelectorAll('#editTable [data-r]').forEach(el => {
+    el.style.opacity = '';
+    el.style.border = '';
+    el.style.cursor = '';
+  });
+}
+
+// 仅更新选区 CSS，不重建整个 DOM
+function updateSelectionVisual() {
+  const allCells = document.querySelectorAll('#editTable [data-r]');
+  allCells.forEach(el => {
+    const r = parseInt(el.dataset.r);
+    const c = parseInt(el.dataset.c);
+    const selClass = isSelected(r, c);
+    const activeClass = activeCell && activeCell.r === r && activeCell.c === c;
+
+    el.classList.toggle('selected', selClass);
+    el.classList.toggle('active-cell', activeClass);
+  });
+  updateFillHandle();
+}
+
+// click 事件：区分单击/双击
+document.addEventListener('click', function(e) {
+  if (editing) return;
+
+  const cellEl = e.target.closest('#editTable [data-r]');
+  if (!cellEl) {
+    if (!e.target.closest('#editTable') && !e.target.closest('#fillHandle') && !e.target.closest('.fill-handle')) {
+      clearSelection();
+      renderEditTable();
+    }
+    return;
+  }
+
+  const r = parseInt(cellEl.dataset.r);
+  const c = parseInt(cellEl.dataset.c);
+
+  // Shift+点击扩展选区（不受 mouseMoved 限制）
+  if (e.shiftKey && activeCell) {
+    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+    mouseMoved = false;
+    selExtra = new Set();
+    selectRange(r, c);
+    activeCell = { r, c };
+    renderEditTable();
+    return;
+  }
+
+  // Ctrl+点击：追加/取消选中（不受 mouseMoved 限制）
+  if (e.ctrlKey || e.metaKey) {
+    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+    mouseMoved = false;
+    const key = `${r},${c}`;
+    if (selExtra.has(key)) {
+      selExtra.delete(key);
+    } else {
+      selExtra.add(key);
+    }
+    activeCell = { r, c };
+    if (!sel) selectCell(r, c);
+    renderEditTable();
+    return;
+  }
+
+  // 普通点击：拖拽过则不触发
+  if (mouseMoved) { mouseMoved = false; return; }
+
+  // 用 timer 延迟渲染，给 dblclick 留时间（overview 不需要单击延迟渲染）
+  if (clickTimer) { clearTimeout(clickTimer); }
+  if (activeGroupId === '__overview__') return;
+  clickTimer = setTimeout(() => {
+    clickTimer = null;
+    renderEditTable();
+  }, 180);
+});
+
+// 双击：使用 lastClickCell（mousedown 时保存）的信息，不依赖可能已被销毁的 DOM
+document.addEventListener('dblclick', function(e) {
+  if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+
+  if (!lastClickCell) return;
+  const { personId, dateStr, r, c } = lastClickCell;
+
+  // 总览表双击编辑
+  if (activeGroupId === '__overview__') {
+    ovDrag = null; ovDragStarted = false;
+    const ovCell = e.target.closest('#overviewTable [data-pid]');
+    if (!ovCell) return;
+    const pid = ovCell.dataset.pid;
+    const ds = ovCell.dataset.date;
+    const gid = ovCell.dataset.gid || (weekGroups().length > 0 ? weekGroups()[0].id : '');
+    if (!pid || !ds) return;
+    ovEntryEdit(ovCell, pid, ds, gid);
+    return;
+  }
+
+  // 小组表双击编辑
+  selectCell(r, c);
+  renderEditTable();
+  const cellEl = document.querySelector(`#editTable [data-pid="${personId}"][data-date="${dateStr}"]`);
+  if (cellEl) startEditDOM(cellEl, personId, dateStr);
+});
+
+// ========================= 编辑 =========================
+function startEditDOM(cellEl, personId, dateStr) {
+  if (editing) commitEdit();
+
+  editing = { personId, dateStr, el: cellEl };
+  renderEditTable();
+
+  const ta = document.getElementById('editInput');
+  if (!ta) return;
+
+  ta.focus();
+  // 光标移到末尾
+  ta.selectionStart = ta.value.length;
+
+  ta.addEventListener('blur', () => {
+    setTimeout(() => { if (editing) commitEdit(); }, 100);
+  });
+
+  ta.addEventListener('keydown', function(e) {
+    // Ctrl+Enter 提交
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      commitEdit();
+      moveActiveCell(1, 0);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      commitEdit();
+      moveActiveCell(0, e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  });
+}
+
+function commitEdit() {
+  if (!editing) return;
+
+  const { personId, dateStr } = editing;
+  const ta = document.getElementById('editInput');
+  const newVal = ta ? ta.value.trim() : '';
+
+  const oldEntry = getCell(personId, dateStr);
+  const oldVal = oldEntry ? oldEntry.note : '';
+
+  if (oldVal !== newVal) {
+    setCellValue(personId, dateStr, newVal);
+    pushUndo([{ personId, dateStr, oldVal, newVal }]);
+    // 修改后清除已有裁决，让冲突重新评估
+    clearResolution(personId, dateStr);
+    saveData();
+  }
+
+  editing = null;
+  renderEditTable();
+}
+
+function cancelEdit() {
+  editing = null;
+  renderEditTable();
+}
+
+function moveActiveCell(dr, dc) {
+  if (!activeCell) {
+    if (sel) activeCell = { r: sel.r1, c: sel.c1 };
+    else { activeCell = { r: 0, c: 0 }; }
+  }
+
+  const total = allPeople().length;
+  if (total === 0) return;
+  activeCell.r = Math.max(0, Math.min(total - 1, activeCell.r + dr));
+  activeCell.c = Math.max(0, Math.min(6, activeCell.c + dc));
+  sel = { r1: activeCell.r, c1: activeCell.c, r2: activeCell.r, c2: activeCell.c };
+  selAnchor = { r: activeCell.r, c: activeCell.c };
+
+  setTimeout(() => {
+    renderEditTable();
+    // 如果在编辑模式下，重新进入编辑
+    if (editing) {
+      const dates = weekDates(currentWeek);
+      const people = weekPeople();
+      const personId = people[activeCell.r].id;
+      const dateStr = fmtFull(dates[activeCell.c]);
+      const cellEl = document.querySelector(`#editTable [data-pid="${personId}"][data-date="${dateStr}"]`);
+      if (cellEl) startEditDOM(cellEl, personId, dateStr);
+    }
+  }, 30);
+}
+
+// ========================= 键盘快捷键 =========================
+document.addEventListener('keydown', function(e) {
+  // 编辑模式下大部分快捷键交给input处理
+  if (editing) return;
+  // 总览 textarea 编辑中
+  if (document.activeElement && document.activeElement.closest('#overviewTable textarea')) return;
+
+  // 弹窗模式下不处理
+  if (document.getElementById('manageModal').style.display === 'flex' ||
+      document.getElementById('resolveModal').style.display === 'flex') return;
+
+  const isCtrl = e.ctrlKey || e.metaKey;
+
+  // Ctrl+C
+  if (isCtrl && e.key === 'c') {
+    e.preventDefault();
+    copySelection();
+    return;
+  }
+
+  // Ctrl+V
+  if (isCtrl && e.key === 'v') {
+    e.preventDefault();
+    pasteToSelection();
+    return;
+  }
+
+  // Ctrl+D (fill down)
+  if (isCtrl && e.key === 'd') {
+    e.preventDefault();
+    fillDown();
+    return;
+  }
+
+  // Ctrl+Z
+  if (isCtrl && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+
+  // Ctrl+Y (or Ctrl+Shift+Z)
+  if ((isCtrl && e.key === 'y') || (isCtrl && e.key === 'z' && e.shiftKey)) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
+  // Delete / Backspace
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (!sel) return;
+    e.preventDefault();
+    const cells = getSelectedCells();
+    const changes = [];
+    cells.forEach(({ person, dateStr }) => {
+      const oldEntry = getCell(person.id, dateStr);
+      if (oldEntry) {
+        setCellValue(person.id, dateStr, '');
+        changes.push({ personId: person.id, dateStr, oldVal: oldEntry.note, newVal: '' });
+      }
+    });
+    if (changes.length > 0) {
+      changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+      pushUndo(changes);
+      saveData();
+      renderEditTable();
+    }
+    return;
+  }
+
+  // 方向键移动选区
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+    if (!activeCell) {
+      activeCell = sel ? { r: sel.r1, c: sel.c1 } : { r: 0, c: 0 };
+    }
+    const dr = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+    const dc = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+    moveActiveCell(dr, dc);
+    return;
+  }
+
+  // Tab 跳格（总览和小组都支持）
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (!activeCell) activeCell = sel ? { r: sel.r1, c: sel.c1 } : { r: 0, c: 0 };
+    moveActiveCell(0, e.shiftKey ? -1 : 1);
+    return;
+  }
+
+  // Enter 进入编辑
+  if (e.key === 'Enter' && !isCtrl) {
+    e.preventDefault();
+    if (!activeCell && sel) activeCell = { r: sel.r1, c: sel.c1 };
+    if (!activeCell) activeCell = { r: 0, c: 0 };
+    const people = weekPeople();
+    if (people.length === 0) return;
+    const dates = weekDates(currentWeek);
+    const pid = people[activeCell.r].id;
+    const ds = fmtFull(dates[activeCell.c]);
+    const cellEl = document.querySelector(`#editTable [data-pid="${pid}"][data-date="${ds}"]`);
+    if (cellEl) startEditDOM(cellEl, pid, ds);
+    return;
+  }
+
+  // F2 进入编辑
+  if (e.key === 'F2') {
+    e.preventDefault();
+    if (!activeCell && sel) activeCell = { r: sel.r1, c: sel.c1 };
+    if (!activeCell) activeCell = { r: 0, c: 0 };
+    const people = weekPeople();
+    if (people.length === 0) return;
+    const dates = weekDates(currentWeek);
+    const pid = people[activeCell.r].id;
+    const ds = fmtFull(dates[activeCell.c]);
+    const cellEl = document.querySelector(`#editTable [data-pid="${pid}"][data-date="${ds}"]`);
+    if (cellEl) startEditDOM(cellEl, pid, ds);
+    return;
+  }
+
+  // Tab 移动选区
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (!activeCell) {
+      activeCell = sel ? { r: sel.r1, c: sel.c1 } : { r: 0, c: 0 };
+    }
+    moveActiveCell(0, e.shiftKey ? -1 : 1);
+    return;
+  }
+
+  // Ctrl+A 全选
+  if (isCtrl && e.key === 'a') {
+    e.preventDefault();
+    const total = allPeople().length;
+    if (total === 0) return;
+    sel = { r1: 0, c1: 0, r2: total - 1, c2: 6 };
+    selAnchor = { r: 0, c: 0 };
+    activeCell = { r: 0, c: 0 };
+    renderEditTable();
+    return;
+  }
+});
+
+// ========================= 总览 =========================
+function getScheduleInfo(personId, dateStr) {
+  const ws = wsKey();
+  const sched = data.schedules[ws] || {};
+  const res = data.resolutions[ws] || {};
+  const key = skey(personId, dateStr);
+
+  // 收集所有原始排班
+  const assigned = [];
+  weekGroups().forEach(g => {
+    if (sched[g.id] && sched[g.id][key]) {
+      assigned.push({ groupId: g.id, groupName: g.name, note: sched[g.id][key].note });
+    }
+  });
+
+  // 有裁决记录（支持多选）
+  if (res[key]) {
+    const resolvedIds = Array.isArray(res[key]) ? res[key] : [res[key]];
+    const valid = resolvedIds.filter(gid => assigned.some(a => a.groupId === gid));
+    // 清理无效裁决
+    if (valid.length === 0) {
+      delete data.resolutions[ws][key]; saveData();
+    } else {
+      if (valid.length !== resolvedIds.length) {
+        data.resolutions[ws][key] = valid.length === 1 ? valid[0] : valid;
+        saveData();
+      }
+      // 全部冲突都已采纳
+      if (valid.length >= assigned.length) {
+        const allNotes = assigned.filter(a => valid.includes(a.groupId)).map(a => a.note).filter(Boolean).join('\n');
+        const g = weekGroups().find(gr => gr.id === assigned[0].groupId);
+        return { type:'resolved', groupId: assigned[0].groupId, groupName: g ? g.name : '?', note: allNotes, allResolved: true, adoptedIds: valid };
+      }
+      // 部分采纳
+      const rejected = assigned.filter(a => !valid.includes(a.groupId));
+      const adoptedNotes = valid.map(gid => assigned.find(a => a.groupId === gid)?.note || '').filter(Boolean);
+      return { type:'partial', groups: assigned, adoptedIds: valid, rejected, note: adoptedNotes.join('\n') };
+    }
+  }
+
+  // 无裁决
+  if (assigned.length === 0) return { type:'empty' };
+  if (assigned.length === 1) return { type:'single', ...assigned[0] };
+  return { type:'conflict', groups: assigned };
+}
+
+function getConflicts() {
+  const ws = wsKey();
+  const sched = data.schedules[ws] || {};
+  const res = data.resolutions[ws] || {};
+  const dates = weekDates(currentWeek);
+  const conflicts = [];
+  const people = weekPeople();
+  people.forEach(p => {
+    dates.forEach(d => {
+      const ds = fmtFull(d);
+      const key = skey(p.id, ds);
+      const assigned = [];
+      weekGroups().forEach(g => {
+        if (sched[g.id] && sched[g.id][key]) assigned.push({ groupId:g.id, groupName:g.name, note:sched[g.id][key].note });
+      });
+      if (assigned.length < 2) return;
+      // 检查决议：全部采纳才跳过
+      if (res[key]) {
+        const resolvedIds = Array.isArray(res[key]) ? res[key] : [res[key]];
+        const allResolved = assigned.every(a => resolvedIds.includes(a.groupId));
+        if (allResolved) return;
+      }
+      conflicts.push({ personId:p.id, personName:p.name, date:ds, dateLabel:fmtDate(d), groups:assigned });
+    });
+  });
+  return conflicts;
+}
+
+function renderOverview() {
+  const ws = wsKey();
+  const sched = data.schedules[ws] || {};
+  const res = data.resolutions[ws] || {};
+  const dates = weekDates(currentWeek);
+
+  let total = 0;
+  let rCount = Object.keys(res).length;
+  weekGroups().forEach(g => { if (sched[g.id]) total += Object.keys(sched[g.id]).length; });
+  const conflicts = getConflicts();
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">总排班数</div></div>
+    <div class="stat danger"><div class="stat-val">${conflicts.length}</div><div class="stat-label">待解决冲突</div></div>
+    <div class="stat success"><div class="stat-val">${rCount}</div><div class="stat-label">已裁决</div></div>
+    <div class="stat"><div class="stat-val">${allPeople().length}</div><div class="stat-label">总人数</div></div>
+    <div class="stat"><div class="stat-val">${weekGroups().length}</div><div class="stat-label">小组</div></div>
+  `;
+
+  // 历史周隐藏统计栏
+  const scheduleMonday = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  document.getElementById('statsRow').style.display = (ws < scheduleMonday) ? 'none' : '';
+
+  const colorsRow = weekGroups().map((g,i) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:11px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:${COLORS[i%COLORS.length]}"></span>${esc(g.name)}
+    </span>`
+  ).join('');
+  document.getElementById('overviewColors').innerHTML = colorsRow;
+
+  // 条件格式切换按钮
+  const hasRules = data.conditionRules && data.conditionRules.length > 0;
+  document.getElementById('overviewModeToggle').style.display = hasRules ? '' : 'none';
+  // 有规则时自动启用条件着色
+  if (hasRules && !ovConditionMode && !document.getElementById('ovModeBtn')._manualOff) {
+    ovConditionMode = true;
+  }
+  document.getElementById('ovModeBtn').textContent = ovConditionMode ? '🏷 切换小组着色' : '🎨 切换条件着色';
+  document.getElementById('ovModeBtn').className = 'btn' + (ovConditionMode ? ' btn-p' : '');
+
+  let html = '<thead><tr><th>姓名</th>';
+  dates.forEach((d,i) => html += `<th>${fmtDate(d)}<br><small>${DAY_NAMES[i]}</small></th>`);
+  html += '</tr></thead><tbody>';
+
+  // 总览提示（先清理旧的再插入）
+  const oldHint = document.getElementById('ovHint');
+  if (oldHint) oldHint.remove();
+  const scheduleWeek = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const isScheduleWeek = wsKey() === scheduleWeek;
+  document.getElementById('overviewPanel').insertAdjacentHTML('afterbegin',
+    `<div class="hint-bar" id="ovHint" style="margin-bottom:12px;">
+      ${isScheduleWeek ? '双击格子编辑内容 · 点击红色格子裁决冲突 · 此表为最终导出源' : '双击格子录入/编辑内容 · 所有格子都可双击编辑'}
+      <span class="hint-spacer"></span>
+    </div>`);
+
+  const ovPeople = weekPeople();
+  if (ovPeople.length === 0) {
+    html += '<tr><td colspan="8" style="padding:40px;color:var(--text2);text-align:center;">暂无人员</td></tr>';
+  } else {
+    let lastCat = null;
+    ovPeople.forEach((p, r) => {
+      if (p._cat !== lastCat) {
+        const label = p._cat === 'internal' ? '内部人员' : '外协人员';
+        html += `<tr class="section-row"><td colspan="8" style="padding:8px 16px;background:#f3f4f6;font-size:12px;font-weight:600;color:var(--text2);text-align:left;border-bottom:2px solid var(--border);">${label}</td></tr>`;
+        lastCat = p._cat;
+      }
+      html += `<tr class="${p._cat === 'external' ? 'row-external' : ''}"><td>${esc(p.name)}<span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${p.id}')" title="从本周移除">×</span></td>`;
+      dates.forEach((d, c) => {
+        const ds = fmtFull(d);
+        const info = getScheduleInfo(p.id, ds);
+        if (info.type === 'empty') {
+          // 空单元格也可以双击添加（历史周只读模式下仍可编辑总览）
+          const defaultGid = weekGroups().length > 0 ? weekGroups()[0].id : '';
+          html += `<td><div class="cell cell-empty" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${defaultGid}">-</div></td>`;
+        } else if (info.type === 'single' || info.type === 'resolved') {
+          const gi = weekGroups().findIndex(g => g.id === info.groupId);
+          const note = info.note || '已排班';
+          const condColor = ovConditionMode ? getConditionColor(note) : null;
+          const style = condColor
+            ? `color:#222;background:${hexToRgba(condColor, 0.30)};font-weight:700;`
+            : `color:${COLORS[gi%COLORS.length]};background:${hexToRgba(COLORS[gi%COLORS.length], 0.08)};`;
+          html += `<td><div class="cell cell-ov-edit" style="${style}"
+            data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${info.groupId}">
+            <span>${esc(note).replace(/\n/g, '<br>')}</span>
+          </div></td>`;
+        } else if (info.type === 'partial') {
+          // 部分采纳：显示所有已采纳小组的内容
+          const content = info.note || '';
+          const adoptedNames = info.adoptedIds.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('/');
+          html += `<td><div class="cell cell-ov-edit"
+            style="color:var(--text);background:#f5f5f5;cursor:pointer;" title="已采纳: ${adoptedNames}&#10;点击修改裁决"
+            data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}"
+            onclick="openResolve('${p.id}','${ds}','${esc(p.name)}','${fmtDate(d)}')">
+            <span>${esc(content).replace(/\n/g, '<br>')}</span>
+            <small style="font-size:10px;color:#9ca3af;">(已裁决)</small>
+          </div></td>`;
+        } else {
+          html += `<td><div class="cell cell-ov-conflict" onclick="openResolve('${p.id}','${ds}','${esc(p.name)}','${fmtDate(d)}')">
+            ${info.groups.map(g=>esc(g.groupName)).join(' / ')}<br><small style="font-size:10px">点击裁决</small></div></td>`;
+        }
+      });
+      html += '</tr>';
+    });
+  }
+  // 底部添加人员按钮
+  html += `<tr class="add-row" onclick="quickAddPerson('internal')">
+    <td colspan="8" style="padding:4px;text-align:center;color:var(--text2);cursor:pointer;border:none;">
+      <span class="add-hint">+ 添加内部人员</span>
+    </td>
+  </tr>`;
+  html += `<tr class="add-row" onclick="quickAddPerson('external')">
+    <td colspan="8" style="padding:4px;text-align:center;color:var(--text2);cursor:pointer;border:none;background:#fefce8;">
+      <span class="add-hint">+ 添加外协人员</span>
+    </td>
+  </tr>`;
+  html += '</tbody>';
+  document.getElementById('overviewTable').innerHTML = html;
+
+  const cs = document.getElementById('conflictSection');
+  if (conflicts.length > 0) {
+    cs.style.display = '';
+    document.getElementById('conflictBadge').textContent = `(${conflicts.length})`;
+    document.getElementById('conflictList').innerHTML = conflicts.map(c => `
+      <div class="conflict-item">
+        <span><span class="ci-name">${esc(c.personName)}</span> · ${c.dateLabel} · ${c.groups.map(g=>esc(g.groupName)).join('、')}</span>
+        <button class="btn btn-p" style="font-size:12px;padding:4px 12px;" onclick="openResolve('${c.personId}','${c.date}','${esc(c.personName)}','${c.dateLabel}')">裁决</button>
+      </div>
+    `).join('');
+  } else {
+    cs.style.display = 'none';
+  }
+}
+
+// 总览表编辑入口 —— 与 startEditDOM 同样的模式
+function ovEntryEdit(cellEl, personId, dateStr, groupId) {
+  if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+  const ws = wsKey(); const key = skey(personId, dateStr);
+  const entry = (data.schedules[ws] && data.schedules[ws][groupId] && data.schedules[ws][groupId][key]) || null;
+  const oldVal = entry ? entry.note : '';
+
+  editing = { mode:'overview', personId, dateStr, groupId, el:cellEl, oldVal };
+  cellEl.classList.add('editing');
+  cellEl.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:vertical;word-break:break-word;white-space:pre-wrap;" placeholder="输入任务"></textarea>`;
+  const ta = cellEl.querySelector('textarea');
+  ta.value = oldVal;
+  ta.focus();
+  ta.selectionStart = ta.value.length;
+
+  function commit() {
+    if (!editing) return;
+    const cur = editing;
+    const newVal = ta.value.trim();
+    if (cur.oldVal !== newVal) {
+      if (!data.schedules[ws]) data.schedules[ws] = {};
+      if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
+      if (newVal) data.schedules[ws][groupId][key] = { note:newVal };
+      else delete data.schedules[ws][groupId][key];
+      pushUndo([{ personId:cur.personId, dateStr:cur.dateStr, oldVal:cur.oldVal, newVal, groupId }]);
+      clearResolution(cur.personId, cur.dateStr);
+      saveData();
+    }
+    editing = null;
+    requestAnimationFrame(() => renderOverview());
+  }
+
+  ta.addEventListener('blur', () => {
+    setTimeout(() => { if (editing) commit(); }, 100);
+  });
+  ta.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); editing = null; requestAnimationFrame(() => renderOverview()); }
+  });
+}
+
+// ========================= 总览拖拽移动 =========================
+let ovDrag = null;
+let ovDragStarted = false;
+let selectedCondColor = '#ef4444';
+
+// 直接在 cell data 上查源数据（不用 getCell，因为 overview 下 activeGroupId 不是具体组）
+function getGroupCell(groupId, personId, dateStr) {
+  const ws = wsKey();
+  if (!data.schedules[ws] || !data.schedules[ws][groupId]) return null;
+  return data.schedules[ws][groupId][skey(personId, dateStr)] || null;
+}
+
+function setGroupCell(groupId, personId, dateStr, val) {
+  const ws = wsKey();
+  if (!data.schedules[ws]) data.schedules[ws] = {};
+  if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
+  const key = skey(personId, dateStr);
+  if (val) {
+    data.schedules[ws][groupId][key] = { note: val };
+  } else {
+    delete data.schedules[ws][groupId][key];
+  }
+}
+
+function cleanupOvDrag() {
+  if (ovDrag && ovDrag.sourceEl) {
+    ovDrag.sourceEl.style.opacity = '';
+    ovDrag.sourceEl.style.border = '';
+    ovDrag.sourceEl.style.cursor = '';
+  }
+  document.querySelectorAll('#overviewTable .drag-target').forEach(el => {
+    el.classList.remove('drag-target'); el.style.background = ''; el.style.border = '';
+  });
+  ovDrag = null;
+  ovDragStarted = false;
+  renderAll();
+}
+
+function ovActionSwap() {
+  document.getElementById('ovActionModal').style.display = 'none';
+  if (!ovDrag || !ovDrag._targetPid) return;
+  const tInfo = ovDrag._targetInfo;
+  const tPid = ovDrag._targetPid;
+  const tDate = ovDrag._targetDate;
+
+  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
+                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
+  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
+                     tInfo.type === 'resolved' ? tInfo.groupId : ovDrag.groupId;
+  const targetVal = targetEntry ? targetEntry.note : '';
+  const changes = [];
+  setGroupCell(ovDrag.groupId, tPid, tDate, ovDrag.val);
+  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: ovDrag.val, groupId: ovDrag.groupId });
+  setGroupCell(targetGid, ovDrag.personId, ovDrag.dateStr, targetVal);
+  changes.push({ personId: ovDrag.personId, dateStr: ovDrag.dateStr, oldVal: ovDrag.val, newVal: targetVal, groupId: targetGid });
+  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+  pushUndo(changes);
+  saveData();
+  cleanupOvDrag();
+  renderOverview();
+}
+
+function ovActionJoin() {
+  document.getElementById('ovActionModal').style.display = 'none';
+  if (!ovDrag || !ovDrag._targetPid) return;
+  const tInfo = ovDrag._targetInfo;
+  const tPid = ovDrag._targetPid;
+  const tDate = ovDrag._targetDate;
+
+  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
+                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
+  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
+                     tInfo.type === 'resolved' ? tInfo.groupId : ovDrag.groupId;
+  const oldTargetVal = targetEntry ? targetEntry.note : '';
+  const newTargetVal = oldTargetVal + '\n' + ovDrag.val;
+  setGroupCell(targetGid, tPid, tDate, newTargetVal);
+  setGroupCell(ovDrag.groupId, ovDrag.personId, ovDrag.dateStr, '');
+  const changes = [
+    { personId: tPid, dateStr: tDate, oldVal: oldTargetVal, newVal: newTargetVal, groupId: targetGid },
+    { personId: ovDrag.personId, dateStr: ovDrag.dateStr, oldVal: ovDrag.val, newVal: '', groupId: ovDrag.groupId },
+  ];
+  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+  pushUndo(changes);
+  saveData();
+  cleanupOvDrag();
+  renderOverview();
+}
+
+function ovActionCancel() {
+  document.getElementById('ovActionModal').style.display = 'none';
+  cleanupOvDrag();
+}
+
+// ========================= 裁决 =========================
+function openResolve(personId, dateStr, personName, dateLabel) {
+  const ws = wsKey();
+  const sched = data.schedules[ws] || {};
+  const key = skey(personId, dateStr);
+  const assigned = [];
+  weekGroups().forEach(g => {
+    if (sched[g.id] && sched[g.id][key]) {
+      assigned.push({ groupId:g.id, groupName:g.name, note:sched[g.id][key].note });
+    }
+  });
+
+  // 读取已有裁决
+  const existingRes = (data.resolutions[ws] && data.resolutions[ws][key]) ? data.resolutions[ws][key] : null;
+  const adopted = existingRes ? (Array.isArray(existingRes) ? existingRes : [existingRes]) : [];
+
+  resolveTarget = { personId, dateStr };
+  document.getElementById('resolveInfo').innerHTML =
+    `<strong>${esc(personName)}</strong> 在 <strong>${dateLabel}</strong> 被 ${assigned.length} 个小组安排：`;
+  document.getElementById('resolveOptions').innerHTML = assigned.map(g => {
+    const gi = weekGroups().findIndex(gr => gr.id === g.groupId);
+    const checked = adopted.includes(g.groupId);
+    return `<label class="resolve-opt" style="border-left:3px solid ${COLORS[gi%COLORS.length]};display:flex;align-items:center;gap:12px;cursor:pointer;">
+      <input type="checkbox" value="${g.groupId}" ${checked ? 'checked' : ''}
+        style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
+      <div><div class="resolve-gname">${esc(g.groupName)}</div><div class="resolve-note">${esc(g.note)}</div></div>
+    </label>`;
+  }).join('');
+  // 添加确认按钮
+  document.getElementById('resolveOptions').insertAdjacentHTML('beforeend',
+    '<div style="text-align:right;margin-top:12px;"><button class="btn btn-p" onclick="doMultiResolve()">确认裁决</button></div>');
+  document.getElementById('resolveModal').style.display = 'flex';
+}
+
+function doMultiResolve() {
+  const checks = document.querySelectorAll('#resolveOptions input[type="checkbox"]:checked');
+  const adopted = Array.from(checks).map(c => c.value);
+  const ws = wsKey();
+  if (!data.resolutions[ws]) data.resolutions[ws] = {};
+  const key = skey(resolveTarget.personId, resolveTarget.dateStr);
+
+  if (adopted.length === 0) {
+    // 全部不选 = 清空裁决
+    delete data.resolutions[ws][key];
+    toast('已清空裁决');
+  } else {
+    data.resolutions[ws][key] = adopted.length === 1 ? adopted[0] : adopted;
+    const names = adopted.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('、');
+    toast(`已采纳：${names}`);
+  }
+  saveData();
+  closeResolveModal();
+  switchGroup('__overview__');
+}
+
+// 保留旧接口兼容
+function doResolve(groupId, el) { doMultiResolve(); }
+
+function closeResolveModal() {
+  document.getElementById('resolveModal').style.display = 'none';
+  resolveTarget = null;
+}
+
+// ========================= 管理弹窗 =========================
+let manageActiveTab = 'people';
+
+function openManageModal() {
+  manageActiveTab = 'people';
+  renderManageTab();
+  document.getElementById('manageModal').style.display = 'flex';
+}
+
+function closeManageModal() {
+  document.getElementById('manageModal').style.display = 'none';
+  renderAll();
+}
+
+function switchManageTab(tab) {
+  manageActiveTab = tab;
+  document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.mtab[onclick="switchManageTab('${tab}')"]`).classList.add('active');
+  document.querySelectorAll('.manage-panel').forEach(p => p.style.display = 'none');
+  document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = '';
+  document.getElementById('manageHint').textContent =
+    tab === 'people' ? '默认人员模板，新周自动沿用；历史周不变。' :
+    tab === 'groups' ? '编辑排班小组。' :
+    tab === 'conditions' ? '内容包含指定文字时自动着色。' : '选择配色主题与字体样式。';
+  renderManageTab();
+}
+
+// 主题定义
+const THEMES = [
+  { id:'pink', name:'柔和粉', colors:['#ff6b9d','#f8c8d8','#fff0f5','#fff'] },
+  { id:'blue', name:'蓝白专业', colors:['#3b82f6','#bfdbfe','#eff6ff','#fff'] },
+  { id:'dark', name:'深蓝暗色', colors:['#60a5fa','#334155','#0f172a','#1e293b'] },
+  { id:'mint', name:'薄荷清新', colors:['#10b981','#a7f3d0','#ecfdf5','#fff'] },
+];
+// 字体选项
+const FONTS = [
+  { id:'system', name:'系统默认', css:'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif', preview:'Aa 排班汇总表', weight:400 },
+  { id:'bold', name:'粗体雅黑', css:'"PingFang SC", "Microsoft YaHei", system-ui, sans-serif', preview:'Aa 排班汇总表', weight:700 },
+  { id:'song', name:'宋体衬线', css:'"Songti SC", "SimSun", "Noto Serif CJK SC", serif', preview:'Aa 排班汇总表', weight:400 },
+  { id:'kai', name:'楷体系列', css:'"Kaiti SC", "KaiTi", "STKaiti", serif', preview:'Aa 排班汇总表', weight:400 },
+];
+let currentTheme = localStorage.getItem('schedule_theme') || 'pink';
+let currentFont = localStorage.getItem('schedule_font') || 'system';
+
+function applyTheme(id) {
+  currentTheme = id;
+  document.documentElement.setAttribute('data-theme', id);
+  localStorage.setItem('schedule_theme', id);
+}
+
+function applyFont(id) {
+  currentFont = id;
+  const font = FONTS.find(f => f.id === id);
+  if (font) {
+    document.documentElement.style.setProperty('--font', font.css);
+    localStorage.setItem('schedule_font', id);
+  }
+  renderThemeTab();
+}
+// 初始化字体
+(function() {
+  const f = FONTS.find(f => f.id === currentFont) || FONTS[0];
+  document.documentElement.style.setProperty('--font', f.css);
+})();
+// 初始化主题
+document.documentElement.setAttribute('data-theme', currentTheme);
+
+function renderThemeTab() {
+  let html = '';
+
+  // 配色：2列2行
+  html += '<p style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">🎨 配色</p>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">';
+  html += THEMES.map(t => `
+    <div onclick="applyTheme('${t.id}');renderThemeTab()" style="
+      cursor:pointer; border-radius:10px; padding:12px 14px; border:2px solid ${t.id===currentTheme?'var(--primary)':'var(--border)'};
+      display:flex; align-items:center; gap:10px;
+      background:${t.id===currentTheme?'var(--cell-hover-bg)':'var(--card)'};
+    ">
+      <div style="display:flex;gap:3px;">
+        ${t.colors.map(c=>`<span style="width:16px;height:16px;border-radius:4px;background:${c};"></span>`).join('')}
+      </div>
+      <span style="font-size:14px;font-weight:600;color:var(--text);">${t.name}</span>
+    </div>
+  `).join('');
+  html += '</div>';
+
+  // 字体
+  html += '<p style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">🔤 字体</p>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+  html += FONTS.map(f => `
+    <div onclick="applyFont('${f.id}')" style="
+      cursor:pointer; border-radius:10px; padding:12px 14px; border:2px solid ${f.id===currentFont?'var(--primary)':'var(--border)'};
+      background:${f.id===currentFont?'var(--cell-hover-bg)':'var(--card)'};
+    ">
+      <div style="font-size:18px;font-weight:${f.weight};color:var(--text);line-height:1.3;font-family:${f.css};text-shadow:none;">${f.preview}</div>
+      <div style="font-size:11px;color:var(--text2);">${f.name}</div>
+    </div>
+  `).join('');
+  html += '</div>';
+
+  document.getElementById('themeOptions').innerHTML = html;
+}
+
+function renderManageTab() {
+  if (manageActiveTab === 'people') {
+    document.getElementById('manageInternalTags').innerHTML = data.internalPeople.map(p =>
+      `<span class="tag">${esc(p.name)}<span class="tag-act" onclick="renamePerson('${p.id}')">✎</span><span class="tag-act" onclick="removePerson('${p.id}')">×</span></span>`
+    ).join('') || '<span style="font-size:12px;color:var(--text2)">暂无</span>';
+
+    document.getElementById('manageExternalTags').innerHTML = data.externalPeople.map(p =>
+      `<span class="tag">${esc(p.name)}<span class="tag-act" onclick="renamePerson('${p.id}')">✎</span><span class="tag-act" onclick="removePerson('${p.id}')">×</span></span>`
+    ).join('') || '<span style="font-size:12px;color:var(--text2)">暂无</span>';
+  } else if (manageActiveTab === 'groups') {
+    document.getElementById('manageGroupTags').innerHTML = data.groups.map((g,i) =>
+      `<span class="tag" style="border-left:3px solid ${COLORS[i%COLORS.length]}">${esc(g.name)}<span class="tag-act" onclick="renameGroup('${g.id}')">✎</span><span class="tag-act" onclick="removeGroup('${g.id}')">×</span></span>`
+    ).join('') || '<span style="font-size:12px;color:var(--text2)">暂无小组</span>';
+  } else if (manageActiveTab === 'conditions') {
+    // 预设颜色：显示当前系列的所有颜色 + 系列切换按钮
+    const allColors = COLOR_SERIES[currentColorSeries].colors;
+    document.getElementById('presetColors').innerHTML = allColors.map(c =>
+      `<span style="width:22px;height:22px;border-radius:5px;background:${c};cursor:pointer;border:2px solid ${selectedCondColor===c?'#333':'transparent'};flex-shrink:0;"
+        onclick="pickCondColor(this,'${c}')" data-color="${c}"></span>`
+    ).join('');
+    // 系列切换按钮
+    const seriesBtns = document.getElementById('colorSeriesBtns');
+    if (seriesBtns) {
+      seriesBtns.innerHTML = Object.keys(COLOR_SERIES).map(k =>
+        `<button style="font-size:10px;padding:2px 8px;border-radius:4px;border:1.5px solid var(--border);background:${k===currentColorSeries?'var(--primary)':'var(--card)'};color:${k===currentColorSeries?'#fff':'var(--text2)'};cursor:pointer;font-family:inherit;" onclick="switchPresetSeries('${k}')">${COLOR_SERIES[k].name}</button>`
+      ).join('');
+    }
+    document.getElementById('conditionRulesList').innerHTML = (data.conditionRules || []).map(condRuleHTML).join('') || '<span class="cond-empty" style="font-size:12px;color:var(--text2);">暂无规则，上方添加</span>';
+    delete document.getElementById('conditionRulesList').dataset.editing;
+  } else if (manageActiveTab === 'theme') {
+    renderThemeTab();
+  }
+}
+
+function addPerson(cat) {
+  const inpId = cat === 'internal' ? 'newInternalInput' : 'newExternalInput';
+  const list = cat === 'internal' ? data.internalPeople : data.externalPeople;
+  const inp = document.getElementById(inpId);
+  const name = inp.value.trim();
+  if (!name) return;
+  if (list.find(p => p.name === name) || data[cat === 'internal' ? 'externalPeople' : 'internalPeople'].find(p => p.name === name)) {
+    alert('已存在'); return;
+  }
+  const prefix = cat === 'internal' ? 'p' : 'e';
+  list.push({ id: prefix + Date.now(), name });
+  inp.value = '';
+  saveData();
+  renderManageTab();
+}
+
+function renamePerson(id) {
+  const info = findPersonList(id);
+  if (!info) return;
+  const p = info.list.find(x => x.id === id);
+  if (!p) return;
+  const n = prompt('修改姓名：', p.name);
+  if (!n||!n.trim()||n.trim()===p.name) return;
+  // 检查所有人员列表中的重名
+  if (allPeople().find(x => x.name===n.trim())) { alert('已存在'); return; }
+  p.name = n.trim(); saveData(); renderManageTab();
+}
+
+function removePerson(id) {
+  if (!confirm('确定从常用模板中删除该人员？\n已有各周的排班数据不受影响。')) return;
+  const info = findPersonList(id);
+  if (!info) return;
+  info.list.splice(info.list.findIndex(p => p.id === id), 1);
+  clearSelection();
+  saveData(); renderManageTab();
+}
+function addGroup() {
+  const inp = document.getElementById('newGroupInput');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (data.groups.find(g => g.name===name)) { alert('已存在'); return; }
+  const g = { id:'g'+Date.now(), name };
+  data.groups.push(g); inp.value = '';
+  // 同步到当前周的小组
+  const wg = weekGroups();
+  if (!wg.find(x => x.id === g.id)) wg.push({ id: g.id, name: g.name });
+  lockWeekGroups();
+  saveData(); renderManageTab(); renderAll();
+}
+
+// 快速添加人员（表格底部+号）
+function quickAddPerson(cat) {
+  const label = cat === 'internal' ? '内部' : '外协';
+  const name = prompt(`添加${label}人员姓名（仅本周）：`);
+  if (!name || !name.trim()) return;
+
+  // 只检查当前周是否重名
+  if (weekPeople().find(p => p.name === name.trim())) { alert('本周已存在'); return; }
+
+  const prefix = cat === 'internal' ? 'p' : 'e';
+  const newPerson = { id: prefix + Date.now(), name: name.trim(), _cat: cat };
+
+  // 只添加到当前周
+  weekPeople().push(newPerson);
+  lockWeekPeople();
+  saveData();
+  renderAll();
+}
+function removePersonFromWeek(personId) {
+  const wp = weekPeople();
+  const idx = wp.findIndex(p => p.id === personId);
+  if (idx < 0) return;
+  const person = wp[idx];
+  if (!confirm(`确定从本周删除「${person.name}」？\n其他周和常用模板不受影响。`)) return;
+  wp.splice(idx, 1);
+  lockWeekPeople();
+  saveData();
+  renderAll();
+}
+function renameGroup(id) {
+  const g = data.groups.find(x => x.id===id);
+  if (!g) return;
+  const n = prompt('修改小组名：', g.name);
+  if (!n||!n.trim()||n.trim()===g.name) return;
+  if (data.groups.find(x => x.name===n.trim())) { alert('已存在'); return; }
+  g.name = n.trim(); saveData(); renderManageTab();
+}
+function removeGroup(id) {
+  if (!confirm('确定从模板中删除该小组？\n已有各周的排班数据不受影响。')) return;
+  data.groups = data.groups.filter(g => g.id !== id);
+  if (activeGroupId === id) activeGroupId = weekGroups()[0] ? weekGroups()[0].id : null;
+  saveData(); renderManageTab(); renderAll();
+}
+
+function addConditionRule() {
+  const inp = document.getElementById('newCondText');
+  const text = inp.value.trim();
+  if (!text) return;
+  if (!data.conditionRules) data.conditionRules = [];
+  if (data.conditionRules.find(r => r.text === text)) { alert('已存在'); return; }
+  const color = selectedCondColor || '#ef4444';
+  const rule = { id: 'cr' + Date.now(), text, color };
+  data.conditionRules.push(rule);
+  inp.value = '';
+  saveData();
+  // 延迟DOM操作，确保IME事件已完成
+  setTimeout(() => {
+    const el = document.getElementById('conditionRulesList');
+    if (el.querySelector('.cond-empty')) el.innerHTML = '';
+    el.insertAdjacentHTML('beforeend', condRuleHTML(rule));
+    el.scrollTop = el.scrollHeight;
+    inp.focus();
+  }, 0);
+}
+
+function pickCondColor(el, color) {
+  document.querySelectorAll('#presetColors span').forEach(s => s.style.borderColor = 'transparent');
+  el.style.borderColor = '#333';
+  selectedCondColor = color;
+  document.getElementById('condColorBtn').style.background = color;
+  const editingId = document.getElementById('conditionRulesList').dataset.editing;
+  if (editingId) {
+    const rule = data.conditionRules.find(r => r.id === editingId);
+    if (rule) { rule.color = color; saveData(); renderAll(); }
+  }
+}
+
+// ========================= 颜色系列 =========================
+const COLOR_SERIES = {
+  'basic': {
+    name: '常用',
+    colors: ['#ef4444','#f97316','#eab308','#22c55e','#10b981','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#84cc16','#14b8a6','#0ea5e9','#64748b'],
+  },
+  'morandi': {
+    name: '莫兰迪',
+    colors: ['#c9a5a0','#b8a89a','#a3b5a6','#a8bfc2','#b4a7c4','#d4b8c7','#c2b5a7','#b5b8c2','#a8c4c2','#d1c4b8','#c8b8d0','#b0c4b8','#c4a8b0','#bcc4c0','#d8c8c0','#c0b8c8'],
+  },
+  'macaron': {
+    name: '马卡龙',
+    colors: ['#ffb3ba','#ffdfba','#ffffba','#baffc9','#bae1ff','#d4baff','#ffb3e6','#b3ffe0','#ffe0b3','#e0b3ff','#b3d4ff','#ffd4b3','#d4ffb3','#b3ffff','#ffc4d4','#c4d4ff'],
+  },
+  'earth': {
+    name: '大地',
+    colors: ['#8b6914','#a0522d','#cd853f','#daa520','#bc8f8f','#6b8e23','#556b2f','#8fbc8f','#bdb76b','#d2b48c','#a0522d','#cd5c5c'],
+  }
+};
+let currentColorSeries = 'basic';
+
+function getCondColorPickerHTML() {
+  let html = '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">';
+  Object.keys(COLOR_SERIES).forEach(k => {
+    html += `<button class="btn" style="font-size:11px;padding:3px 10px;border-radius:6px;${k===currentColorSeries?'background:var(--primary);color:#fff;border-color:transparent;':''}" onclick="switchColorSeries('${k}',event)">${COLOR_SERIES[k].name}</button>`;
+  });
+  html += '</div>';
+  html += '<div id="condColorGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;">';
+  COLOR_SERIES[currentColorSeries].colors.forEach(c => {
+    html += `<div style="width:100%;aspect-ratio:1;border-radius:5px;background:${c};cursor:pointer;border:2px solid ${selectedCondColor===c?'#333':'transparent'};" onclick="selectCondColor('${c}',event)"></div>`;
+  });
+  html += '</div>';
+  html += '<button class="btn btn-p" style="width:100%;font-size:12px;padding:4px 0;" onclick="closeCondColorPicker()">完成</button>';
+  return html;
+}
+
+function switchColorSeries(k, e) {
+  e.stopPropagation();
+  currentColorSeries = k;
+  document.getElementById('condColorPicker').innerHTML = getCondColorPickerHTML();
+}
+
+function switchPresetSeries(k) {
+  currentColorSeries = k;
+  renderManageTab();
+}
+function toggleCondColorPicker(e) {
+  e.stopPropagation();
+  const picker = document.getElementById('condColorPicker');
+  if (picker.style.display === 'none') {
+    picker.innerHTML = getCondColorPickerHTML();
+    picker.style.display = 'block';
+  } else {
+    picker.style.display = 'none';
+  }
+}
+function selectCondColor(color, e) {
+  e.stopPropagation();
+  selectedCondColor = color;
+  document.getElementById('condColorBtn').style.background = color;
+  document.querySelectorAll('#condColorGrid div').forEach(d => d.style.borderColor = 'transparent');
+  e.target.style.borderColor = '#333';
+  const editingId = document.getElementById('conditionRulesList').dataset.editing;
+  if (editingId) {
+    const rule = data.conditionRules.find(r => r.id === editingId);
+    if (rule) { rule.color = color; saveData(); renderAll(); }
+  }
+}
+function closeCondColorPicker() {
+  document.getElementById('condColorPicker').style.display = 'none';
+  document.getElementById('newCondText').focus();
+}
+
+function condRuleHTML(r) {
+  return `<div class="cond-rule" id="condRule_${r.id}">
+    <span style="width:14px;height:14px;border-radius:4px;background:${r.color};flex-shrink:0;"></span>
+    <span class="cond-text" onclick="startEditCondition('${r.id}')">包含「${esc(r.text)}」</span>
+    <span class="cond-act" onclick="startEditCondition('${r.id}')" title="编辑">✎</span>
+    <span class="cond-act del" onclick="removeConditionRule('${r.id}')" title="删除">×</span>
+  </div>`;
+}
+
+function removeConditionRule(id) {
+  data.conditionRules = data.conditionRules.filter(r => r.id !== id);
+  saveData();
+  const el = document.getElementById('condRule_' + id);
+  if (el) { el.remove(); if (data.conditionRules.length === 0) document.getElementById('conditionRulesList').innerHTML = '<span class="cond-empty" style="font-size:12px;color:var(--text2);">暂无规则，上方添加</span>'; }
+}
+
+function startEditCondition(id) {
+  const rule = data.conditionRules.find(r => r.id === id);
+  if (!rule) return;
+  const el = document.getElementById('condRule_' + id);
+  if (!el) return;
+  document.getElementById('conditionRulesList').dataset.editing = id;
+  // 使用当前系列的颜色
+  const editColors = COLOR_SERIES[currentColorSeries].colors;
+  el.outerHTML = `<div class="cond-rule" id="condRule_${id}" style="flex-wrap:wrap;gap:6px;">
+    <input type="text" id="condEditText_${id}" value="${esc(rule.text)}" style="flex:1;min-width:120px;padding:4px 8px;border:1.5px solid var(--primary);border-radius:6px;font-size:12px;font-family:inherit;outline:none;background:var(--card);color:var(--text);"
+      onkeydown="if(event.key==='Enter' && !event.isComposing)saveEditCondition('${id}');if(event.key==='Escape')renderManageTab()">
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+      ${editColors.map(c => `<span style="width:22px;height:22px;border-radius:4px;background:${c};cursor:pointer;border:2px solid ${c===rule.color?'#333':'var(--border)'};flex-shrink:0;"
+        onclick="pickEditColor(this,'${c}','${id}')" data-color="${c}"></span>`).join('')}
+    </div>
+    <span class="cond-act" onclick="saveEditCondition('${id}')" title="保存">✓</span>
+    <span class="cond-act del" onclick="renderManageTab()" title="取消">×</span>
+  </div>`;
+  const inp = document.getElementById('condEditText_' + id);
+  inp.focus(); inp.select();
+}
+
+function pickEditColor(el, color, id) {
+  const rule = data.conditionRules.find(r => r.id === id);
+  if (!rule) return;
+  rule.color = color;
+  saveData();
+  // 高亮选中的色块
+  const parent = el.closest('.cond-rule');
+  if (parent) {
+    parent.querySelectorAll('span[data-color]').forEach(s => {
+      s.style.borderColor = s.dataset.color === color ? '#333' : 'var(--border)';
+    });
+  }
+}
+
+function saveEditCondition(id) {
+  const inp = document.getElementById('condEditText_' + id);
+  if (!inp) return;
+  const newText = inp.value.trim();
+  if (!newText) { renderManageTab(); return; }
+  const rule = data.conditionRules.find(r => r.id === id);
+  if (!rule) return;
+  if (newText !== rule.text && data.conditionRules.find(r => r.text === newText)) {
+    alert('已存在相同规则'); renderManageTab(); return;
+  }
+  rule.text = newText;
+  delete document.getElementById('conditionRulesList').dataset.editing;
+  saveData(); renderManageTab();
+}
+
+function editConditionRule(id) {
+  startEditCondition(id);
+}
+
+// 根据条件规则获取单元格颜色（返回颜色或 null）
+function getConditionColor(content) {
+  if (!data.conditionRules || !content) return null;
+  for (const rule of data.conditionRules) {
+    if (content.indexOf(rule.text) !== -1) return rule.color;
+  }
+  return null;
+}
+
+function hexToRgba(hex, alpha) {
+  hex = hex.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+document.getElementById('manageModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeManageModal(); });
+document.getElementById('resolveModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeResolveModal(); });
+// 点击取色器外部关闭
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('condColorPicker');
+  if (picker && picker.style.display !== 'none') {
+    if (!e.target.closest('#condColorPicker') && e.target.id !== 'condColorBtn') {
+      picker.style.display = 'none';
+    }
+  }
+});
+
+// ========================= 切换 =========================
+function toggleOverviewMode() {
+  ovConditionMode = !ovConditionMode;
+  document.getElementById('ovModeBtn')._manualOff = !ovConditionMode;
+  renderOverview();
+}
+
+function switchGroup(id) {
+  if (editing) commitEdit();
+  clearSelection();
+  activeGroupId = id;
+  renderAll();
+}
+
+function clearGroup() {
+  if (!activeGroupId || activeGroupId === '__overview__') return;
+  if (!confirm('确定清空当前小组本周所有排班？')) return;
+  const ws = wsKey();
+  const changes = [];
+  if (data.schedules[ws] && data.schedules[ws][activeGroupId]) {
+    Object.entries(data.schedules[ws][activeGroupId]).forEach(([key, entry]) => {
+      const [personId, dateStr] = key.split(/_(.+)/);
+      changes.push({ personId, dateStr, oldVal: entry.note, newVal: '' });
+    });
+    delete data.schedules[ws][activeGroupId];
+  }
+  if (changes.length > 0) {
+    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+    pushUndo(changes);
+  }
+  saveData();
+  clearSelection();
+  renderAll();
+  toast('已清空');
+}
+
+function renderAll() {
+  renderGroupTabs();
+  if (weekGroups().length > 0 && !activeGroupId) activeGroupId = weekGroups()[0].id;
+  const isOv = activeGroupId === '__overview__';
+  document.getElementById('editPanel').style.display = isOv ? 'none' : '';
+  document.getElementById('overviewPanel').style.display = isOv ? '' : 'none';
+  if (isOv) renderOverview(); else renderEditTable();
+}
+
+function renderGroupTabs() {
+  const ws = wsKey();
+  const sched = data.schedules[ws] || {};
+  const scheduleWeek = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const isReadonly = ws < scheduleWeek; // 只有排班周及之后才可编辑小组
+
+  let html = '';
+  if (isReadonly) {
+    html += `<span style="font-size:12px;color:var(--text2);margin-right:8px;">📅 历史周（只读）</span>`;
+    // 记住当前周选中的小组，切换到历史周时强制汇总表
+    if (activeGroupId !== '__overview__') {
+      weekActiveGroup[ws] = activeGroupId;
+    }
+    activeGroupId = '__overview__';
+  } else {
+    // 恢复到该周之前选中的小组
+    if (weekActiveGroup[ws] && activeGroupId === '__overview__') {
+      activeGroupId = weekActiveGroup[ws];
+    }
+    html += weekGroups().map((g, i) => {
+      const color = COLORS[i % COLORS.length];
+      const count = sched[g.id] ? Object.keys(sched[g.id]).length : 0;
+      const active = activeGroupId === g.id;
+      return `<button class="gtab${active?' active':''}" style="${active?`background:${color};color:#fff;`:`border-left:3px solid ${color};`}" onclick="switchGroup('${g.id}')">${esc(g.name)}<span class="cnt">${count}</span></button>`;
+    }).join('');
+  }
+  const ovActive = activeGroupId === '__overview__';
+  html += `<button class="gtab${ovActive?' active':''}" style="${ovActive?'background:#6b7280;color:#fff;':''}" onclick="switchGroup('__overview__')">📊 总览</button>`;
+  if (!isReadonly) html += `<button class="gtab-add" onclick="openManageModal()" title="添加小组">+</button>`;
+  document.getElementById('groupTabs').innerHTML = html;
+}
+
+// ========================= 导出 =========================
+function exportExcel() {
+  const dates = weekDates(currentWeek);
+  const exportData = [['姓名', ...dates.map((d,i) => `${fmtDate(d)} ${DAY_NAMES[i]}`)]];
+  const exportPeople = allPeople();
+  exportPeople.forEach(p => {
+    const row = [p.name];
+    dates.forEach(d => {
+      const info = getScheduleInfo(p.id, fmtFull(d));
+      if (info.type === 'empty') row.push('');
+      else if (info.type === 'single' || info.type === 'resolved') row.push(`${info.groupName}: ${info.note || ''}`);
+      else row.push('冲突:'+info.groups.map(g=>g.groupName).join('/'));
+    });
+    exportData.push(row);
+  });
+  const wb = XLSX.utils.book_new();
+  wb.SheetNames.push('排班汇总');
+  wb.Sheets['排班汇总'] = XLSX.utils.aoa_to_sheet(exportData);
+  XLSX.writeFile(wb, `视频排班汇总_${wsKey()}.xlsx`);
+}
+
+async function exportImage() {
+  const { canvas, container } = await buildExportCanvas();
+  if (!canvas) return;
+
+  const link = document.createElement('a');
+  link.download = `OM1视频制作排班表_${wsKey()}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  document.body.removeChild(container);
+  toast('图片已导出');
+}
+
+async function copyImageToClipboard() {
+  const { canvas, container } = await buildExportCanvas();
+  if (!canvas) return;
+
+  try {
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    toast('图片已复制到剪切板');
+  } catch(e) {
+    toast('复制失败，请尝试导出图片');
+  }
+  document.body.removeChild(container);
+}
+
+async function buildExportCanvas() {
+  // 构建干净的导出表格
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:20px 24px;font-family:sans-serif;';
+
+  const title = document.createElement('h2');
+  title.textContent = 'OM1视频制作排班表';
+  title.style.cssText = 'text-align:center;margin:0 0 4px;font-size:18px;color:#333;';
+  container.appendChild(title);
+
+  const dates = weekDates(currentWeek);
+  const weekStr = `${fmtDate(currentWeek)} ~ ${fmtDate(new Date(currentWeek.getTime()+6*86400000))}`;
+  const subtitle = document.createElement('div');
+  subtitle.textContent = weekStr;
+  subtitle.style.cssText = 'text-align:center;margin:0 0 16px;font-size:12px;color:#999;';
+  container.appendChild(subtitle);
+
+  const table = document.createElement('table');
+  table.style.cssText = 'border-collapse:collapse;width:100%;font-size:12px;';
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const thName = document.createElement('th');
+  thName.textContent = '姓名';
+  thName.style.cssText = 'border:1px solid #ccc;padding:8px;background:#f9f9f9;font-weight:600;min-width:60px;';
+  headerRow.appendChild(thName);
+  dates.forEach((d, i) => {
+    const th = document.createElement('th');
+    th.innerHTML = `${fmtDate(d)}<br><small>${DAY_NAMES[i]}</small>`;
+    th.style.cssText = 'border:1px solid #ccc;padding:8px 6px;background:#f9f9f9;font-weight:600;font-size:11px;min-width:70px;';
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const people = weekPeople();
+  let lastCat = null;
+  people.forEach(p => {
+    if (p._cat !== lastCat) {
+      const sepRow = document.createElement('tr');
+      const sepCell = document.createElement('td');
+      sepCell.colSpan = 8;
+      sepCell.textContent = p._cat === 'internal' ? '内部人员' : '外协人员';
+      sepCell.style.cssText = 'border:1px solid #ccc;padding:6px 8px;background:#f0f0f0;font-weight:600;font-size:12px;';
+      sepRow.appendChild(sepCell);
+      tbody.appendChild(sepRow);
+      lastCat = p._cat;
+    }
+    const tr = document.createElement('tr');
+    const tdName = document.createElement('td');
+    tdName.textContent = p.name;
+    tdName.style.cssText = 'border:1px solid #ccc;padding:6px 8px;text-align:center;font-weight:500;';
+    if (p._cat === 'external') {
+      tdName.style.background = '#fffde7';
+      tr.style.background = '#fffef5';
+    }
+    tr.appendChild(tdName);
+    dates.forEach(d => {
+      const td = document.createElement('td');
+      const info = getScheduleInfo(p.id, fmtFull(d));
+      let content = '';
+      if (info.type === 'single' || info.type === 'resolved' || info.type === 'partial') {
+        content = (info.note || '').replace(/\n/g, '<br>');
+      } else if (info.type === 'conflict') {
+        content = '⚠冲突';
+      }
+      td.innerHTML = content;
+      let cellStyle = 'border:1px solid #ccc;padding:6px 4px;text-align:center;font-size:10px;word-break:break-word;';
+      // 条件格式着色
+      if (content && !info.type.startsWith('conflict') && !info.type.startsWith('empty')) {
+        const condColor = getConditionColor(content);
+        if (condColor) cellStyle += `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:700;`;
+      }
+      td.style.cssText = cellStyle;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  container.appendChild(table);
+
+  document.body.appendChild(container);
+  await new Promise(r => setTimeout(r, 100));
+
+  try {
+    const canvas = await html2canvas(container, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      logging: false,
+    });
+    return { canvas, container };
+  } catch(e) {
+    document.body.removeChild(container);
+    toast('导出失败: ' + e.message);
+    return { canvas: null, container };
+  }
+}
+
+function copyToClipboard() {
+  const dates = weekDates(currentWeek);
+  const lines = [];
+  lines.push(['姓名', ...dates.map((d,i) => `${fmtDate(d)} ${DAY_NAMES[i]}`)].join('\t'));
+  const exportPeople = allPeople();
+  exportPeople.forEach(p => {
+    const cells = [p.name];
+    dates.forEach(d => {
+      const info = getScheduleInfo(p.id, fmtFull(d));
+      if (info.type === 'empty') cells.push('');
+      else if (info.type === 'single' || info.type === 'resolved') cells.push(info.note || '');
+      else cells.push('冲突:'+info.groups.map(g=>g.groupName).join('/'));
+    });
+    lines.push(cells.join('\t'));
+  });
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    toast('已复制到剪贴板');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = lines.join('\n');
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制到剪贴板');
+  });
+}
+
+// ========================= 周选择器 =========================
+function updateWeekUI() {
+  const end = new Date(currentWeek); end.setDate(end.getDate()+6);
+  document.getElementById('weekLabel').textContent = `${fmtDate(currentWeek)} ~ ${fmtDate(end)}`;
+  // 下一周期显示「排班周」标签
+  const nextMonday = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  document.getElementById('weekBadge').style.display = (wsKey() === nextMonday) ? 'inline' : 'none';
+}
+
+function prevWeek() {
+  if (editing) commitEdit();
+  currentWeek = new Date(currentWeek);
+  currentWeek.setDate(currentWeek.getDate() - 7);
+  clearSelection();
+  updateWeekUI();
+  renderAll();
+}
+
+function nextWeek() {
+  if (editing) commitEdit();
+  currentWeek = new Date(currentWeek);
+  currentWeek.setDate(currentWeek.getDate() + 7);
+  clearSelection();
+  updateWeekUI();
+  renderAll();
+}
+
+function jumpToWeek(dateVal) {
+  if (!dateVal) return;
+  if (editing) commitEdit();
+  currentWeek = getMonday(new Date(dateVal + 'T00:00:00'));
+  clearSelection();
+  updateWeekUI();
+  renderAll();
+}
+
+// ========================= 启动 =========================
+(async function init() {
+  await loadData();
+  updateWeekUI();
+  if (weekGroups().length > 0) activeGroupId = weekGroups()[0].id;
+  renderAll();
+  updateUndoHint();
+})();
+</script>
+</body>
+</html>
