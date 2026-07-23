@@ -541,6 +541,12 @@ body {
   </div>
 </div>
 
+<!-- 冲突改排期提示条 -->
+<div id="ovPlaceBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:2000;background:var(--topbar-bg);color:#fff;padding:12px 24px;text-align:center;font-size:14px;font-weight:500;box-shadow:0 2px 12px rgba(0,0,0,0.15);">
+  <span id="ovPlaceBannerText"></span>
+  <button onclick="cancelOvPlacement()" style="margin-left:16px;background:rgba(255,255,255,0.25);border:none;color:#fff;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:13px;">✕ 取消</button>
+</div>
+
 <script>
 // ========================= 数据（本地+远程同步） =========================
 const STORAGE_KEY = 'schedule_v4';
@@ -1702,6 +1708,12 @@ document.addEventListener('mousedown', function(e) {
   // ===== 总览表单元格 =====
   const ovCell = e.target.closest('#overviewTable [data-pid]');
   if (ovCell && activeGroupId === '__overview__') {
+    // 放置模式（冲突改排期）
+    if (ovPlacement && !e.target.closest('#ovPlaceBanner') && !e.target.closest('#ovActionModal') && !e.target.closest('#resolveModal')) {
+      handleOvPlacementClick(ovCell);
+      return;
+    }
+
     const pid = ovCell.dataset.pid;
     const date = ovCell.dataset.date;
     const gid = ovCell.dataset.gid;
@@ -1953,6 +1965,7 @@ document.addEventListener('click', function(e) {
 // 双击：使用 lastClickCell（mousedown 时保存）的信息，不依赖可能已被销毁的 DOM
 document.addEventListener('dblclick', function(e) {
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+  if (ovPlacement) return; // 放置模式下禁止双击
 
   if (!lastClickCell) return;
   const { personId, dateStr, r, c } = lastClickCell;
@@ -2076,6 +2089,25 @@ document.addEventListener('keydown', function(e) {
   // 弹窗模式下不处理
   if (document.getElementById('manageModal').style.display === 'flex' ||
       document.getElementById('resolveModal').style.display === 'flex') return;
+
+  // 放置模式 Esc 取消
+  if (ovPlacement) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (document.getElementById('ovActionModal').style.display === 'flex') {
+        document.getElementById('ovActionModal').style.display = 'none';
+        if (ovPlacement && ovPlacement._targetInfo) {
+          ovPlacement._targetPid = null;
+          ovPlacement._targetDate = null;
+          ovPlacement._targetGid = null;
+          ovPlacement._targetInfo = null;
+        }
+      } else {
+        cancelOvPlacement();
+      }
+    }
+    return;
+  }
 
   const isCtrl = e.ctrlKey || e.metaKey;
 
@@ -2460,6 +2492,7 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId) {
 // ========================= 总览拖拽移动 =========================
 let ovDrag = null;
 let ovDragStarted = false;
+let ovPlacement = null;       // { personId, dateStr, groupId, val, groupName } + _queue: [{...}]
 let selectedCondColor = '#ef4444';
 
 // 直接在 cell data 上查源数据（不用 getCell，因为 overview 下 activeGroupId 不是具体组）
@@ -2497,6 +2530,12 @@ function cleanupOvDrag() {
 
 function ovActionSwap() {
   document.getElementById('ovActionModal').style.display = 'none';
+  // 放置模式
+  if (ovPlacement && ovPlacement._targetPid) {
+    commitOvPlacementSwap(ovPlacement);
+    return;
+  }
+  // 拖拽模式
   if (!ovDrag || !ovDrag._targetPid) return;
   const tInfo = ovDrag._targetInfo;
   const tPid = ovDrag._targetPid;
@@ -2521,6 +2560,12 @@ function ovActionSwap() {
 
 function ovActionJoin() {
   document.getElementById('ovActionModal').style.display = 'none';
+  // 放置模式
+  if (ovPlacement && ovPlacement._targetPid) {
+    commitOvPlacementJoin(ovPlacement);
+    return;
+  }
+  // 拖拽模式
   if (!ovDrag || !ovDrag._targetPid) return;
   const tInfo = ovDrag._targetInfo;
   const tPid = ovDrag._targetPid;
@@ -2547,6 +2592,7 @@ function ovActionJoin() {
 
 function ovActionCancel() {
   document.getElementById('ovActionModal').style.display = 'none';
+  if (ovPlacement) { cancelOvPlacement(); return; }
   cleanupOvDrag();
 }
 
@@ -2573,7 +2619,7 @@ function openResolve(personId, dateStr, personName, dateLabel) {
     const gi = weekGroups().findIndex(gr => gr.id === g.groupId);
     const checked = adopted.includes(g.groupId);
     return `<label class="resolve-opt" style="border-left:3px solid ${COLORS[gi%COLORS.length]};display:flex;align-items:center;gap:12px;cursor:pointer;">
-      <input type="checkbox" value="${g.groupId}" ${checked ? 'checked' : ''}
+      <input type="checkbox" value="${g.groupId}" data-note="${esc(g.note)}" data-group-name="${esc(g.groupName)}" ${checked ? 'checked' : ''}
         style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
       <div><div class="resolve-gname">${esc(g.groupName)}</div><div class="resolve-note">${esc(g.note)}</div></div>
     </label>`;
@@ -2591,18 +2637,183 @@ function doMultiResolve() {
   if (!data.resolutions[ws]) data.resolutions[ws] = {};
   const key = skey(resolveTarget.personId, resolveTarget.dateStr);
 
+  // 找出未被选中的、有排班内容的小组
+  const allChecks = document.querySelectorAll('#resolveOptions input[type="checkbox"]');
+  const unselected = [];
+  allChecks.forEach(c => {
+    if (!c.checked && c.dataset.note) {
+      unselected.push({
+        groupId: c.value,
+        groupName: c.dataset.groupName || '',
+        note: c.dataset.note
+      });
+    }
+  });
+
   if (adopted.length === 0) {
-    // 全部不选 = 清空裁决
     delete data.resolutions[ws][key];
-    toast('已清空裁决');
   } else {
     data.resolutions[ws][key] = adopted.length === 1 ? adopted[0] : adopted;
-    const names = adopted.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('、');
-    toast(`已采纳：${names}`);
   }
   saveData();
   closeResolveModal();
+
+  if (unselected.length > 0) {
+    // 将未选中小组的排班加入改期队列
+    const queue = unselected.map(u => ({
+      personId: resolveTarget.personId,
+      dateStr: resolveTarget.dateStr,
+      groupId: u.groupId,
+      groupName: u.groupName,
+      val: u.note
+    }));
+    startNextOvPlacement(queue);
+  } else {
+    const names = adopted.length > 0
+      ? adopted.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('、')
+      : '无';
+    toast(`已采纳：${names}`);
+    switchGroup('__overview__');
+  }
+}
+
+// ========================= 冲突改期放置 =========================
+function startNextOvPlacement(queue) {
+  if (!queue || queue.length === 0) {
+    ovPlacement = null;
+    document.getElementById('ovPlaceBanner').style.display = 'none';
+    toast('所有未选排班已重新排期');
+    switchGroup('__overview__');
+    return;
+  }
+  const next = queue.shift();
+  ovPlacement = {
+    ...next,
+    _queue: queue
+  };
+  const banner = document.getElementById('ovPlaceBanner');
+  const info = getScheduleInfo(next.personId, next.dateStr);
+  const personName = findPersonInAll(next.personId)?.name || '?';
+  banner.querySelector('#ovPlaceBannerText').textContent =
+    `【${next.groupName}】的「${personName}」(${fmtDate(new Date(next.dateStr+'T00:00:00'))}) 排班未采纳 — 请点击汇总表中的新位置`;
+  banner.style.display = 'block';
   switchGroup('__overview__');
+}
+
+function handleOvPlacementClick(ovCell) {
+  if (!ovPlacement) return false;
+  if (ovCell && typeof ovCell.closest === 'function' && ovCell.closest('#ovPlaceBanner')) return true;
+
+  const tPid = ovCell.dataset.pid;
+  const tDate = ovCell.dataset.date;
+  const tGid = ovCell.dataset.gid;
+  if (!tPid || !tDate) return true;
+
+  const tInfo = getScheduleInfo(tPid, tDate);
+  if (tInfo.type !== 'empty') {
+    // 目标有内容 → 弹窗询问
+    ovPlacement._targetPid = tPid;
+    ovPlacement._targetDate = tDate;
+    ovPlacement._targetGid = tGid;
+    ovPlacement._targetInfo = tInfo;
+    document.getElementById('ovActionInfo').textContent =
+      `目标位置已有内容「${tInfo.type === 'conflict' ? '冲突' : (tInfo.note || '已排班')}」`;
+    document.getElementById('ovActionModal').style.display = 'flex';
+    return true;
+  }
+
+  // 目标为空，直接移动
+  commitOvPlacement(ovPlacement, tPid, tDate, tGid);
+  return true;
+}
+
+function commitOvPlacement(op, tPid, tDate, tGid) {
+  const changes = [];
+  // 从原位置移到新位置
+  setGroupCell(op.groupId, tPid, tDate, op.val);
+  changes.push({ personId: tPid, dateStr: tDate, oldVal: '', newVal: op.val, groupId: op.groupId });
+  // 清空原位置（冲突的那个格子）
+  setGroupCell(op.groupId, op.personId, op.dateStr, '');
+  changes.push({ personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: '', groupId: op.groupId });
+  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+  pushUndo(changes);
+  saveData();
+
+  const pName = findPersonInAll(op.personId)?.name || '?';
+  const dLabel = fmtDate(new Date(tDate+'T00:00:00'));
+  toast(`已将【${op.groupName}】「${pName}」改到 ${dLabel} 的 ${findPersonInAll(tPid)?.name || '?'}`);
+
+  // 处理队列中的下一个
+  startNextOvPlacement(op._queue);
+}
+
+function commitOvPlacementSwap(op) {
+  const tInfo = op._targetInfo;
+  const tPid = op._targetPid;
+  const tDate = op._targetDate;
+  const tGid = op._targetGid;
+
+  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
+                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
+  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
+                     tInfo.type === 'resolved' ? tInfo.groupId : tGid;
+  const targetVal = targetEntry ? targetEntry.note : '';
+
+  const changes = [];
+  setGroupCell(op.groupId, tPid, tDate, op.val);
+  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: op.val, groupId: op.groupId });
+  setGroupCell(targetGid, op.personId, op.dateStr, targetVal);
+  changes.push({ personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: targetVal, groupId: targetGid });
+  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+  pushUndo(changes);
+  saveData();
+
+  const pName = findPersonInAll(op.personId)?.name || '?';
+  toast(`已将【${op.groupName}】「${pName}」交换排期`);
+  document.getElementById('ovActionModal').style.display = 'none';
+  startNextOvPlacement(op._queue);
+}
+
+function commitOvPlacementJoin(op) {
+  const tInfo = op._targetInfo;
+  const tPid = op._targetPid;
+  const tDate = op._targetDate;
+  const tGid = op._targetGid;
+
+  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
+                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
+  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
+                     tInfo.type === 'resolved' ? tInfo.groupId : tGid;
+  const oldTargetVal = targetEntry ? targetEntry.note : '';
+  const newTargetVal = oldTargetVal + '\n' + op.val;
+
+  setGroupCell(targetGid, tPid, tDate, newTargetVal);
+  setGroupCell(op.groupId, op.personId, op.dateStr, '');
+  const changes = [
+    { personId: tPid, dateStr: tDate, oldVal: oldTargetVal, newVal: newTargetVal, groupId: targetGid },
+    { personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: '', groupId: op.groupId },
+  ];
+  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+  pushUndo(changes);
+  saveData();
+
+  const pName = findPersonInAll(op.personId)?.name || '?';
+  toast(`已将【${op.groupName}】「${pName}」加入排期`);
+  document.getElementById('ovActionModal').style.display = 'none';
+  startNextOvPlacement(op._queue);
+}
+
+function cancelOvPlacement() {
+  if (ovPlacement && ovPlacement._queue && ovPlacement._queue.length > 0) {
+    toast(`已取消【${ovPlacement.groupName}】改排期，继续下一个`);
+    startNextOvPlacement(ovPlacement._queue);
+  } else {
+    ovPlacement = null;
+    document.getElementById('ovPlaceBanner').style.display = 'none';
+    document.getElementById('ovActionModal').style.display = 'none';
+    toast('已取消改排期');
+    switchGroup('__overview__');
+  }
 }
 
 // 保留旧接口兼容
