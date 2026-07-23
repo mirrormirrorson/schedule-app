@@ -199,6 +199,7 @@ app.get('*', (req, res) => {
 (async function startup() {
   const ghData = await pullFromGitHub();
   if (ghData) {
+    lastSyncSha = ghData._lastSyncSha || null;
     const cleanData = { ...ghData };
     delete cleanData._lastSyncSha;
     writeDB(cleanData);
