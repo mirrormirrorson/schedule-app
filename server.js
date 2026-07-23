@@ -90,7 +90,7 @@ async function syncToGitHub(data) {
     const apiPath = `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
 
     const body = {
-      message: `数据同步 - ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
+      message: `[skip render] 数据同步 - ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
       content: base64
     };
 
