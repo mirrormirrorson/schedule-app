@@ -154,7 +154,7 @@ body {
 
 .table-card {
   background: var(--card); border-radius: var(--radius);
-  box-shadow: var(--shadow); overflow: hidden; position: relative;
+  box-shadow: var(--shadow); overflow: visible; position: relative;
   border: 1.5px solid var(--border);
 }
 .table-wrap {
@@ -173,7 +173,7 @@ body {
 .schedule-table thead th:first-child { width: 120px; text-align: left; padding-left: 16px; z-index: 4; }
 .schedule-table tbody td {
   border: 1px solid var(--cell-border); padding: 1px; text-align: center;
-  vertical-align: top; height: 56px;
+  vertical-align: top; height: 56px; overflow: visible;
 }
 .schedule-table tbody td:first-child {
   font-weight: 600; text-align: center; padding: 6px 8px; background: var(--name-col-bg);
@@ -234,8 +234,9 @@ body {
   width: 18px; height: 18px; background: #ff4777; color: #fff;
   border-radius: 50%; font-size: 11px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
-  line-height: 1; pointer-events: none;
+  line-height: 1; pointer-events: auto; cursor: pointer;
   box-shadow: 0 1px 4px rgba(255,71,119,0.4);
+  z-index: 1;
 }
 
 .fill-handle {
@@ -276,9 +277,9 @@ body {
 
 .cell-ov-conflict {
   color: var(--danger); background: var(--danger-bg); text-align: center;
-  border: 2px solid var(--danger) !important; font-weight: 600; cursor: pointer;
-  height: 100%; display: flex; align-items: center; justify-content: center;
-  word-break: break-word;
+  border: 2px solid var(--danger) !important; font-weight: 500; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 6px 4px; min-height: 52px;
 }
 .cell-ov-conflict:hover { opacity: 0.85; }
 
@@ -382,6 +383,7 @@ body {
 
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes ovBannerPulse { 0%,100% { box-shadow:0 4px 24px rgba(238,90,36,0.4); } 50% { box-shadow:0 4px 40px rgba(238,90,36,0.7); } }
 </style></head>
 <body>
 
@@ -409,9 +411,15 @@ body {
 
   <div id="editPanel">
     <div class="hint-bar">
-      <span>点击选中 · 拖拽选区域 · 双击编辑</span>
-      <kbd>Ctrl+C</kbd> 复制 <kbd>Ctrl+V</kbd> 粘贴 <kbd>Ctrl+D</kbd> 填充
-      <kbd>Delete</kbd> 清空 <kbd>Ctrl+Z</kbd> 撤销 <kbd>Ctrl+Y</kbd> 重做
+      <span>点击选中 · 双击编辑 · 摁住单元格拖拽 · 摁住右下角选区填充 · Ctrl+点击多选</span>
+      <span style="margin:0 12px;color:var(--border);">|</span>
+      <kbd>Ctrl+C</kbd> 复制
+      <span style="margin:0 6px;"></span>
+      <kbd>Ctrl+V</kbd> 粘贴
+      <span style="margin:0 6px;"></span>
+      <kbd>Ctrl+Z</kbd> 撤销
+      <span style="margin:0 6px;"></span>
+      <kbd>Delete</kbd> 清空
       <span class="hint-spacer"></span>
       <button class="btn" style="font-size:12px;padding:3px 10px;" onclick="clearGroup()">清空当前组</button>
     </div>
@@ -528,6 +536,20 @@ body {
   </div>
 </div>
 
+<!-- 冲突未采纳排班弹窗 -->
+<div class="modal-overlay" id="reassignModal" style="display:none">
+  <div class="modal">
+    <h3>未采纳的排班</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
+      以下排班未被采纳，请逐个改到其他合适位置
+    </p>
+    <div id="reassignList" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
+    <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="skipAllReassign()">全部跳过</button>
+    </div>
+  </div>
+</div>
+
 <!-- 总览拖拽操作弹窗 -->
 <div class="modal-overlay" id="ovActionModal" style="display:none">
   <div class="modal">
@@ -542,9 +564,21 @@ body {
 </div>
 
 <!-- 冲突改排期提示条 -->
-<div id="ovPlaceBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:2000;background:var(--topbar-bg);color:#fff;padding:12px 24px;text-align:center;font-size:14px;font-weight:500;box-shadow:0 2px 12px rgba(0,0,0,0.15);">
+<div id="ovPlaceBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:3000;background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff;padding:16px 24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 4px 24px rgba(238,90,36,0.4);letter-spacing:0.5px;animation:ovBannerPulse 2s ease-in-out infinite;">
   <span id="ovPlaceBannerText"></span>
-  <button onclick="cancelOvPlacement()" style="margin-left:16px;background:rgba(255,255,255,0.25);border:none;color:#fff;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:13px;">✕ 取消</button>
+  <button onclick="cancelOvPlacement()" style="margin-left:20px;background:rgba(255,255,255,0.3);border:1px solid rgba(255,255,255,0.5);color:#fff;padding:6px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">✕ 取消</button>
+</div>
+
+<!-- 冲突详情弹窗 -->
+<div class="modal-overlay" id="conflictDetailModal" style="display:none">
+  <div class="modal" style="max-width:420px;">
+    <h3 style="margin-bottom:6px;" id="conflictDetailTitle">排班冲突</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px;">此单元格被多个小组同时安排：</p>
+    <div id="conflictDetailBody" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div style="text-align:right;margin-top:16px;">
+      <button class="btn btn-p" onclick="document.getElementById('conflictDetailModal').style.display='none'">关闭</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1040,23 +1074,18 @@ function copySelection() {
   const cells = getSelectedCells();
   if (cells.length === 0) return;
 
-  // 计算选中区域的包围盒
-  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
-  cells.forEach(({ r, c }) => {
-    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
-    minC = Math.min(minC, c); maxC = Math.max(maxC, c);
-  });
-
-  const rows = maxR - minR + 1;
-  const cols = maxC - minC + 1;
-  const d = Array.from({ length: rows }, () => Array(cols).fill(''));
-
-  cells.forEach(({ r, c, person }) => {
+  const flatData = cells.map(({ r, c, person }) => {
     const entry = getCell(person.id, fmtFull(weekDates(currentWeek)[c]));
-    d[r - minR][c - minC] = entry ? entry.note : '';
+    return entry ? entry.note : '';
   });
 
-  clipData = { rows, cols, data: d };
+  clipData = { rows: 1, cols: 1, data: [['']], flat: flatData };
+
+  // 写入系统剪贴板：多个格子用 \\n\\n 分隔
+  try {
+    const clipboardText = flatData.join('\n\n');
+    navigator.clipboard.writeText(clipboardText);
+  } catch(e) {}
   toast(`已复制 ${cells.length} 个单元格`);
 }
 
@@ -1081,51 +1110,35 @@ async function pasteToSelection() {
   if (isOv) return pasteOverviewSelection();
 
   const dates = weekDates(currentWeek);
-  let pasteRows, pasteCols, pasteData;
+  let flatData = null;
 
-  // 优先用内部剪贴板
-  if (clipData) {
-    pasteRows = clipData.rows;
-    pasteCols = clipData.cols;
-    pasteData = clipData.data;
-  } else {
-    // 尝试从系统剪贴板读取
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
-      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-      pasteData = lines.map(l => l.split('\t'));
-      pasteRows = pasteData.length;
-      pasteCols = Math.max(...pasteData.map(r => r.length));
-      // 填充短行
-      pasteData.forEach(r => { while (r.length < pasteCols) r.push(''); });
-      clipData = { rows: pasteRows, cols: pasteCols, data: pasteData };
-    } catch(e) {
+  // 始终优先读系统剪贴板
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      flatData = text.split('\n\n');
+      clipData = { flat: flatData };
+    }
+  } catch(e) {}
+
+  // 系统剪贴板为空时，回退到内部剪贴板
+  if (!flatData || flatData.length === 0) {
+    if (clipData && clipData.flat && clipData.flat.length > 0) {
+      flatData = clipData.flat;
+    } else {
       return;
     }
   }
 
-  if (!pasteData || pasteRows === 0) return;
+  if (!flatData || flatData.length === 0) return;
 
   // 获取所有选中的单元格
   const selected = getSelectedCells();
-  const people = weekPeople();
 
   if (selected.length > 0) {
-    // 有选中格子 → 粘贴到每个选中的格子
-    const isSingle = pasteRows === 1 && pasteCols === 1;
     const changes = [];
-    let pi = 0;
-    selected.forEach(({ person, dateStr }) => {
-      let newVal;
-      if (isSingle) {
-        // 单值：全部填入相同内容（保留换行格式）
-        newVal = pasteData[0][0];
-      } else {
-        const dr = pi % pasteRows;
-        const dc = pi % pasteCols;
-        newVal = (pasteData[dr] && pasteData[dr][dc]) ? pasteData[dr][dc] : '';
-      }
+    selected.forEach(({ person, dateStr }, pi) => {
+      const newVal = flatData[pi % flatData.length];
       const oldEntry = getCell(person.id, dateStr);
       const oldVal = oldEntry ? oldEntry.note : '';
 
@@ -1133,7 +1146,6 @@ async function pasteToSelection() {
         setCellValue(person.id, dateStr, newVal);
         changes.push({ personId: person.id, dateStr, oldVal, newVal });
       }
-      pi++;
     });
 
     if (changes.length > 0) {
@@ -1146,29 +1158,28 @@ async function pasteToSelection() {
     return;
   }
 
-  // 无选中 → 网格粘贴
+  // 无选中 → 从激活单元格开始，每个格子依次填 flatData
   let startR, startC;
   if (activeCell) { startR = activeCell.r; startC = activeCell.c; }
   else if (sel) { startR = sel.r1; startC = sel.c1; }
   else { startR = 0; startC = 0; }
 
   const changes = [];
-  for (let dr = 0; dr < pasteRows; dr++) {
-    for (let dc = 0; dc < pasteCols; dc++) {
-      const r = startR + dr;
-      const c = startC + dc;
-      if (r >= people.length || c >= 7) continue;
-
+  const people = weekPeople();
+  let fi = 0;
+  for (let r = startR; r < people.length && fi < flatData.length; r++) {
+    for (let c = r === startR ? startC : 0; c < 7 && fi < flatData.length; c++) {
       const personId = people[r].id;
       const dateStr = fmtFull(dates[c]);
       const oldEntry = getCell(personId, dateStr);
       const oldVal = oldEntry ? oldEntry.note : '';
-      const newVal = (pasteData[dr] && pasteData[dr][dc]) ? pasteData[dr][dc].trim() : '';
+      const newVal = flatData[fi];
 
       if (oldVal !== newVal) {
         setCellValue(personId, dateStr, newVal);
         changes.push({ personId, dateStr, oldVal, newVal });
       }
+      fi++;
     }
   }
 
@@ -1186,10 +1197,11 @@ async function pasteOverviewSelection() {
     try {
       const text = await navigator.clipboard.readText();
       if (!text) return;
-      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-      pasteData = lines.map(l => l.split('\t'));
-      pasteRows = pasteData.length; pasteCols = Math.max(...pasteData.map(r => r.length));
-      pasteData.forEach(r => { while (r.length < pasteCols) r.push(''); });
+      const lines = text.split('\n');
+      const rows = lines.map(l => l.split('\t').map(c => c.replace(/\u2424/g, '\n')));
+      pasteRows = rows.length; pasteCols = Math.max(...rows.map(r => r.length));
+      rows.forEach(r => { while (r.length < pasteCols) r.push(''); });
+      pasteData = rows;
       clipData = { rows: pasteRows, cols: pasteCols, data: pasteData };
     } catch(e) { return; }
   }
@@ -1465,7 +1477,7 @@ function renderEditTable() {
             } else {
               // 无裁决
               isConflict = true;
-              conflictTooltip = `冲突: ${conflicts.join('; ')}`;
+              conflictTooltip = `冲突：${conflicts.join('；')}`;
             }
           }
         }
@@ -1478,14 +1490,13 @@ function renderEditTable() {
           : '';
         html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}"
           data-r="${r}" data-c="${c}" data-pid="${person.id}" data-date="${ds}"
-          title="${esc(conflictTooltip)}"
           style="position:relative;${cellStyle}">`;
         if (isEdit) {
           html += `<textarea placeholder="输入任务" id="editInput"></textarea>`;
         } else {
           html += esc(val || '-');
-          if (isConflict) {
-            html += `<span class="conflict-dot" title="${esc(conflictTooltip)}">!</span>`;
+            if (isConflict) {
+            html += `<span class="conflict-dot" data-tip="${esc(conflictTooltip).replace(/'/g, '&#39;')}">!</span>`;
           }
         }
         html += '</div></td>';
@@ -2088,7 +2099,8 @@ document.addEventListener('keydown', function(e) {
 
   // 弹窗模式下不处理
   if (document.getElementById('manageModal').style.display === 'flex' ||
-      document.getElementById('resolveModal').style.display === 'flex') return;
+      document.getElementById('resolveModal').style.display === 'flex' ||
+      document.getElementById('reassignModal').style.display === 'flex') return;
 
   // 放置模式 Esc 取消
   if (ovPlacement) {
@@ -2412,8 +2424,10 @@ function renderOverview() {
             <small style="font-size:10px;color:#9ca3af;">(已裁决)</small>
           </div></td>`;
         } else {
+          const groupTags = info.groups.map(g => `<span style="display:inline-block;background:${hexToRgba(COLORS[weekGroups().findIndex(gr=>gr.id===g.groupId)%COLORS.length],0.2)};color:var(--text);padding:1px 6px;border-radius:4px;font-size:11px;margin:1px 2px;">${esc(g.groupName)}</span>`).join('');
           html += `<td><div class="cell cell-ov-conflict" onclick="openResolve('${p.id}','${ds}','${esc(p.name)}','${fmtDate(d)}')">
-            ${info.groups.map(g=>esc(g.groupName)).join(' / ')}<br><small style="font-size:10px">点击裁决</small></div></td>`;
+            <div style="font-weight:600;margin-bottom:2px;">${groupTags}</div>
+            <small style="font-size:10px;opacity:0.7;">点击裁决</small></div></td>`;
         }
       });
       html += '</tr>';
@@ -2656,19 +2670,13 @@ function doMultiResolve() {
     data.resolutions[ws][key] = adopted.length === 1 ? adopted[0] : adopted;
   }
   saveData();
-  closeResolveModal();
+  document.getElementById('resolveModal').style.display = 'none';
 
   if (unselected.length > 0) {
-    // 将未选中小组的排班加入改期队列
-    const queue = unselected.map(u => ({
-      personId: resolveTarget.personId,
-      dateStr: resolveTarget.dateStr,
-      groupId: u.groupId,
-      groupName: u.groupName,
-      val: u.note
-    }));
-    startNextOvPlacement(queue);
+    // 显示未采纳排班弹窗
+    showReassignModal(unselected);
   } else {
+    resolveTarget = null;
     const names = adopted.length > 0
       ? adopted.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('、')
       : '无';
@@ -2677,32 +2685,71 @@ function doMultiResolve() {
   }
 }
 
-// ========================= 冲突改期放置 =========================
-function startNextOvPlacement(queue) {
-  if (!queue || queue.length === 0) {
-    ovPlacement = null;
-    document.getElementById('ovPlaceBanner').style.display = 'none';
-    toast('所有未选排班已重新排期');
+// ========================= 未采纳排班改期弹窗 =========================
+let reassignQueue = [];
+
+function showReassignModal(items) {
+  reassignQueue = items;
+  renderReassignModal();
+  document.getElementById('reassignModal').style.display = 'flex';
+}
+
+function renderReassignModal() {
+  const list = document.getElementById('reassignList');
+  if (reassignQueue.length === 0) {
+    document.getElementById('reassignModal').style.display = 'none';
+    resolveTarget = null;
+    toast('所有未采纳排班已处理完毕');
     switchGroup('__overview__');
     return;
   }
-  const next = queue.shift();
+  list.innerHTML = reassignQueue.map((u, i) => {
+    const personName = findPersonInAll(resolveTarget.personId)?.name || '?';
+    const dateLabel = fmtDate(new Date(resolveTarget.dateStr + 'T00:00:00'));
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+      <div>
+        <span style="font-weight:500;">${esc(u.groupName)}</span>
+        <span style="color:var(--text2);margin-left:8px;font-size:12px;">${esc(personName)} · ${dateLabel}</span>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${esc(u.note.substring(0, 40))}${u.note.length > 40 ? '...' : ''}</div>
+      </div>
+      <button class="btn btn-p" style="font-size:12px;padding:4px 12px;white-space:nowrap;"
+        onclick="startOvPlacementItem(${i})">改到其他排期</button>
+    </div>`;
+  }).join('');
+}
+
+function skipAllReassign() {
+  document.getElementById('reassignModal').style.display = 'none';
+  reassignQueue = [];
+  resolveTarget = null;
+  toast('已跳过所有未采纳排班');
+  switchGroup('__overview__');
+}
+
+function startOvPlacementItem(index) {
+  const item = reassignQueue[index];
+  reassignQueue.splice(index, 1); // 从队列中移除
+  document.getElementById('reassignModal').style.display = 'none';
+
   ovPlacement = {
-    ...next,
-    _queue: queue
+    personId: resolveTarget.personId,
+    dateStr: resolveTarget.dateStr,
+    groupId: item.groupId,
+    groupName: item.groupName,
+    val: item.note
   };
+
+  const personName = findPersonInAll(resolveTarget.personId)?.name || '?';
+  const dateLabel = fmtDate(new Date(resolveTarget.dateStr + 'T00:00:00'));
   const banner = document.getElementById('ovPlaceBanner');
-  const info = getScheduleInfo(next.personId, next.dateStr);
-  const personName = findPersonInAll(next.personId)?.name || '?';
   banner.querySelector('#ovPlaceBannerText').textContent =
-    `【${next.groupName}】的「${personName}」(${fmtDate(new Date(next.dateStr+'T00:00:00'))}) 排班未采纳 — 请点击汇总表中的新位置`;
+    `请为【${item.groupName}】的「${personName}」(${dateLabel}) 选择新的排期，点击单元格即可`;
   banner.style.display = 'block';
   switchGroup('__overview__');
 }
 
 function handleOvPlacementClick(ovCell) {
   if (!ovPlacement) return false;
-  if (ovCell && typeof ovCell.closest === 'function' && ovCell.closest('#ovPlaceBanner')) return true;
 
   const tPid = ovCell.dataset.pid;
   const tDate = ovCell.dataset.date;
@@ -2729,10 +2776,8 @@ function handleOvPlacementClick(ovCell) {
 
 function commitOvPlacement(op, tPid, tDate, tGid) {
   const changes = [];
-  // 从原位置移到新位置
   setGroupCell(op.groupId, tPid, tDate, op.val);
   changes.push({ personId: tPid, dateStr: tDate, oldVal: '', newVal: op.val, groupId: op.groupId });
-  // 清空原位置（冲突的那个格子）
   setGroupCell(op.groupId, op.personId, op.dateStr, '');
   changes.push({ personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: '', groupId: op.groupId });
   changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
@@ -2740,23 +2785,21 @@ function commitOvPlacement(op, tPid, tDate, tGid) {
   saveData();
 
   const pName = findPersonInAll(op.personId)?.name || '?';
-  const dLabel = fmtDate(new Date(tDate+'T00:00:00'));
+  const dLabel = fmtDate(new Date(tDate + 'T00:00:00'));
   toast(`已将【${op.groupName}】「${pName}」改到 ${dLabel} 的 ${findPersonInAll(tPid)?.name || '?'}`);
 
-  // 处理队列中的下一个
-  startNextOvPlacement(op._queue);
+  finishOvPlacement();
 }
 
 function commitOvPlacementSwap(op) {
   const tInfo = op._targetInfo;
   const tPid = op._targetPid;
   const tDate = op._targetDate;
-  const tGid = op._targetGid;
 
   const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
                        tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
   const targetGid = tInfo.type === 'single' ? tInfo.groupId :
-                     tInfo.type === 'resolved' ? tInfo.groupId : tGid;
+                     tInfo.type === 'resolved' ? tInfo.groupId : op._targetGid;
   const targetVal = targetEntry ? targetEntry.note : '';
 
   const changes = [];
@@ -2771,19 +2814,18 @@ function commitOvPlacementSwap(op) {
   const pName = findPersonInAll(op.personId)?.name || '?';
   toast(`已将【${op.groupName}】「${pName}」交换排期`);
   document.getElementById('ovActionModal').style.display = 'none';
-  startNextOvPlacement(op._queue);
+  finishOvPlacement();
 }
 
 function commitOvPlacementJoin(op) {
   const tInfo = op._targetInfo;
   const tPid = op._targetPid;
   const tDate = op._targetDate;
-  const tGid = op._targetGid;
 
   const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
                        tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
   const targetGid = tInfo.type === 'single' ? tInfo.groupId :
-                     tInfo.type === 'resolved' ? tInfo.groupId : tGid;
+                     tInfo.type === 'resolved' ? tInfo.groupId : op._targetGid;
   const oldTargetVal = targetEntry ? targetEntry.note : '';
   const newTargetVal = oldTargetVal + '\n' + op.val;
 
@@ -2800,18 +2842,39 @@ function commitOvPlacementJoin(op) {
   const pName = findPersonInAll(op.personId)?.name || '?';
   toast(`已将【${op.groupName}】「${pName}」加入排期`);
   document.getElementById('ovActionModal').style.display = 'none';
-  startNextOvPlacement(op._queue);
+  finishOvPlacement();
+}
+
+function finishOvPlacement() {
+  ovPlacement = null;
+  document.getElementById('ovPlaceBanner').style.display = 'none';
+  if (reassignQueue.length > 0) {
+    renderReassignModal();
+    document.getElementById('reassignModal').style.display = 'flex';
+  } else {
+    resolveTarget = null;
+    toast('所有未采纳排班已处理完毕');
+    switchGroup('__overview__');
+  }
 }
 
 function cancelOvPlacement() {
-  if (ovPlacement && ovPlacement._queue && ovPlacement._queue.length > 0) {
-    toast(`已取消【${ovPlacement.groupName}】改排期，继续下一个`);
-    startNextOvPlacement(ovPlacement._queue);
+  // 把当前这个放回队列，继续处理其他的
+  if (ovPlacement) {
+    reassignQueue.unshift({
+      groupId: ovPlacement.groupId,
+      groupName: ovPlacement.groupName,
+      note: ovPlacement.val
+    });
+  }
+  ovPlacement = null;
+  document.getElementById('ovPlaceBanner').style.display = 'none';
+  document.getElementById('ovActionModal').style.display = 'none';
+  if (reassignQueue.length > 0) {
+    renderReassignModal();
+    document.getElementById('reassignModal').style.display = 'flex';
   } else {
-    ovPlacement = null;
-    document.getElementById('ovPlaceBanner').style.display = 'none';
-    document.getElementById('ovActionModal').style.display = 'none';
-    toast('已取消改排期');
+    resolveTarget = null;
     switchGroup('__overview__');
   }
 }
@@ -2819,8 +2882,38 @@ function cancelOvPlacement() {
 // 保留旧接口兼容
 function doResolve(groupId, el) { doMultiResolve(); }
 
+// 冲突详情弹窗 - 事件委托
+document.addEventListener('click', function(e) {
+  const dot = e.target.closest('.conflict-dot');
+  if (!dot) return;
+  const tip = dot.getAttribute('data-tip');
+  if (!tip) return;
+  e.stopPropagation();
+  showConflictDetail(tip);
+});
+
+function showConflictDetail(conflictText) {
+  const modal = document.getElementById('conflictDetailModal');
+  const body = document.getElementById('conflictDetailBody');
+  const items = conflictText.replace(/^冲突：/, '').split('；');
+  body.innerHTML = items.map((item, i) => {
+    const colon = item.indexOf(': ');
+    const gname = colon > 0 ? item.substring(0, colon) : item;
+    const note = colon > 0 ? item.substring(colon + 2) : '';
+    const gi = weekGroups().findIndex(g => g.name === gname);
+    const color = gi >= 0 ? COLORS[gi % COLORS.length] : '#888';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--bg);border-radius:8px;border-left:3px solid ${color};">
+      <span style="font-weight:600;color:${color};white-space:nowrap;">${esc(gname)}</span>
+      <span style="color:var(--text);line-height:1.5;word-break:break-word;">${esc(note)}</span>
+    </div>`;
+  }).join('');
+  modal.style.display = 'flex';
+}
+
 function closeResolveModal() {
   document.getElementById('resolveModal').style.display = 'none';
+  document.getElementById('reassignModal').style.display = 'none';
+  reassignQueue = [];
   resolveTarget = null;
 }
 
@@ -2894,33 +2987,34 @@ document.documentElement.setAttribute('data-theme', currentTheme);
 function renderThemeTab() {
   let html = '';
 
-  // 配色：2列2行
-  html += '<p style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">🎨 配色</p>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">';
+  // 配色：横向排列
+  html += '<p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;">主题</p>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:20px;">';
   html += THEMES.map(t => `
     <div onclick="applyTheme('${t.id}');renderThemeTab()" style="
-      cursor:pointer; border-radius:10px; padding:12px 14px; border:2px solid ${t.id===currentTheme?'var(--primary)':'var(--border)'};
-      display:flex; align-items:center; gap:10px;
+      cursor:pointer; border-radius:8px; padding:10px 16px; border:2px solid ${t.id===currentTheme?'var(--primary)':'var(--border)'};
       background:${t.id===currentTheme?'var(--cell-hover-bg)':'var(--card)'};
+      display:flex;align-items:center;gap:8px;flex:1;
     ">
       <div style="display:flex;gap:3px;">
-        ${t.colors.map(c=>`<span style="width:16px;height:16px;border-radius:4px;background:${c};"></span>`).join('')}
+        ${t.colors.map(c=>`<span style="width:14px;height:14px;border-radius:3px;background:${c};"></span>`).join('')}
       </div>
-      <span style="font-size:14px;font-weight:600;color:var(--text);">${t.name}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--text);">${t.name}</span>
     </div>
   `).join('');
   html += '</div>';
 
-  // 字体
-  html += '<p style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">🔤 字体</p>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+  // 字体：横向排列
+  html += '<p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;">字体</p>';
+  html += '<div style="display:flex;gap:8px;">';
   html += FONTS.map(f => `
     <div onclick="applyFont('${f.id}')" style="
-      cursor:pointer; border-radius:10px; padding:12px 14px; border:2px solid ${f.id===currentFont?'var(--primary)':'var(--border)'};
+      cursor:pointer; border-radius:8px; padding:10px 16px; border:2px solid ${f.id===currentFont?'var(--primary)':'var(--border)'};
       background:${f.id===currentFont?'var(--cell-hover-bg)':'var(--card)'};
+      text-align:center;flex:1;
     ">
-      <div style="font-size:18px;font-weight:${f.weight};color:var(--text);line-height:1.3;font-family:${f.css};text-shadow:none;">${f.preview}</div>
-      <div style="font-size:11px;color:var(--text2);">${f.name}</div>
+      <div style="font-size:16px;font-weight:${f.weight};color:var(--text);font-family:${f.css};">${f.preview}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px;">${f.name}</div>
     </div>
   `).join('');
   html += '</div>';
@@ -3252,6 +3346,7 @@ function hexToRgba(hex, alpha) {
 
 document.getElementById('manageModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeManageModal(); });
 document.getElementById('resolveModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeResolveModal(); });
+document.getElementById('conflictDetailModal').addEventListener('click', e => { if (e.target===e.currentTarget) e.currentTarget.style.display='none'; });
 // 点击取色器外部关闭
 document.addEventListener('click', function(e) {
   const picker = document.getElementById('condColorPicker');
