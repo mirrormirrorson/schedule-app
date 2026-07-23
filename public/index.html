@@ -2560,11 +2560,47 @@ function ovActionSwap() {
   const targetGid = tInfo.type === 'single' ? tInfo.groupId :
                      tInfo.type === 'resolved' ? tInfo.groupId : ovDrag.groupId;
   const targetVal = targetEntry ? targetEntry.note : '';
+  // 交换：收集双方位置的全部小组，交换后清理所有残留
+  const srcGid = ovDrag.groupId;
+  const tgtGid = targetGid;
+  const srcPid = ovDrag.personId;
+  const srcDate = ovDrag.dateStr;
+  const srcVal = ovDrag.val;
+  
+  // 先写新位置
+  setGroupCell(srcGid, tPid, tDate, srcVal);
+  setGroupCell(tgtGid, srcPid, srcDate, targetVal);
+  
+  // 全面清理旧位置：遍历所有小组，清除在 srcDate/srcPid 和 tDate/tPid 的旧条目
+  weekGroups().forEach(g => {
+    const gid = g.id;
+    // 清除来源组在源位置的旧数据（源组不应该还留在原处）
+    if (gid === srcGid) setGroupCell(srcGid, srcPid, srcDate, '');
+    // 清除目标组在目标位置的旧数据
+    if (gid === tgtGid) setGroupCell(tgtGid, tPid, tDate, '');
+  });
+  
+  // 确保数据一致性：循环结束后检查源位和目标位是否只各有一个组
+  // 如果多于一个组存在，额外清理
+  weekGroups().forEach(g => {
+    const gid = g.id;
+    const ws = wsKey();
+    const srcKey = skey(srcPid, srcDate);
+    const tgtKey = skey(tPid, tDate);
+    if (data.schedules[ws] && data.schedules[ws][gid]) {
+      // 不是源组也不是目标组，但在源位有数据 → 可能是旧冲突残留
+      if (gid !== srcGid && gid !== tgtGid && data.schedules[ws][gid][srcKey]) {
+        delete data.schedules[ws][gid][srcKey];
+      }
+      if (gid !== srcGid && gid !== tgtGid && data.schedules[ws][gid][tgtKey]) {
+        delete data.schedules[ws][gid][tgtKey];
+      }
+    }
+  });
+  
   const changes = [];
-  setGroupCell(ovDrag.groupId, tPid, tDate, ovDrag.val);
-  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: ovDrag.val, groupId: ovDrag.groupId });
-  setGroupCell(targetGid, ovDrag.personId, ovDrag.dateStr, targetVal);
-  changes.push({ personId: ovDrag.personId, dateStr: ovDrag.dateStr, oldVal: ovDrag.val, newVal: targetVal, groupId: targetGid });
+  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: srcVal, groupId: srcGid });
+  changes.push({ personId: srcPid, dateStr: srcDate, oldVal: srcVal, newVal: targetVal, groupId: tgtGid });
   changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
   pushUndo(changes);
   saveData();
@@ -2802,11 +2838,22 @@ function commitOvPlacementSwap(op) {
                      tInfo.type === 'resolved' ? tInfo.groupId : op._targetGid;
   const targetVal = targetEntry ? targetEntry.note : '';
 
+  const srcGid2 = op.groupId;
+  const tgtGid2 = targetGid;
+  const srcPid2 = op.personId;
+  const srcDate2 = op.dateStr;
+  const srcVal2 = op.val;
+
+  setGroupCell(srcGid2, tPid, tDate, srcVal2);
+  setGroupCell(tgtGid2, srcPid2, srcDate2, targetVal);
+  weekGroups().forEach(g => {
+    if (g.id === srcGid2) setGroupCell(srcGid2, srcPid2, srcDate2, '');
+    if (g.id === tgtGid2) setGroupCell(tgtGid2, tPid, tDate, '');
+  });
+
   const changes = [];
-  setGroupCell(op.groupId, tPid, tDate, op.val);
-  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: op.val, groupId: op.groupId });
-  setGroupCell(targetGid, op.personId, op.dateStr, targetVal);
-  changes.push({ personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: targetVal, groupId: targetGid });
+  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: srcVal2, groupId: srcGid2 });
+  changes.push({ personId: srcPid2, dateStr: srcDate2, oldVal: srcVal2, newVal: targetVal, groupId: tgtGid2 });
   changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
   pushUndo(changes);
   saveData();
