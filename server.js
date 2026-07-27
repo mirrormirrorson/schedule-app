@@ -130,7 +130,7 @@ function readDB() {
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
     return JSON.parse(raw);
   } catch (e) {
-    return { internalPeople:[], externalPeople:[], groups:[], schedules:{}, resolutions:{}, _updated: 0 };
+    return { internalPeople:[], externalPeople:[], groups:[], schedules:{}, _updated: 0 };
   }
 }
 
@@ -162,7 +162,6 @@ app.post('/api/state', (req, res) => {
   if (newData.internalPeople) merged.internalPeople = newData.internalPeople;
   if (newData.externalPeople) merged.externalPeople = newData.externalPeople;
   if (newData.groups) merged.groups = newData.groups;
-  if (newData.resolutions) merged.resolutions = newData.resolutions;
   if (newData.conditionRules) merged.conditionRules = newData.conditionRules;
   if (newData.weekPeople) merged.weekPeople = newData.weekPeople;
 

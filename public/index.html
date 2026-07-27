@@ -124,6 +124,14 @@ body {
 .btn-p:hover { background: var(--primary-hover); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
 .btn-g { border-color: transparent; background: transparent; }
 .btn-g:hover { background: var(--cell-hover-bg); }
+.btn-w {
+  background: #fff; color: var(--primary); border-color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.btn-w:hover {
+  background: #fff; transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+}
 
 .main { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
 
@@ -166,19 +174,20 @@ body {
 }
 .schedule-table thead th {
   background: var(--thead-bg);
-  font-weight: 700; font-size: 12px; color: var(--text2);
-  text-align: center; padding: 12px 6px; border-bottom: 2px solid var(--thead-border);
-  position: sticky; top: 0; z-index: 3;
+  font-weight: 700; font-size: 15px; color: var(--text2);
+  text-align: center; padding: 14px 6px; border-bottom: 2px solid var(--thead-border);
+  position: sticky; top: 0; z-index: 3; line-height: 1.3;
 }
-.schedule-table thead th:first-child { width: 120px; text-align: left; padding-left: 16px; z-index: 4; }
+.schedule-table thead th small { font-size: 13px; font-weight: 600; }
+.schedule-table thead th:first-child { width: 150px; text-align: left; padding-left: 16px; z-index: 4; }
 .schedule-table tbody td {
   border: 1px solid var(--cell-border); padding: 1px; text-align: center;
-  vertical-align: top; height: 56px; overflow: visible;
+  vertical-align: top; overflow: visible; height: 1px;
 }
 .schedule-table tbody td:first-child {
-  font-weight: 600; text-align: center; padding: 6px 8px; background: var(--name-col-bg);
-  position: sticky; left: 0; z-index: 2; color: var(--text); font-size: 14px;
-  border-right: 2px solid var(--cell-border); vertical-align: middle;
+  font-weight: 600; text-align: center; padding: 8px 10px; background: var(--name-col-bg);
+  position: sticky; left: 0; z-index: 2; color: var(--text); font-size: 16px; width: 150px;
+  border-right: 2px solid var(--cell-border); vertical-align: middle; line-height: 1.35;
 }
 .row-del {
   display: none; margin-left: 6px; cursor: pointer; color: #d4a0b0;
@@ -187,57 +196,74 @@ body {
 .schedule-table tr:hover .row-del { display: inline; }
 .row-del:hover { color: var(--danger); }
 .schedule-table tr.row-external td:first-child { background: var(--external-name-col-bg); }
+.person-name { white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
 .schedule-table tr.row-external td { background: var(--external-row-bg); }
 
 .cell {
-  height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+  height: 100%; min-height: 56px; display: flex; align-items: stretch; text-align: center;
   border-radius: 6px; cursor: cell; font-size: 13px; font-weight: 500;
-  transition: all .15s; border: 2px solid transparent;
-  word-break: break-word; white-space: pre-wrap; padding: 4px 6px;
+  transition: background .15s, outline-color .15s; outline: 2px solid transparent; outline-offset: -2px;
+  word-break: break-word; white-space: pre-wrap;
   flex-direction: column; box-sizing: border-box;
+  gap: 3px; padding: 3px;
 }
-.cell:hover { background: var(--cell-hover-bg); border-color: var(--cell-hover-bd); }
-.cell-empty { color: #e8c8d4; height: 100%; display: flex; align-items: center; justify-content: center; }
+.cell:hover { background: var(--cell-hover-bg); outline-color: var(--cell-hover-bd); }
+.cell-empty { color: #e8c8d4; display: flex; align-items: center; justify-content: center; }
 .cell-empty:hover { color: var(--text2); }
 
 .cell.selected {
   background: var(--cell-select-bg) !important;
-  border-color: var(--cell-select-bd) !important;
+  outline-color: var(--cell-select-bd) !important;
   z-index: 1;
 }
 .cell.active-cell {
-  border-color: var(--primary) !important;
+  outline-color: var(--primary) !important;
   box-shadow: 0 0 0 2px rgba(59,130,246,.2);
   z-index: 2;
 }
 .cell.active-cell.selected {
-  border-color: var(--primary) !important;
+  outline-color: var(--primary) !important;
   background: var(--cell-active-bg) !important;
 }
 
 .cell.editing {
-  border-color: var(--primary) !important;
+  outline-color: var(--primary) !important;
   background: var(--card) !important;
   box-shadow: 0 0 0 3px rgba(59,130,246,.2);
   z-index: 5; cursor: text; padding: 2px;
+  height: auto; min-height: 56px;
 }
 .cell.editing textarea {
-  flex: 1; width: 100%; border: none; background: transparent;
+  flex: 0 0 auto; width: 100%; border: none; background: transparent;
   text-align: center; font-size: 13px; font-weight: 500; font-family: inherit;
-  outline: none; padding: 4px; color: var(--text); resize: vertical;
-  word-break: break-word; white-space: pre-wrap;
+  outline: none; padding: 4px; color: var(--text); resize: none; overflow: hidden;
+  word-break: break-word; white-space: pre-wrap; min-height: 56px;
 }
 .cell.editing textarea::placeholder { color: #e8c8d4; font-weight: 400; }
 
-.cell .conflict-dot {
-  position: absolute; top: 2px; right: 2px;
-  width: 18px; height: 18px; background: #ff4777; color: #fff;
-  border-radius: 50%; font-size: 11px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  line-height: 1; pointer-events: auto; cursor: pointer;
-  box-shadow: 0 1px 4px rgba(255,71,119,0.4);
-  z-index: 1;
+.cell-tooltip {
+  position: fixed;
+  display: none;
+  max-width: 320px;
+  background: var(--card);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  box-shadow: 0 6px 24px rgba(0,0,0,.12);
+  z-index: 500;
+  pointer-events: none;
+  white-space: normal;
+  word-break: break-word;
 }
+.cell-tooltip .tip-title { font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+.cell-tooltip .tip-item { padding: 3px 0; border-top: 1px dashed var(--border); }
+.cell-tooltip .tip-item:first-of-type { border-top: none; }
+.cell-tooltip .tip-group { font-weight: 600; color: var(--primary); display: block; margin-bottom: 2px; }
+.cell-tooltip .tip-content { white-space: pre-wrap; }
+.cell-tooltip .tip-message { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); font-weight: 600; color: var(--text); }
 
 .fill-handle {
   position: absolute;
@@ -275,21 +301,30 @@ body {
   box-shadow: inset 0 0 0 2px #ffb3c6;
 }
 
-.cell-ov-conflict {
-  color: var(--danger); background: var(--danger-bg); text-align: center;
-  border: 2px solid var(--danger) !important; font-weight: 500; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; padding: 6px 4px; min-height: 52px;
+/* 汇总表独立小组块：只显示内容文字，按小组配色区分 */
+.ov-cell { height: 100%; padding: 3px; display: flex; flex-direction: column; gap: 3px; box-sizing: border-box; }
+/* 单块时占满单元格，多块时上下均分；min-height:auto 保证内容不被截断 */
+.ov-block {
+  flex: 1 1 0;
+  padding: 4px 8px; border-radius: 7px; font-size: 12px; line-height: 1.45;
+  cursor: grab; word-break: break-word; white-space: pre-wrap;
+  transition: filter .15s, transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  display: flex; align-items: center; justify-content: center; text-align: center;
 }
-.cell-ov-conflict:hover { opacity: 0.85; }
+.ov-block:hover { filter: brightness(0.95); }
+.ov-block:active { cursor: grabbing; transform: scale(0.98); }
+.ov-block.dragging { opacity: 0.4; }
 
-.conflict-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-.conflict-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 18px; background: var(--card); border-radius: var(--radius);
-  border: 1.5px solid var(--border); box-shadow: var(--shadow); font-size: 13px;
+.et-block {
+  flex: 1 1 0;
+  padding: 4px 8px; border-radius: 7px; font-size: 12px; line-height: 1.45;
+  cursor: grab; word-break: break-word; white-space: pre-wrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  display: flex; align-items: center; justify-content: center; text-align: center;
 }
-.conflict-item .ci-name { color: var(--danger); font-weight: 700; }
+.et-block:hover { filter: brightness(0.95); }
+.et-block:active { cursor: grabbing; transform: scale(0.98); }
+.et-block.dragging { opacity: 0.4; }
 
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.35); backdrop-filter: blur(4px);
@@ -306,10 +341,11 @@ body {
 .modal-section { margin-bottom: 20px; }
 .modal-section h4 { font-size: 13px; color: var(--text2); font-weight: 600; margin-bottom: 10px; }
 .modal-row { display: flex; gap: 8px; margin-bottom: 10px; }
-.modal-row input { flex: 1; padding: 8px 14px; border: 1.5px solid var(--border);
+.modal-row input, .modal-row textarea { flex: 1; padding: 8px 14px; border: 1.5px solid var(--border);
   border-radius: 8px; font-size: 13px; outline: none; font-family: inherit;
-  background: var(--card); color: var(--text); }
-.modal-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+  background: var(--card); color: var(--text); resize: vertical; }
+.modal-row input:focus, .modal-row textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.modal-row textarea { min-height: 56px; white-space: pre-wrap; word-break: break-word; }
 .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px;
   background: var(--tag-bg); border: 1.5px solid var(--border); border-radius: 18px; font-size: 13px; font-weight: 500; }
@@ -390,6 +426,7 @@ body {
 <div class="topbar">
   <div class="topbar-l">
     <div class="logo"><span class="logo-dot"></span>🎀 视频排班汇总</div>
+    <button class="btn btn-w" onclick="goToScheduleWeek()" style="padding:5px 12px;font-size:13px;white-space:nowrap;">📋 去排班</button>
     <div class="week-nav">
       <button class="btn btn-g" onclick="prevWeek()" style="padding:2px 8px;font-size:14px;">◀</button>
       <span id="weekLabel" style="font-size:13px;font-weight:500;min-width:110px;text-align:center;cursor:pointer;" onclick="document.getElementById('weekDateInput').showPicker()" title="点击选择日期"></span>
@@ -442,12 +479,6 @@ body {
         <table class="schedule-table" id="overviewTable"></table>
       </div>
     </div>
-    <div id="conflictSection" style="display:none">
-      <div style="font-weight:600;margin:16px 0 8px;font-size:14px;">
-        待解决冲突 <span style="color:var(--danger)" id="conflictBadge"></span>
-      </div>
-      <div class="conflict-list" id="conflictList"></div>
-    </div>
   </div>
 </div>
 
@@ -468,16 +499,16 @@ body {
       <div class="modal-section">
         <h4>内部人员</h4>
         <div class="modal-row">
-          <input type="text" id="newInternalInput" placeholder="输入姓名，回车添加" onkeydown="if(event.key==='Enter' && !event.isComposing)addPerson('internal')">
-          <button class="btn btn-p" onclick="addPerson('internal')">添加</button>
+          <textarea id="newInternalInput" placeholder="按Enter换行" onkeydown="event.stopPropagation(); if((event.key==='Enter' && (event.ctrlKey||event.metaKey)) && !event.isComposing){event.preventDefault();addPersonFromInput('internal');}"></textarea>
+          <button class="btn btn-p" onclick="addPersonFromInput('internal')">添加</button>
         </div>
         <div class="tag-row" id="manageInternalTags"></div>
       </div>
       <div class="modal-section">
         <h4>外协人员</h4>
         <div class="modal-row">
-          <input type="text" id="newExternalInput" placeholder="输入姓名，回车添加" onkeydown="if(event.key==='Enter' && !event.isComposing)addPerson('external')">
-          <button class="btn btn-p" onclick="addPerson('external')">添加</button>
+          <textarea id="newExternalInput" placeholder="按Enter换行" onkeydown="event.stopPropagation(); if((event.key==='Enter' && (event.ctrlKey||event.metaKey)) && !event.isComposing){event.preventDefault();addPersonFromInput('external');}"></textarea>
+          <button class="btn btn-p" onclick="addPersonFromInput('external')">添加</button>
         </div>
         <div class="tag-row" id="manageExternalTags"></div>
       </div>
@@ -526,61 +557,6 @@ body {
   </div>
 </div>
 
-<!-- 裁决弹窗 -->
-<div class="modal-overlay" id="resolveModal" style="display:none">
-  <div class="modal">
-    <h3>解决排班冲突</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="resolveInfo"></p>
-    <div class="resolve-options" id="resolveOptions"></div>
-    <div style="text-align:right"><button class="btn" onclick="closeResolveModal()">取消</button></div>
-  </div>
-</div>
-
-<!-- 冲突未采纳排班弹窗 -->
-<div class="modal-overlay" id="reassignModal" style="display:none">
-  <div class="modal">
-    <h3>未采纳的排班</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
-      以下排班未被采纳，请逐个改到其他合适位置
-    </p>
-    <div id="reassignList" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>
-    <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn" onclick="skipAllReassign()">全部跳过</button>
-    </div>
-  </div>
-</div>
-
-<!-- 总览拖拽操作弹窗 -->
-<div class="modal-overlay" id="ovActionModal" style="display:none">
-  <div class="modal">
-    <h3>目标位置已有内容</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="ovActionInfo"></p>
-    <div style="display:flex;gap:8px;justify-content:center;">
-      <button class="btn btn-p" onclick="ovActionSwap()">🔄 交换</button>
-      <button class="btn btn-p" style="background:linear-gradient(135deg,#f59e0b,#f59e0b);" onclick="ovActionJoin()">➕ 加入</button>
-      <button class="btn" onclick="ovActionCancel()">取消</button>
-    </div>
-  </div>
-</div>
-
-<!-- 冲突改排期提示条 -->
-<div id="ovPlaceBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:3000;background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff;padding:16px 24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 4px 24px rgba(238,90,36,0.4);letter-spacing:0.5px;animation:ovBannerPulse 2s ease-in-out infinite;">
-  <span id="ovPlaceBannerText"></span>
-  <button onclick="cancelOvPlacement()" style="margin-left:20px;background:rgba(255,255,255,0.3);border:1px solid rgba(255,255,255,0.5);color:#fff;padding:6px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">✕ 取消</button>
-</div>
-
-<!-- 冲突详情弹窗 -->
-<div class="modal-overlay" id="conflictDetailModal" style="display:none">
-  <div class="modal" style="max-width:420px;">
-    <h3 style="margin-bottom:6px;" id="conflictDetailTitle">排班冲突</h3>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:16px;">此单元格被多个小组同时安排：</p>
-    <div id="conflictDetailBody" style="display:flex;flex-direction:column;gap:8px;"></div>
-    <div style="text-align:right;margin-top:16px;">
-      <button class="btn btn-p" onclick="document.getElementById('conflictDetailModal').style.display='none'">关闭</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // ========================= 数据（本地+远程同步） =========================
 const STORAGE_KEY = 'schedule_v4';
@@ -591,10 +567,9 @@ const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日
 let data = defaultData();
 let serverUpdated = 0;
 let pollingTimer = null;
-let currentWeek = getMonday(new Date(Date.now() + 7*86400000)); // 默认下一周
+let currentWeek = getMonday(new Date()); // 默认本周排班（当前现实周，已排完）
 let activeGroupId = null;
 let weekActiveGroup = {}; // 记每周围活跃小组，切回来时恢复
-let resolveTarget = null;
 let ovConditionMode = false; // 总览表着色模式：false=按小组, true=按条件
 
 // 选区
@@ -630,7 +605,6 @@ function defaultData() {
     ],
     conditionRules: [],
     schedules: {},
-    resolutions: {},
   };
 }
 
@@ -660,7 +634,35 @@ async function loadData() {
       saveLocal();
     }
   } catch(e) { /* 离线模式 */ }
+
+  // 修复历史上被 \u2424 占位符污染的数据
+  normalizePlaceholders();
   startPolling();
+}
+
+function normalizePlaceholders() {
+  let changed = false;
+  const rep = s => {
+    if (typeof s === 'string' && s.includes('\u2424')) {
+      changed = true;
+      return s.replace(/\u2424/g, '\n');
+    }
+    return s;
+  };
+  if (data.schedules) {
+    Object.values(data.schedules).forEach(ws => {
+      Object.values(ws).forEach(group => {
+        Object.values(group).forEach(entries => {
+          if (Array.isArray(entries)) {
+            entries.forEach(e => {
+              if (e && e.note !== undefined) e.note = rep(e.note);
+            });
+          }
+        });
+      });
+    });
+  }
+  if (changed) saveData();
 }
 
 function saveData() {
@@ -721,6 +723,7 @@ function getMonday(d) {
 }
 function fmtDate(d) { return `${d.getMonth()+1}/${d.getDate()}`; }
 function fmtFull(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function fmtExportDate(d) { return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; }
 function weekDates(monday) {
   const ds = [];
   for (let i=0;i<7;i++) { const d=new Date(monday); d.setDate(monday.getDate()+i); ds.push(d); }
@@ -729,6 +732,10 @@ function weekDates(monday) {
 function wsKey() { return fmtFull(currentWeek); }
 function skey(personId, dateStr) { return `${personId}_${dateStr}`; }
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function autoResizeTextarea(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+}
 
 // 默认人员（常用模板），管理弹窗里编辑，新周首次打开自动拷贝
 function allPeople() {
@@ -845,39 +852,53 @@ function findPersonList(id) {
   return null;
 }
 
-function getCell(personId, dateStr) {
+// ========================= 数组化数据模型 =========================
+// 单元格数据统一为 entries 数组：data.schedules[ws][groupId][key] = [{note}, ...]
+// 兼容旧格式（单个 {note} 对象或字符串），读取时自动归一化。
+function normEntries(v) {
+  const cleanNote = n => typeof n === 'string' ? n.replace(/\u2424/g, '\n') : n;
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map(e => ({ note: cleanNote((e && (typeof e === 'string' ? e : e.note)) || '') })).filter(e => e.note && e.note.trim());
+  if (typeof v === 'string') return v.trim() ? [{ note: cleanNote(v) }] : [];
+  if (v && typeof v === 'object' && v.note !== undefined) return v.note.trim() ? [{ note: cleanNote(v.note) }] : [];
+  return [];
+}
+
+function getEntries(groupId, personId, dateStr) {
   const ws = wsKey();
-  if (!data.schedules[ws] || !data.schedules[ws][activeGroupId]) return null;
-  return data.schedules[ws][activeGroupId][skey(personId, dateStr)] || null;
+  if (!data.schedules[ws] || !data.schedules[ws][groupId]) return [];
+  return normEntries(data.schedules[ws][groupId][skey(personId, dateStr)]);
+}
+
+function setEntries(groupId, personId, dateStr, arr) {
+  const ws = wsKey();
+  if (!data.schedules[ws]) data.schedules[ws] = {};
+  if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
+  const key = skey(personId, dateStr);
+  const clean = (arr || [])
+    .filter(e => { const n = e && (e.note !== undefined ? e.note : e); return n && typeof n.trim === 'function' && n.trim(); })
+    .map(e => ({ note: (e.note !== undefined ? e.note : e).replace(/\u2424/g, '\n') }));
+  if (clean.length) data.schedules[ws][groupId][key] = clean;
+  else delete data.schedules[ws][groupId][key];
+}
+
+function getCellEntries(personId, dateStr) {
+  return getEntries(activeGroupId, personId, dateStr);
+}
+
+function setCellEntries(personId, dateStr, arr) {
+  setEntries(activeGroupId, personId, dateStr, arr);
+}
+
+// 兼容旧调用：getCell 返回首个 entry（无则 null），.note 仍可访问
+function getCell(personId, dateStr) {
+  const arr = getCellEntries(personId, dateStr);
+  return arr.length ? arr[0] : null;
 }
 
 function setCellValue(personId, dateStr, val) {
-  const ws = wsKey();
-  if (!data.schedules[ws]) data.schedules[ws] = {};
-  if (!data.schedules[ws][activeGroupId]) data.schedules[ws][activeGroupId] = {};
-  const key = skey(personId, dateStr);
-  if (val) {
-    data.schedules[ws][activeGroupId][key] = { note: val };
-  } else {
-    delete data.schedules[ws][activeGroupId][key];
-  }
-}
-
-function clearResolution(personId, dateStr) {
-  const ws = wsKey();
-  if (data.resolutions[ws]) {
-    delete data.resolutions[ws][skey(personId, dateStr)];
-  }
-}
-
-// 检查某个小组是否被采纳（裁决后）
-function isGroupAdopted(personId, dateStr, groupId) {
-  const ws = wsKey();
-  const res = data.resolutions[ws] || {};
-  const key = skey(personId, dateStr);
-  if (!res[key]) return null; // 无裁决
-  const resolved = Array.isArray(res[key]) ? res[key] : [res[key]];
-  return resolved.includes(groupId);
+  if (Array.isArray(val)) { setCellEntries(personId, dateStr, val); return; }
+  setCellEntries(personId, dateStr, val ? [{ note: val }] : []);
 }
 
 // ========================= Toast =========================
@@ -1067,6 +1088,59 @@ function getOverviewSelectedCells() {
 }
 
 // ========================= 剪贴板 =========================
+// 统一剪贴板格式：系统剪贴板用 TSV（\t 列、\n 行），单元格内换行用 \u2424 占位；
+// 内部 clipData = { rows, cols, data:[[note,...],...] }，data 内换行用真实 \n。
+// 总览表与小组表共用该格式，因此复制粘贴无需进入编辑态即可选区操作，且跨表一致。
+function parseGridText(text) {
+  // 不含制表符时视为单个单元格，保留内部换行，避免多行文本被拆成多格
+  if (!text.includes('\t')) {
+    return { rows: 1, cols: 1, data: [[(text || '').trim()]] };
+  }
+  const lines = text.split('\n');
+  const data = lines.map(l => l.split('\t').map(c => c.replace(/\u2424/g, '\n').trim()));
+  const rows = data.length, cols = Math.max(1, ...data.map(r => r.length));
+  data.forEach(r => { while (r.length < cols) r.push(''); });
+  return { rows, cols, data };
+}
+function writeClipboardGrid(clip) {
+  try {
+    let text;
+    if (clip.rows === 1 && clip.cols === 1) {
+      // 单格复制：直接保留真实换行，便于粘贴到编辑框或外部应用；trim 掉末尾空行
+      text = (clip.data[0][0] || '').trim();
+    } else {
+      // 多格复制：用 TSV + 占位符保证网格结构
+      text = clip.data.map(row => row.map(c => (c || '').replace(/\n/g, '\u2424')).join('\t')).join('\n');
+    }
+    navigator.clipboard.writeText(text);
+  } catch (e) {}
+}
+// 把若干 note 合并成单元格字符串：trim、过滤空字符串，避免多余空行
+function joinNotes(notes) {
+  return notes.map(n => String(n || '').trim()).filter(n => n).join('\n');
+}
+async function readClipboardGrid() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text && text.trim() !== '') {
+      // 如果系统剪贴板内容与当前内部 clipData 的拼接结果一致，优先使用内部 blockData 以保留独立块结构
+      if (clipData && clipData.data && clipData.data.length) {
+        const internalText = clipData.rows === 1 && clipData.cols === 1
+          ? (clipData.data[0][0] || '').trim()
+          : clipData.data.map(row => row.map(c => (c || '').replace(/\n/g, '\u2424')).join('\t')).join('\n');
+        if (text.trim() === internalText.trim()) {
+          return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData };
+        }
+      }
+      const d = parseGridText(text);
+      if (d && d.rows > 0 && d.cols > 0) return d;
+    }
+  } catch (e) {}
+  if (clipData && clipData.data && clipData.data.length) {
+    return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData };
+  }
+  return null;
+}
 function copySelection() {
   const isOv = activeGroupId === '__overview__';
   if (isOv) return copyOverviewSelection();
@@ -1074,168 +1148,117 @@ function copySelection() {
   const cells = getSelectedCells();
   if (cells.length === 0) return;
 
-  const flatData = cells.map(({ r, c, person }) => {
-    const entry = getCell(person.id, fmtFull(weekDates(currentWeek)[c]));
-    return entry ? entry.note : '';
+  const minR = Math.min(...cells.map(c => c.r)), maxR = Math.max(...cells.map(c => c.r));
+  const minC = Math.min(...cells.map(c => c.c)), maxC = Math.max(...cells.map(c => c.c));
+  const dates = weekDates(currentWeek);
+  const rows = maxR - minR + 1, cols = maxC - minC + 1;
+  const data = Array.from({ length: rows }, () => Array(cols).fill(''));
+  const blockData = Array.from({ length: rows }, () => Array(cols).fill(null));
+  cells.forEach(({ r, c, person }) => {
+    const entries = getCellEntries(person.id, fmtFull(dates[c]));
+    data[r - minR][c - minC] = joinNotes(entries.map(e => e.note));
+    if (entries.length > 0) blockData[r - minR][c - minC] = entries.map(e => ({ note: e.note }));
   });
-
-  clipData = { rows: 1, cols: 1, data: [['']], flat: flatData };
-
-  // 写入系统剪贴板：多个格子用 \\n\\n 分隔
-  try {
-    const clipboardText = flatData.join('\n\n');
-    navigator.clipboard.writeText(clipboardText);
-  } catch(e) {}
+  clipData = { rows, cols, data, blockData };
+  writeClipboardGrid(clipData);
   toast(`已复制 ${cells.length} 个单元格`);
 }
 
 function copyOverviewSelection() {
   const cells = getOverviewSelectedCells();
   if (cells.length === 0) return;
-  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
-  cells.forEach(({ r, c }) => { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); });
+  const minR = Math.min(...cells.map(c => c.r)), maxR = Math.max(...cells.map(c => c.r));
+  const minC = Math.min(...cells.map(c => c.c)), maxC = Math.max(...cells.map(c => c.c));
   const rows = maxR - minR + 1, cols = maxC - minC + 1;
-  const d = Array.from({ length: rows }, () => Array(cols).fill(''));
+  const data = Array.from({ length: rows }, () => Array(cols).fill(''));
+  const blockData = Array.from({ length: rows }, () => Array(cols).fill(null));
   cells.forEach(({ r, c, person, dateStr }) => {
-    const info = getScheduleInfo(person.id, dateStr);
-    const note = (info.note) || '';
-    d[r - minR][c - minC] = note;
+    const blocks = getScheduleInfo(person.id, dateStr);
+    data[r - minR][c - minC] = joinNotes(blocks.map(b => b.note || ''));
+    if (blocks.length > 0) blockData[r - minR][c - minC] = blocks.map(b => ({ note: b.note }));
   });
-  clipData = { rows, cols, data: d };
+  clipData = { rows, cols, data, blockData };
+  writeClipboardGrid(clipData);
   toast(`已复制 ${cells.length} 个单元格`);
 }
 
 async function pasteToSelection() {
   const isOv = activeGroupId === '__overview__';
-  if (isOv) return pasteOverviewSelection();
+  const clip = await readClipboardGrid();
+  if (!clip) return;
 
-  const dates = weekDates(currentWeek);
-  let flatData = null;
+  let cells = isOv ? getOverviewSelectedCells() : getSelectedCells();
 
-  // 始终优先读系统剪贴板
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      flatData = text.split('\n\n');
-      clipData = { flat: flatData };
-    }
-  } catch(e) {}
-
-  // 系统剪贴板为空时，回退到内部剪贴板
-  if (!flatData || flatData.length === 0) {
-    if (clipData && clipData.flat && clipData.flat.length > 0) {
-      flatData = clipData.flat;
-    } else {
-      return;
-    }
-  }
-
-  if (!flatData || flatData.length === 0) return;
-
-  // 获取所有选中的单元格
-  const selected = getSelectedCells();
-
-  if (selected.length > 0) {
-    const changes = [];
-    selected.forEach(({ person, dateStr }, pi) => {
-      const newVal = flatData[pi % flatData.length];
-      const oldEntry = getCell(person.id, dateStr);
-      const oldVal = oldEntry ? oldEntry.note : '';
-
-      if (oldVal !== newVal) {
-        setCellValue(person.id, dateStr, newVal);
-        changes.push({ personId: person.id, dateStr, oldVal, newVal });
+  // 无选区时，从激活单元格开始（单格起点）
+  if (cells.length === 0 && activeCell) {
+    const dates = weekDates(currentWeek);
+    const people = weekPeople();
+    const person = people[activeCell.r];
+    if (person && activeCell.c < 7) {
+      const cell = { r: activeCell.r, c: activeCell.c, person, dateStr: fmtFull(dates[activeCell.c]) };
+      if (isOv) {
+        const el = document.querySelector(`#overviewTable [data-r="${activeCell.r}"][data-c="${activeCell.c}"]`);
+        cell.gid = el ? (el.dataset.gid || '') : '';
       }
-    });
-
-    if (changes.length > 0) {
-      changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-      pushUndo(changes);
-      saveData();
+      cells = [cell];
     }
-    renderEditTable();
-    toast(`已粘贴到 ${changes.length} 个单元格`);
-    return;
   }
+  if (cells.length === 0) { toast('请先选中目标单元格'); return; }
 
-  // 无选中 → 从激活单元格开始，每个格子依次填 flatData
-  let startR, startC;
-  if (activeCell) { startR = activeCell.r; startC = activeCell.c; }
-  else if (sel) { startR = sel.r1; startC = sel.c1; }
-  else { startR = 0; startC = 0; }
+  const minR = Math.min(...cells.map(c => c.r)), maxR = Math.max(...cells.map(c => c.r));
+  const minC = Math.min(...cells.map(c => c.c)), maxC = Math.max(...cells.map(c => c.c));
 
   const changes = [];
-  const people = weekPeople();
-  let fi = 0;
-  for (let r = startR; r < people.length && fi < flatData.length; r++) {
-    for (let c = r === startR ? startC : 0; c < 7 && fi < flatData.length; c++) {
-      const personId = people[r].id;
-      const dateStr = fmtFull(dates[c]);
-      const oldEntry = getCell(personId, dateStr);
-      const oldVal = oldEntry ? oldEntry.note : '';
-      const newVal = flatData[fi];
-
-      if (oldVal !== newVal) {
-        setCellValue(personId, dateStr, newVal);
-        changes.push({ personId, dateStr, oldVal, newVal });
-      }
-      fi++;
-    }
-  }
-
-  if (changes.length > 0) {
-    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-    pushUndo(changes);
-    saveData();
-  }
-}
-
-async function pasteOverviewSelection() {
-  let pasteRows, pasteCols, pasteData;
-  if (clipData) { pasteRows = clipData.rows; pasteCols = clipData.cols; pasteData = clipData.data; }
-  else {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
-      const lines = text.split('\n');
-      const rows = lines.map(l => l.split('\t').map(c => c.replace(/\u2424/g, '\n')));
-      pasteRows = rows.length; pasteCols = Math.max(...rows.map(r => r.length));
-      rows.forEach(r => { while (r.length < pasteCols) r.push(''); });
-      pasteData = rows;
-      clipData = { rows: pasteRows, cols: pasteCols, data: pasteData };
-    } catch(e) { return; }
-  }
-  if (!pasteData || pasteRows === 0) return;
-
-  const selected = getOverviewSelectedCells();
-  if (selected.length === 0) return;
-  const isSingle = pasteRows === 1 && pasteCols === 1;
-  const changes = [];
-  const ws = wsKey();
-
-  selected.forEach(({ person, dateStr, gid }, i) => {
-    const newVal = isSingle ? pasteData[0][0] : (pasteData[i % pasteRows] && pasteData[i % pasteRows][i % pasteCols]) || '';
-    const oldEntry = getGroupCell(gid || (weekGroups()[0] ? weekGroups()[0].id : ''), person.id, dateStr);
-    const oldVal = oldEntry ? oldEntry.note : '';
-    if (oldVal !== newVal) {
+  const useBlocks = clip.blockData && clipData && clipData.blockData;
+  cells.forEach(({ r, c, person, dateStr, gid }) => {
+    const sr = (r - minR) % clip.rows;
+    const sc = (c - minC) % clip.cols;
+    const srcBlocks = useBlocks ? clipData.blockData[sr][sc] : null;
+    if (isOv) {
       const groupId = gid || (weekGroups()[0] ? weekGroups()[0].id : '');
-      if (!data.schedules[ws]) data.schedules[ws] = {};
-      if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
-      const key = skey(person.id, dateStr);
-      if (newVal) data.schedules[ws][groupId][key] = { note: newVal };
-      else delete data.schedules[ws][groupId][key];
-      changes.push({ personId: person.id, dateStr, oldVal, newVal });
+      const oldEntries = getEntries(groupId, person.id, dateStr);
+      const oldVal = oldEntries.map(e => e.note).join('\n');
+      if (srcBlocks && srcBlocks.length > 0) {
+        const newEntries = srcBlocks.map(b => ({ note: (b.note || '').replace(/\u2424/g, '\n') }));
+        const newVal = newEntries.map(e => e.note).join('\n');
+        if (oldVal !== newVal) {
+          setEntries(groupId, person.id, dateStr, newEntries);
+          changes.push({ personId: person.id, dateStr, groupId, oldVal: oldEntries, newVal: newEntries });
+        }
+      } else {
+        const newVal = clip.data[sr][sc] || '';
+        if (oldVal !== newVal) {
+          setEntries(groupId, person.id, dateStr, newVal ? [{ note: newVal }] : []);
+          changes.push({ personId: person.id, dateStr, groupId, oldVal: oldEntries, newVal: newVal ? [{ note: newVal }] : [] });
+        }
+      }
+    } else {
+      const oldEntries = getCellEntries(person.id, dateStr);
+      const oldVal = oldEntries.map(e => e.note).join('\n');
+      if (srcBlocks && srcBlocks.length > 0) {
+        const newEntries = srcBlocks.map(b => ({ note: (b.note || '').replace(/\u2424/g, '\n') }));
+        const newVal = newEntries.map(e => e.note).join('\n');
+        if (oldVal !== newVal) {
+          setCellEntries(person.id, dateStr, newEntries);
+          changes.push({ personId: person.id, dateStr, oldVal: oldEntries, newVal: newEntries });
+        }
+      } else {
+        const newVal = clip.data[sr][sc] || '';
+        if (oldVal !== newVal) {
+          setCellEntries(person.id, dateStr, newVal ? [{ note: newVal }] : []);
+          changes.push({ personId: person.id, dateStr, oldVal: oldEntries, newVal: newVal ? [{ note: newVal }] : [] });
+        }
+      }
     }
   });
+
   if (changes.length > 0) {
-    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
     pushUndo(changes);
     saveData();
-    renderAll();
-    toast(`已粘贴 ${changes.length} 个单元格`);
-    // 恢复选区高亮
-    highlightOverviewSelection();
   }
+  if (isOv) { renderAll(); highlightOverviewSelection(); }
+  else renderEditTable();
+  toast(`已粘贴 ${changes.length} 个单元格`);
 }
 
 // ========================= 填充 =========================
@@ -1249,25 +1272,22 @@ function fillDown() {
   // 对每一列，用该列第一行的值填充到下面所有行
   for (let c = sel.c1; c <= sel.c2; c++) {
     if (sel.r1 >= people.length) break;
-    const srcEntry = getCell(people[sel.r1].id, fmtFull(dates[c]));
-    const srcVal = srcEntry ? srcEntry.note : '';
+    const srcEntries = getCellEntries(people[sel.r1].id, fmtFull(dates[c]));
     const dateStr = fmtFull(dates[c]);
 
     for (let r = sel.r1 + 1; r <= sel.r2; r++) {
       if (r >= people.length) break;
       const personId = people[r].id;
-      const oldEntry = getCell(personId, dateStr);
-      const oldVal = oldEntry ? oldEntry.note : '';
-      if (oldVal !== srcVal) {
-        setCellValue(personId, dateStr, srcVal);
-        changes.push({ personId, dateStr, oldVal, newVal: srcVal });
+      const oldEntries = getCellEntries(personId, dateStr);
+      if (JSON.stringify(oldEntries) !== JSON.stringify(srcEntries)) {
+        setCellEntries(personId, dateStr, srcEntries);
+        changes.push({ personId, dateStr, oldVal: oldEntries, newVal: srcEntries });
       }
     }
   }
 
   if (changes.length > 0) {
-    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-    pushUndo(changes);
+        pushUndo(changes);
     saveData();
     renderEditTable();
     toast('已填充');
@@ -1342,24 +1362,21 @@ function endFillDrag() {
 
       if (srcR > maxR || srcC > 6) continue;
 
-      const srcEntry = getCell(people[srcR].id, fmtFull(dates[srcC]));
-      const srcVal = srcEntry ? srcEntry.note : '';
+      const srcEntries = getCellEntries(people[srcR].id, fmtFull(dates[srcC]));
 
       const personId = people[r].id;
       const dateStr = fmtFull(dates[c]);
-      const oldEntry = getCell(personId, dateStr);
-      const oldVal = oldEntry ? oldEntry.note : '';
+      const oldEntries = getCellEntries(personId, dateStr);
 
-      if (oldVal !== srcVal) {
-        setCellValue(personId, dateStr, srcVal);
-        changes.push({ personId, dateStr, oldVal, newVal: srcVal });
+      if (JSON.stringify(oldEntries) !== JSON.stringify(srcEntries)) {
+        setCellEntries(personId, dateStr, srcEntries);
+        changes.push({ personId, dateStr, oldVal: oldEntries, newVal: srcEntries });
       }
     }
   }
 
   if (changes.length > 0) {
-    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-    pushUndo(changes);
+        pushUndo(changes);
     saveData();
     toast(`已填充 ${changes.length} 个单元格`);
   }
@@ -1440,64 +1457,30 @@ function renderEditTable() {
         html += `<tr class="section-row"><td colspan="8" style="padding:8px 16px;background:#f3f4f6;font-size:12px;font-weight:600;color:var(--text2);text-align:left;border-bottom:2px solid var(--border);">${label}</td></tr>`;
         lastCat = person._cat;
       }
-      html += `<tr class="${person._cat === 'external' ? 'row-external' : ''}"><td>${esc(person.name)}<span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${person.id}')" title="从本周移除">×</span></td>`;
+      html += `<tr class="${person._cat === 'external' ? 'row-external' : ''}"><td><span class="person-name">${esc(person.name)}</span><span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${person.id}')" title="从本周移除">×</span></td>`;
       dates.forEach((date, c) => {
         const ds = fmtFull(date);
-        const entry = getCell(person.id, ds);
-        const val = entry ? entry.note : '';
+        const entries = getCellEntries(person.id, ds);
         const selClass = isSelected(r, c) ? ' selected' : '';
         const activeClass = (activeCell && activeCell.r === r && activeCell.c === c) ? ' active-cell' : '';
         const isEdit = editing && editing.personId === person.id && editing.dateStr === ds;
         const editClass = isEdit ? ' editing' : '';
-        const emptyClass = (!val && !isEdit) ? ' cell-empty' : '';
-
-        // 检测与其他组的冲突
-        let conflictTooltip = '';
-        let isConflict = false;
-        let isOverridden = false; // 该组被裁决否决
-        if (val && !isEdit) {
-          const ws = wsKey();
-          const sched = data.schedules[ws] || {};
-          const key = skey(person.id, ds);
-          const conflicts = [];
-          weekGroups().forEach(g => {
-            if (g.id !== activeGroupId && sched[g.id] && sched[g.id][key]) {
-              conflicts.push(`${esc(g.name)}: ${esc(sched[g.id][key].note)}`);
-            }
-          });
-          if (conflicts.length > 0) {
-            // 检查裁决状态
-            const adopted = isGroupAdopted(person.id, ds, activeGroupId);
-            if (adopted === true) {
-              // 当前组被采用 → 不显示冲突
-            } else if (adopted === false) {
-              // 当前组未被采用，有其他组被采用 → 显示灰色（已覆盖）
-              isOverridden = true;
-              conflictTooltip = `裁决未采纳，已采用其他小组的安排`;
-            } else {
-              // 无裁决
-              isConflict = true;
-              conflictTooltip = `冲突：${conflicts.join('；')}`;
-            }
-          }
-        }
-
-        const condColor = getConditionColor(val);
-        const cellStyle = val && !isEdit
-          ? (isOverridden ? `color:#9ca3af;background:#f3f4f6;text-decoration:line-through;`
-              : condColor ? `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:700;`
-              : `color:${color};background:${color}15;`)
-          : '';
+        const emptyClass = (entries.length === 0 && !isEdit) ? ' cell-empty' : '';
         html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}"
           data-r="${r}" data-c="${c}" data-pid="${person.id}" data-date="${ds}"
-          style="position:relative;${cellStyle}">`;
+          style="position:relative;">`;
         if (isEdit) {
           html += `<textarea placeholder="输入任务" id="editInput"></textarea>`;
+        } else if (entries.length === 0) {
+          html += '-';
         } else {
-          html += esc(val || '-');
-            if (isConflict) {
-            html += `<span class="conflict-dot" data-tip="${esc(conflictTooltip).replace(/'/g, '&#39;')}">!</span>`;
-          }
+          entries.forEach((e, idx) => {
+            const condColor = getConditionColor(e.note);
+            const style = condColor
+              ? `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:600;`
+              : `color:${color};background:${hexToRgba(color,0.12)};border-left:3px solid ${color};`;
+            html += `<div class="et-block" style="${style}" data-idx="${idx}">${esc(e.note).replace(/\n/g, '<br>')}</div>`;
+          });
         }
         html += '</div></td>';
       });
@@ -1523,8 +1506,9 @@ function renderEditTable() {
   if (editing) {
     const ta = document.getElementById('editInput');
     if (ta) {
-      const entry = getCell(editing.personId, editing.dateStr);
-      ta.value = entry ? entry.note : '';
+      const entries = getCellEntries(editing.personId, editing.dateStr);
+      const v = (editing.idx >= 0 && entries[editing.idx]) ? entries[editing.idx].note : '';
+      ta.value = v;
       ta.focus();
       ta.selectionStart = ta.value.length;
     }
@@ -1717,17 +1701,11 @@ document.addEventListener('mousedown', function(e) {
   if (e.target.closest('#overviewTable textarea')) return;
 
   // ===== 总览表单元格 =====
-  const ovCell = e.target.closest('#overviewTable [data-pid]');
+  // 必须用 .ov-cell 而不是 [data-pid]，否则点击小组块时会拿到没有 data-r/data-c 的块元素
+  const ovCell = e.target.closest('#overviewTable .ov-cell');
   if (ovCell && activeGroupId === '__overview__') {
-    // 放置模式（冲突改排期）
-    if (ovPlacement && !e.target.closest('#ovPlaceBanner') && !e.target.closest('#ovActionModal') && !e.target.closest('#resolveModal')) {
-      handleOvPlacementClick(ovCell);
-      return;
-    }
-
     const pid = ovCell.dataset.pid;
     const date = ovCell.dataset.date;
-    const gid = ovCell.dataset.gid;
     if (!pid || !date) return;
     const r = parseInt(ovCell.dataset.r);
     const c = parseInt(ovCell.dataset.c);
@@ -1754,12 +1732,13 @@ document.addEventListener('mousedown', function(e) {
     activeCell = { r, c };
     highlightOverviewSelection();
 
-    // 有内容 → 准备拖拽（mousemove 超过阈值才真正开始）
-    const info = getScheduleInfo(pid, date);
-    if (info.type !== 'empty' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    // 准备拖拽（mousemove 超过阈值才真正开始）。拖拽以「单块」为单位。
+    const blk = e.target.closest('.ov-block');
+    if (blk && blk.dataset.gid && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       ovDrag = {
-        personId: pid, dateStr: date, groupId: gid, r, c,
-        val: info.note || '', sourceEl: ovCell
+        groupId: blk.dataset.gid, personId: pid, dateStr: date,
+        note: blk.dataset.note || '', idx: parseInt(blk.dataset.idx) || 0,
+        sourceEl: blk, r, c
       };
     }
     return;
@@ -1779,8 +1758,8 @@ document.addEventListener('mousedown', function(e) {
   dragStarted = false;
   cellDrag = null;
 
-  const entry = getCell(personId, dateStr);
-  const hasContent = entry && entry.note;
+  const entries = getCellEntries(personId, dateStr);
+  const hasContent = entries.length > 0;
 
   // 更新选区状态
   if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
@@ -1789,11 +1768,13 @@ document.addEventListener('mousedown', function(e) {
     updateSelectionVisual();
   }
 
-  // 仅在「抓手区域」（鼠标在格子中心 + 有内容）时才激活拖拽移动
+  // 仅在「抓手区域」（鼠标在格子中心 + 有内容）时才激活拖拽移动；以被点击的具体块为单位
   if (hasContent && !e.shiftKey && !e.ctrlKey && !e.metaKey && isInGrabZone(cellEl, e)) {
+    const blk = e.target.closest('.et-block');
+    const idx = blk ? parseInt(blk.dataset.idx) : 0;
+    const note = (entries[idx] && entries[idx].note) || (entries[0] && entries[0].note) || '';
     cellDrag = {
-      personId, dateStr, r, c,
-      val: entry.note,
+      personId, dateStr, r, c, gid: activeGroupId, idx, note,
       sourceEl: cellEl,
     };
     cellEl.style.cursor = 'grabbing';
@@ -1804,40 +1785,17 @@ document.addEventListener('mouseup', function(e) {
   if (fillDragging) { endFillDrag(); return; }
   
 
-  // 总览拖拽移动释放
+  // 总览拖拽移动释放：直接单块移动，不再弹窗
   if (ovDrag && ovDragStarted) {
-    // 如果操作弹窗已打开，说明用户正在选择操作（交换/加入/取消），不清理拖拽状态
-    if (document.getElementById('ovActionModal').style.display === 'flex') {
-      return;
-    }
     const targetEl = document.elementFromPoint(e.clientX, e.clientY);
     if (targetEl) {
       const targetCell = targetEl.closest('#overviewTable [data-pid]');
-      if (targetCell && targetCell !== ovDrag.sourceEl) {
+      const srcCell = ovDrag.sourceEl.closest('[data-pid]');
+      if (targetCell && targetCell !== srcCell) {
         const tPid = targetCell.dataset.pid;
         const tDate = targetCell.dataset.date;
         if (tPid && tDate) {
-          const tInfo = getScheduleInfo(tPid, tDate);
-          const targetHasContent = tInfo.type !== 'empty';
-          if (targetHasContent) {
-            ovDrag._targetPid = tPid;
-            ovDrag._targetDate = tDate;
-            ovDrag._targetInfo = tInfo;
-            document.getElementById('ovActionInfo').textContent =
-              `目标位置已有内容「${tInfo.type === 'conflict' ? '冲突' : (tInfo.note || '已排班')}」`;
-            document.getElementById('ovActionModal').style.display = 'flex';
-            return;
-          } else {
-            const srcGid = ovDrag.groupId || (weekGroups()[0]?weekGroups()[0].id:'');
-            const changes = [];
-            setGroupCell(srcGid, tPid, tDate, ovDrag.val);
-            changes.push({ personId: tPid, dateStr: tDate, oldVal: '', newVal: ovDrag.val, groupId: srcGid });
-            setGroupCell(srcGid, ovDrag.personId, ovDrag.dateStr, '');
-            changes.push({ personId: ovDrag.personId, dateStr: ovDrag.dateStr, oldVal: ovDrag.val, newVal: '', groupId: srcGid });
-            changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-            pushUndo(changes);
-            saveData();
-          }
+          moveBlock(ovDrag.groupId, ovDrag.personId, ovDrag.dateStr, ovDrag.idx, tPid, tDate);
         }
       }
     }
@@ -1847,25 +1805,24 @@ document.addEventListener('mouseup', function(e) {
     return;
   }
 
-  // 拖拽移动释放
+  // 拖拽移动释放（小组表）：源移除被拖块，目标追加该块（即使同组也作为独立块，不覆盖）
   if (cellDrag && dragStarted) {
     const targetEl = findCellAtPoint(e.clientX, e.clientY);
     if (targetEl && targetEl !== cellDrag.sourceEl) {
-      const tr = parseInt(targetEl.dataset.r);
-      const tc = parseInt(targetEl.dataset.c);
       const tPid = targetEl.dataset.pid;
       const tDate = targetEl.dataset.date;
-
-      const tEntry = getCell(tPid, tDate);
-      const tVal = tEntry ? tEntry.note : '';
+      const srcEntries = getEntries(cellDrag.gid, cellDrag.personId, cellDrag.dateStr);
+      const moved = (srcEntries[cellDrag.idx] && srcEntries[cellDrag.idx].note) || cellDrag.note;
+      const tgtEntries = getEntries(cellDrag.gid, tPid, tDate);
 
       const changes = [];
-      setCellValue(tPid, tDate, cellDrag.val);
-      changes.push({ personId: tPid, dateStr: tDate, oldVal: tVal, newVal: cellDrag.val });
-      setCellValue(cellDrag.personId, cellDrag.dateStr, '');
-      changes.push({ personId: cellDrag.personId, dateStr: cellDrag.dateStr, oldVal: cellDrag.val, newVal: '' });
+      const newTgt = tgtEntries.concat([{ note: moved }]);
+      setEntries(cellDrag.gid, tPid, tDate, newTgt);
+      changes.push({ personId: tPid, dateStr: tDate, groupId: cellDrag.gid, oldVal: tgtEntries, newVal: newTgt });
+      const newSrc = srcEntries.filter((_, i) => i !== cellDrag.idx);
+      setEntries(cellDrag.gid, cellDrag.personId, cellDrag.dateStr, newSrc);
+      changes.push({ personId: cellDrag.personId, dateStr: cellDrag.dateStr, groupId: cellDrag.gid, oldVal: srcEntries, newVal: newSrc });
 
-      changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
       pushUndo(changes);
       saveData();
     }
@@ -1921,6 +1878,8 @@ function updateSelectionVisual() {
 // click 事件：区分单击/双击
 document.addEventListener('click', function(e) {
   if (editing) return;
+  // 汇总表的选区由 mousedown 维护，这里不要清空
+  if (activeGroupId === '__overview__') return;
 
   const cellEl = e.target.closest('#editTable [data-r]');
   if (!cellEl) {
@@ -1976,7 +1935,6 @@ document.addEventListener('click', function(e) {
 // 双击：使用 lastClickCell（mousedown 时保存）的信息，不依赖可能已被销毁的 DOM
 document.addEventListener('dblclick', function(e) {
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-  if (ovPlacement) return; // 放置模式下禁止双击
 
   if (!lastClickCell) return;
   const { personId, dateStr, r, c } = lastClickCell;
@@ -1984,13 +1942,19 @@ document.addEventListener('dblclick', function(e) {
   // 总览表双击编辑
   if (activeGroupId === '__overview__') {
     ovDrag = null; ovDragStarted = false;
+    // 双击具体小组块 → 仅编辑该块
+    const blk = e.target.closest('.ov-block');
+    if (blk && blk.dataset.gid) {
+      ovEntryEdit(blk, blk.dataset.pid, blk.dataset.date, blk.dataset.gid, parseInt(blk.dataset.idx) || 0);
+      return;
+    }
     const ovCell = e.target.closest('#overviewTable [data-pid]');
     if (!ovCell) return;
     const pid = ovCell.dataset.pid;
     const ds = ovCell.dataset.date;
     const gid = ovCell.dataset.gid || (weekGroups().length > 0 ? weekGroups()[0].id : '');
     if (!pid || !ds) return;
-    ovEntryEdit(ovCell, pid, ds, gid);
+    ovEntryEdit(ovCell, pid, ds, gid, -1); // 空单元格 → 新增一个块
     return;
   }
 
@@ -1998,22 +1962,37 @@ document.addEventListener('dblclick', function(e) {
   selectCell(r, c);
   renderEditTable();
   const cellEl = document.querySelector(`#editTable [data-pid="${personId}"][data-date="${dateStr}"]`);
-  if (cellEl) startEditDOM(cellEl, personId, dateStr);
+  if (cellEl) {
+    // 双击具体块 → 编辑该块；否则编辑首个块（有内容时）或新增块
+    const blk = e.target.closest('.et-block');
+    let idx = -1;
+    if (blk) idx = parseInt(blk.dataset.idx);
+    else {
+      const entries = getCellEntries(personId, dateStr);
+      idx = entries.length ? 0 : -1;
+    }
+    startEditDOM(cellEl, personId, dateStr, idx);
+  }
 });
 
 // ========================= 编辑 =========================
-function startEditDOM(cellEl, personId, dateStr) {
+function startEditDOM(cellEl, personId, dateStr, idx) {
   if (editing) commitEdit();
 
-  editing = { personId, dateStr, el: cellEl };
+  editing = { personId, dateStr, idx, el: cellEl };
   renderEditTable();
 
   const ta = document.getElementById('editInput');
   if (!ta) return;
 
+  const entries = getCellEntries(personId, dateStr);
+  const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
+  ta.value = oldVal;
   ta.focus();
   // 光标移到末尾
   ta.selectionStart = ta.value.length;
+  autoResizeTextarea(ta);
+  ta.addEventListener('input', () => autoResizeTextarea(ta));
 
   ta.addEventListener('blur', () => {
     setTimeout(() => { if (editing) commitEdit(); }, 100);
@@ -2039,20 +2018,26 @@ function startEditDOM(cellEl, personId, dateStr) {
 function commitEdit() {
   if (!editing) return;
 
-  const { personId, dateStr } = editing;
+  const { personId, dateStr, idx } = editing;
   const ta = document.getElementById('editInput');
   const newVal = ta ? ta.value.trim() : '';
 
-  const oldEntry = getCell(personId, dateStr);
-  const oldVal = oldEntry ? oldEntry.note : '';
+  const entries = getCellEntries(personId, dateStr);
+  const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
 
-  if (oldVal !== newVal) {
-    setCellValue(personId, dateStr, newVal);
-    pushUndo([{ personId, dateStr, oldVal, newVal }]);
-    // 修改后清除已有裁决，让冲突重新评估
-    clearResolution(personId, dateStr);
-    saveData();
+  let next;
+  if (idx < 0) {
+    if (!newVal) { editing = null; renderEditTable(); return; }
+    next = entries.concat([{ note: newVal }]);
+  } else {
+    if (oldVal === newVal) { editing = null; renderEditTable(); return; }
+    next = entries.slice();
+    if (newVal) next[idx] = { note: newVal };
+    else next.splice(idx, 1);
   }
+  setCellEntries(personId, dateStr, next);
+  pushUndo([{ personId, dateStr, oldVal: entries, newVal: next }]);
+  saveData();
 
   editing = null;
   renderEditTable();
@@ -2085,7 +2070,7 @@ function moveActiveCell(dr, dc) {
       const personId = people[activeCell.r].id;
       const dateStr = fmtFull(dates[activeCell.c]);
       const cellEl = document.querySelector(`#editTable [data-pid="${personId}"][data-date="${dateStr}"]`);
-      if (cellEl) startEditDOM(cellEl, personId, dateStr);
+      if (cellEl) startEditDOM(cellEl, personId, dateStr, getCellEntries(personId, dateStr).length ? 0 : -1);
     }
   }, 30);
 }
@@ -2098,28 +2083,7 @@ document.addEventListener('keydown', function(e) {
   if (document.activeElement && document.activeElement.closest('#overviewTable textarea')) return;
 
   // 弹窗模式下不处理
-  if (document.getElementById('manageModal').style.display === 'flex' ||
-      document.getElementById('resolveModal').style.display === 'flex' ||
-      document.getElementById('reassignModal').style.display === 'flex') return;
-
-  // 放置模式 Esc 取消
-  if (ovPlacement) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (document.getElementById('ovActionModal').style.display === 'flex') {
-        document.getElementById('ovActionModal').style.display = 'none';
-        if (ovPlacement && ovPlacement._targetInfo) {
-          ovPlacement._targetPid = null;
-          ovPlacement._targetDate = null;
-          ovPlacement._targetGid = null;
-          ovPlacement._targetInfo = null;
-        }
-      } else {
-        cancelOvPlacement();
-      }
-    }
-    return;
-  }
+  if (document.getElementById('manageModal').style.display === 'flex') return;
 
   const isCtrl = e.ctrlKey || e.metaKey;
 
@@ -2162,18 +2126,34 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (!sel) return;
     e.preventDefault();
+    if (activeGroupId === '__overview__') {
+      // 汇总表：清除选中格中「所有小组」的全部块
+      const cells = getOverviewSelectedCells();
+      const changes = [];
+      cells.forEach(({ person, dateStr }) => {
+        weekGroups().forEach(g => {
+          const oldEntries = getEntries(g.id, person.id, dateStr);
+          if (oldEntries.length) {
+            setEntries(g.id, person.id, dateStr, []);
+            changes.push({ personId: person.id, dateStr, groupId: g.id, oldVal: oldEntries, newVal: [] });
+          }
+        });
+      });
+      if (changes.length > 0) { pushUndo(changes); saveData(); renderAll(); }
+      return;
+    }
+    // 小组表：清除选中格内容（整格 entries）
     const cells = getSelectedCells();
     const changes = [];
     cells.forEach(({ person, dateStr }) => {
-      const oldEntry = getCell(person.id, dateStr);
-      if (oldEntry) {
-        setCellValue(person.id, dateStr, '');
-        changes.push({ personId: person.id, dateStr, oldVal: oldEntry.note, newVal: '' });
+      const oldEntries = getCellEntries(person.id, dateStr);
+      if (oldEntries.length) {
+        setCellEntries(person.id, dateStr, []);
+        changes.push({ personId: person.id, dateStr, oldVal: oldEntries, newVal: [] });
       }
     });
     if (changes.length > 0) {
-      changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-      pushUndo(changes);
+            pushUndo(changes);
       saveData();
       renderEditTable();
     }
@@ -2211,7 +2191,7 @@ document.addEventListener('keydown', function(e) {
     const pid = people[activeCell.r].id;
     const ds = fmtFull(dates[activeCell.c]);
     const cellEl = document.querySelector(`#editTable [data-pid="${pid}"][data-date="${ds}"]`);
-    if (cellEl) startEditDOM(cellEl, pid, ds);
+    if (cellEl) startEditDOM(cellEl, pid, ds, getCellEntries(pid, ds).length ? 0 : -1);
     return;
   }
 
@@ -2226,7 +2206,7 @@ document.addEventListener('keydown', function(e) {
     const pid = people[activeCell.r].id;
     const ds = fmtFull(dates[activeCell.c]);
     const cellEl = document.querySelector(`#editTable [data-pid="${pid}"][data-date="${ds}"]`);
-    if (cellEl) startEditDOM(cellEl, pid, ds);
+    if (cellEl) startEditDOM(cellEl, pid, ds, getCellEntries(pid, ds).length ? 0 : -1);
     return;
   }
 
@@ -2254,96 +2234,46 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ========================= 总览 =========================
+// 返回某 (人,日期) 的所有小组块（无 conflict 概念，每个块 = 一个小组的排期）
+// 返回数组：[{ groupId, groupName, note }, ...]，空数组表示无排班
 function getScheduleInfo(personId, dateStr) {
   const ws = wsKey();
   const sched = data.schedules[ws] || {};
-  const res = data.resolutions[ws] || {};
   const key = skey(personId, dateStr);
-
-  // 收集所有原始排班
-  const assigned = [];
+  const blocks = [];
   weekGroups().forEach(g => {
-    if (sched[g.id] && sched[g.id][key]) {
-      assigned.push({ groupId: g.id, groupName: g.name, note: sched[g.id][key].note });
-    }
-  });
-
-  // 有裁决记录（支持多选）
-  if (res[key]) {
-    const resolvedIds = Array.isArray(res[key]) ? res[key] : [res[key]];
-    const valid = resolvedIds.filter(gid => assigned.some(a => a.groupId === gid));
-    // 清理无效裁决
-    if (valid.length === 0) {
-      delete data.resolutions[ws][key]; saveData();
-    } else {
-      if (valid.length !== resolvedIds.length) {
-        data.resolutions[ws][key] = valid.length === 1 ? valid[0] : valid;
-        saveData();
-      }
-      // 全部冲突都已采纳
-      if (valid.length >= assigned.length) {
-        const allNotes = assigned.filter(a => valid.includes(a.groupId)).map(a => a.note).filter(Boolean).join('\n');
-        const g = weekGroups().find(gr => gr.id === assigned[0].groupId);
-        return { type:'resolved', groupId: assigned[0].groupId, groupName: g ? g.name : '?', note: allNotes, allResolved: true, adoptedIds: valid };
-      }
-      // 部分采纳
-      const rejected = assigned.filter(a => !valid.includes(a.groupId));
-      const adoptedNotes = valid.map(gid => assigned.find(a => a.groupId === gid)?.note || '').filter(Boolean);
-      return { type:'partial', groups: assigned, adoptedIds: valid, rejected, note: adoptedNotes.join('\n') };
-    }
-  }
-
-  // 无裁决
-  if (assigned.length === 0) return { type:'empty' };
-  if (assigned.length === 1) return { type:'single', ...assigned[0] };
-  return { type:'conflict', groups: assigned };
-}
-
-function getConflicts() {
-  const ws = wsKey();
-  const sched = data.schedules[ws] || {};
-  const res = data.resolutions[ws] || {};
-  const dates = weekDates(currentWeek);
-  const conflicts = [];
-  const people = weekPeople();
-  people.forEach(p => {
-    dates.forEach(d => {
-      const ds = fmtFull(d);
-      const key = skey(p.id, ds);
-      const assigned = [];
-      weekGroups().forEach(g => {
-        if (sched[g.id] && sched[g.id][key]) assigned.push({ groupId:g.id, groupName:g.name, note:sched[g.id][key].note });
-      });
-      if (assigned.length < 2) return;
-      // 检查决议：全部采纳才跳过
-      if (res[key]) {
-        const resolvedIds = Array.isArray(res[key]) ? res[key] : [res[key]];
-        const allResolved = assigned.every(a => resolvedIds.includes(a.groupId));
-        if (allResolved) return;
-      }
-      conflicts.push({ personId:p.id, personName:p.name, date:ds, dateLabel:fmtDate(d), groups:assigned });
+    const es = getEntries(g.id, personId, dateStr);
+    es.forEach((e, idx) => {
+      blocks.push({ groupId: g.id, groupName: g.name, note: e.note, idx });
     });
   });
-  return conflicts;
+  return blocks;
+}
+
+// 小组表中，当前单元格在其它小组是否已有排期（原“冲突”概念）
+function getCrossGroupBlocks(personId, dateStr) {
+  const blocks = [];
+  weekGroups().forEach(g => {
+    if (g.id === activeGroupId) return;
+    const es = getEntries(g.id, personId, dateStr);
+    es.forEach(e => blocks.push({ groupName: g.name, note: e.note }));
+  });
+  return blocks;
 }
 
 function renderOverview() {
   const ws = wsKey();
   const sched = data.schedules[ws] || {};
-  const res = data.resolutions[ws] || {};
   const dates = weekDates(currentWeek);
 
   let total = 0;
-  let rCount = Object.keys(res).length;
   weekGroups().forEach(g => { if (sched[g.id]) total += Object.keys(sched[g.id]).length; });
-  const conflicts = getConflicts();
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">总排班数</div></div>
-    <div class="stat danger"><div class="stat-val">${conflicts.length}</div><div class="stat-label">待解决冲突</div></div>
-    <div class="stat success"><div class="stat-val">${rCount}</div><div class="stat-label">已裁决</div></div>
     <div class="stat"><div class="stat-val">${allPeople().length}</div><div class="stat-label">总人数</div></div>
     <div class="stat"><div class="stat-val">${weekGroups().length}</div><div class="stat-label">小组</div></div>
+    <div class="stat"><div class="stat-val">${Object.keys(sched).length}</div><div class="stat-label">有排班小组</div></div>
   `;
 
   // 历史周隐藏统计栏
@@ -2378,7 +2308,7 @@ function renderOverview() {
   const isScheduleWeek = wsKey() === scheduleWeek;
   document.getElementById('overviewPanel').insertAdjacentHTML('afterbegin',
     `<div class="hint-bar" id="ovHint" style="margin-bottom:12px;">
-      ${isScheduleWeek ? '双击格子编辑内容 · 点击红色格子裁决冲突 · 此表为最终导出源' : '双击格子录入/编辑内容 · 所有格子都可双击编辑'}
+      ${isScheduleWeek ? '双击格子编辑内容 · 拖动小组块可移动到其他格 · 此表为最终导出源' : '双击格子录入/编辑内容 · 拖动小组块可移动到其他格'}
       <span class="hint-spacer"></span>
     </div>`);
 
@@ -2393,41 +2323,28 @@ function renderOverview() {
         html += `<tr class="section-row"><td colspan="8" style="padding:8px 16px;background:#f3f4f6;font-size:12px;font-weight:600;color:var(--text2);text-align:left;border-bottom:2px solid var(--border);">${label}</td></tr>`;
         lastCat = p._cat;
       }
-      html += `<tr class="${p._cat === 'external' ? 'row-external' : ''}"><td>${esc(p.name)}<span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${p.id}')" title="从本周移除">×</span></td>`;
+      html += `<tr class="${p._cat === 'external' ? 'row-external' : ''}"><td><span class="person-name">${esc(p.name)}</span><span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${p.id}')" title="从本周移除">×</span></td>`;
       dates.forEach((d, c) => {
         const ds = fmtFull(d);
-        const info = getScheduleInfo(p.id, ds);
-        if (info.type === 'empty') {
-          // 空单元格也可以双击添加（历史周只读模式下仍可编辑总览）
+        const blocks = getScheduleInfo(p.id, ds);
+        if (blocks.length === 0) {
+          // 空单元格：双击可在第一个小组新增（仅作便捷入口，主入口仍在各小组表）
           const defaultGid = weekGroups().length > 0 ? weekGroups()[0].id : '';
-          html += `<td><div class="cell cell-empty" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${defaultGid}">-</div></td>`;
-        } else if (info.type === 'single' || info.type === 'resolved') {
-          const gi = weekGroups().findIndex(g => g.id === info.groupId);
-          const note = info.note || '已排班';
-          const condColor = ovConditionMode ? getConditionColor(note) : null;
-          const style = condColor
-            ? `color:#222;background:${hexToRgba(condColor, 0.30)};font-weight:700;`
-            : `color:${COLORS[gi%COLORS.length]};background:${hexToRgba(COLORS[gi%COLORS.length], 0.08)};`;
-          html += `<td><div class="cell cell-ov-edit" style="${style}"
-            data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${info.groupId}">
-            <span>${esc(note).replace(/\n/g, '<br>')}</span>
-          </div></td>`;
-        } else if (info.type === 'partial') {
-          // 部分采纳：显示所有已采纳小组的内容
-          const content = info.note || '';
-          const adoptedNames = info.adoptedIds.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('/');
-          html += `<td><div class="cell cell-ov-edit"
-            style="color:var(--text);background:#f5f5f5;cursor:pointer;" title="已采纳: ${adoptedNames}&#10;点击修改裁决"
-            data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}"
-            onclick="openResolve('${p.id}','${ds}','${esc(p.name)}','${fmtDate(d)}')">
-            <span>${esc(content).replace(/\n/g, '<br>')}</span>
-            <small style="font-size:10px;color:#9ca3af;">(已裁决)</small>
-          </div></td>`;
+          html += `<td><div class="cell cell-empty ov-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${defaultGid}">-</div></td>`;
         } else {
-          const groupTags = info.groups.map(g => `<span style="display:inline-block;background:${hexToRgba(COLORS[weekGroups().findIndex(gr=>gr.id===g.groupId)%COLORS.length],0.2)};color:var(--text);padding:1px 6px;border-radius:4px;font-size:11px;margin:1px 2px;">${esc(g.groupName)}</span>`).join('');
-          html += `<td><div class="cell cell-ov-conflict" onclick="openResolve('${p.id}','${ds}','${esc(p.name)}','${fmtDate(d)}')">
-            <div style="font-weight:600;margin-bottom:2px;">${groupTags}</div>
-            <small style="font-size:10px;opacity:0.7;">点击裁决</small></div></td>`;
+          html += `<td><div class="cell ov-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}">`;
+          blocks.forEach(b => {
+            const gi = weekGroups().findIndex(g => g.id === b.groupId);
+            const condColor = ovConditionMode ? getConditionColor(b.note) : null;
+            const style = condColor
+              ? `color:#222;background:${hexToRgba(condColor, 0.30)};font-weight:600;`
+              : `color:${COLORS[gi%COLORS.length]};background:${hexToRgba(COLORS[gi%COLORS.length], 0.12)};border-left:3px solid ${COLORS[gi%COLORS.length]};`;
+            const noteAttr = esc(b.note).replace(/"/g, '&quot;');
+            html += `<div class="ov-block" style="${style}"
+              data-gid="${b.groupId}" data-idx="${b.idx}" data-pid="${p.id}" data-date="${ds}" data-note="${noteAttr}"
+              title="双击编辑 · 拖动移到其他格">${esc(b.note).replace(/\n/g, '<br>')}</div>`;
+          });
+          html += `</div></td>`;
         }
       });
       html += '</tr>';
@@ -2446,50 +2363,43 @@ function renderOverview() {
   </tr>`;
   html += '</tbody>';
   document.getElementById('overviewTable').innerHTML = html;
-
-  const cs = document.getElementById('conflictSection');
-  if (conflicts.length > 0) {
-    cs.style.display = '';
-    document.getElementById('conflictBadge').textContent = `(${conflicts.length})`;
-    document.getElementById('conflictList').innerHTML = conflicts.map(c => `
-      <div class="conflict-item">
-        <span><span class="ci-name">${esc(c.personName)}</span> · ${c.dateLabel} · ${c.groups.map(g=>esc(g.groupName)).join('、')}</span>
-        <button class="btn btn-p" style="font-size:12px;padding:4px 12px;" onclick="openResolve('${c.personId}','${c.date}','${esc(c.personName)}','${c.dateLabel}')">裁决</button>
-      </div>
-    `).join('');
-  } else {
-    cs.style.display = 'none';
-  }
 }
 
-// 总览表编辑入口 —— 与 startEditDOM 同样的模式
-function ovEntryEdit(cellEl, personId, dateStr, groupId) {
+// 总览表编辑入口 —— 编辑某一小组的具体块（idx）；idx<0 表示新增块
+function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-  const ws = wsKey(); const key = skey(personId, dateStr);
-  const entry = (data.schedules[ws] && data.schedules[ws][groupId] && data.schedules[ws][groupId][key]) || null;
-  const oldVal = entry ? entry.note : '';
+  const entries = getEntries(groupId, personId, dateStr);
+  const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
+  const isNew = !(idx >= 0 && entries[idx]);
 
-  editing = { mode:'overview', personId, dateStr, groupId, el:cellEl, oldVal };
+  editing = { mode:'overview', personId, dateStr, groupId, idx, isNew, el:cellEl, oldVal };
   cellEl.classList.add('editing');
-  cellEl.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:vertical;word-break:break-word;white-space:pre-wrap;" placeholder="输入任务"></textarea>`;
+  cellEl.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:none;overflow:hidden;word-break:break-word;white-space:pre-wrap;" placeholder="输入任务"></textarea>`;
   const ta = cellEl.querySelector('textarea');
   ta.value = oldVal;
   ta.focus();
   ta.selectionStart = ta.value.length;
+  autoResizeTextarea(ta);
+  ta.addEventListener('input', () => autoResizeTextarea(ta));
 
   function commit() {
     if (!editing) return;
     const cur = editing;
     const newVal = ta.value.trim();
-    if (cur.oldVal !== newVal) {
-      if (!data.schedules[ws]) data.schedules[ws] = {};
-      if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
-      if (newVal) data.schedules[ws][groupId][key] = { note:newVal };
-      else delete data.schedules[ws][groupId][key];
-      pushUndo([{ personId:cur.personId, dateStr:cur.dateStr, oldVal:cur.oldVal, newVal, groupId }]);
-      clearResolution(cur.personId, cur.dateStr);
-      saveData();
+    const curEntries = getEntries(cur.groupId, cur.personId, cur.dateStr);
+    let next;
+    if (cur.isNew) {
+      if (!newVal) { editing = null; requestAnimationFrame(() => renderOverview()); return; }
+      next = curEntries.concat([{ note: newVal }]);
+    } else {
+      if (cur.oldVal === newVal) { editing = null; requestAnimationFrame(() => renderOverview()); return; }
+      next = curEntries.slice();
+      if (newVal) next[cur.idx] = { note: newVal };
+      else next.splice(cur.idx, 1);
     }
+    setEntries(cur.groupId, cur.personId, cur.dateStr, next);
+    pushUndo([{ personId: cur.personId, dateStr: cur.dateStr, groupId: cur.groupId, oldVal: curEntries, newVal: next }]);
+    saveData();
     editing = null;
     requestAnimationFrame(() => renderOverview());
   }
@@ -2506,26 +2416,15 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId) {
 // ========================= 总览拖拽移动 =========================
 let ovDrag = null;
 let ovDragStarted = false;
-let ovPlacement = null;       // { personId, dateStr, groupId, val, groupName } + _queue: [{...}]
-let selectedCondColor = '#ef4444';
 
 // 直接在 cell data 上查源数据（不用 getCell，因为 overview 下 activeGroupId 不是具体组）
 function getGroupCell(groupId, personId, dateStr) {
-  const ws = wsKey();
-  if (!data.schedules[ws] || !data.schedules[ws][groupId]) return null;
-  return data.schedules[ws][groupId][skey(personId, dateStr)] || null;
+  return getEntries(groupId, personId, dateStr);
 }
 
 function setGroupCell(groupId, personId, dateStr, val) {
-  const ws = wsKey();
-  if (!data.schedules[ws]) data.schedules[ws] = {};
-  if (!data.schedules[ws][groupId]) data.schedules[ws][groupId] = {};
-  const key = skey(personId, dateStr);
-  if (val) {
-    data.schedules[ws][groupId][key] = { note: val };
-  } else {
-    delete data.schedules[ws][groupId][key];
-  }
+  if (Array.isArray(val)) { setEntries(groupId, personId, dateStr, val); return; }
+  setEntries(groupId, personId, dateStr, val ? [{ note: val }] : []);
 }
 
 function cleanupOvDrag() {
@@ -2539,429 +2438,31 @@ function cleanupOvDrag() {
   });
   ovDrag = null;
   ovDragStarted = false;
-  renderAll();
 }
 
-function ovActionSwap() {
-  document.getElementById('ovActionModal').style.display = 'none';
-  // 放置模式
-  if (ovPlacement && ovPlacement._targetPid) {
-    commitOvPlacementSwap(ovPlacement);
-    return;
-  }
-  // 拖拽模式
-  if (!ovDrag || !ovDrag._targetPid) return;
-  const tInfo = ovDrag._targetInfo;
-  const tPid = ovDrag._targetPid;
-  const tDate = ovDrag._targetDate;
-
-  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
-                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
-  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
-                     tInfo.type === 'resolved' ? tInfo.groupId : ovDrag.groupId;
-  const targetVal = targetEntry ? targetEntry.note : '';
-  // 交换：收集双方位置的全部小组，交换后清理所有残留
-  const srcGid = ovDrag.groupId;
-  const tgtGid = targetGid;
-  const srcPid = ovDrag.personId;
-  const srcDate = ovDrag.dateStr;
-  const srcVal = ovDrag.val;
-  
-  // 先写新位置
-  setGroupCell(srcGid, tPid, tDate, srcVal);
-  setGroupCell(tgtGid, srcPid, srcDate, targetVal);
-  
-  // 全面清理旧位置：遍历所有小组，清除在 srcDate/srcPid 和 tDate/tPid 的旧条目
-  weekGroups().forEach(g => {
-    const gid = g.id;
-    // 清除来源组在源位置的旧数据（源组不应该还留在原处）
-    if (gid === srcGid) setGroupCell(srcGid, srcPid, srcDate, '');
-    // 清除目标组在目标位置的旧数据
-    if (gid === tgtGid) setGroupCell(tgtGid, tPid, tDate, '');
-  });
-  
-  // 确保数据一致性：循环结束后检查源位和目标位是否只各有一个组
-  // 如果多于一个组存在，额外清理
-  weekGroups().forEach(g => {
-    const gid = g.id;
-    const ws = wsKey();
-    const srcKey = skey(srcPid, srcDate);
-    const tgtKey = skey(tPid, tDate);
-    if (data.schedules[ws] && data.schedules[ws][gid]) {
-      // 不是源组也不是目标组，但在源位有数据 → 可能是旧冲突残留
-      if (gid !== srcGid && gid !== tgtGid && data.schedules[ws][gid][srcKey]) {
-        delete data.schedules[ws][gid][srcKey];
-      }
-      if (gid !== srcGid && gid !== tgtGid && data.schedules[ws][gid][tgtKey]) {
-        delete data.schedules[ws][gid][tgtKey];
-      }
-    }
-  });
-  
-  const changes = [];
-  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: srcVal, groupId: srcGid });
-  changes.push({ personId: srcPid, dateStr: srcDate, oldVal: srcVal, newVal: targetVal, groupId: tgtGid });
-  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-  pushUndo(changes);
-  saveData();
-  cleanupOvDrag();
-  renderOverview();
-}
-
-function ovActionJoin() {
-  document.getElementById('ovActionModal').style.display = 'none';
-  // 放置模式
-  if (ovPlacement && ovPlacement._targetPid) {
-    commitOvPlacementJoin(ovPlacement);
-    return;
-  }
-  // 拖拽模式
-  if (!ovDrag || !ovDrag._targetPid) return;
-  const tInfo = ovDrag._targetInfo;
-  const tPid = ovDrag._targetPid;
-  const tDate = ovDrag._targetDate;
-
-  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
-                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
-  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
-                     tInfo.type === 'resolved' ? tInfo.groupId : ovDrag.groupId;
-  const oldTargetVal = targetEntry ? targetEntry.note : '';
-  const newTargetVal = oldTargetVal + '\n' + ovDrag.val;
-  setGroupCell(targetGid, tPid, tDate, newTargetVal);
-  setGroupCell(ovDrag.groupId, ovDrag.personId, ovDrag.dateStr, '');
-  const changes = [
-    { personId: tPid, dateStr: tDate, oldVal: oldTargetVal, newVal: newTargetVal, groupId: targetGid },
-    { personId: ovDrag.personId, dateStr: ovDrag.dateStr, oldVal: ovDrag.val, newVal: '', groupId: ovDrag.groupId },
-  ];
-  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-  pushUndo(changes);
-  saveData();
-  cleanupOvDrag();
-  renderOverview();
-}
-
-function ovActionCancel() {
-  document.getElementById('ovActionModal').style.display = 'none';
-  if (ovPlacement) { cancelOvPlacement(); return; }
-  cleanupOvDrag();
-}
-
-// ========================= 裁决 =========================
-function openResolve(personId, dateStr, personName, dateLabel) {
-  const ws = wsKey();
-  const sched = data.schedules[ws] || {};
-  const key = skey(personId, dateStr);
-  const assigned = [];
-  weekGroups().forEach(g => {
-    if (sched[g.id] && sched[g.id][key]) {
-      assigned.push({ groupId:g.id, groupName:g.name, note:sched[g.id][key].note });
-    }
-  });
-
-  // 读取已有裁决
-  const existingRes = (data.resolutions[ws] && data.resolutions[ws][key]) ? data.resolutions[ws][key] : null;
-  const adopted = existingRes ? (Array.isArray(existingRes) ? existingRes : [existingRes]) : [];
-
-  resolveTarget = { personId, dateStr };
-  document.getElementById('resolveInfo').innerHTML =
-    `<strong>${esc(personName)}</strong> 在 <strong>${dateLabel}</strong> 被 ${assigned.length} 个小组安排：`;
-  document.getElementById('resolveOptions').innerHTML = assigned.map(g => {
-    const gi = weekGroups().findIndex(gr => gr.id === g.groupId);
-    const checked = adopted.includes(g.groupId);
-    return `<label class="resolve-opt" style="border-left:3px solid ${COLORS[gi%COLORS.length]};display:flex;align-items:center;gap:12px;cursor:pointer;">
-      <input type="checkbox" value="${g.groupId}" data-note="${esc(g.note)}" data-group-name="${esc(g.groupName)}" ${checked ? 'checked' : ''}
-        style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;">
-      <div><div class="resolve-gname">${esc(g.groupName)}</div><div class="resolve-note">${esc(g.note)}</div></div>
-    </label>`;
-  }).join('');
-  // 添加确认按钮
-  document.getElementById('resolveOptions').insertAdjacentHTML('beforeend',
-    '<div style="text-align:right;margin-top:12px;"><button class="btn btn-p" onclick="doMultiResolve()">确认裁决</button></div>');
-  document.getElementById('resolveModal').style.display = 'flex';
-}
-
-function doMultiResolve() {
-  const checks = document.querySelectorAll('#resolveOptions input[type="checkbox"]:checked');
-  const adopted = Array.from(checks).map(c => c.value);
-  const ws = wsKey();
-  if (!data.resolutions[ws]) data.resolutions[ws] = {};
-  const key = skey(resolveTarget.personId, resolveTarget.dateStr);
-
-  // 找出未被选中的、有排班内容的小组
-  const allChecks = document.querySelectorAll('#resolveOptions input[type="checkbox"]');
-  const unselected = [];
-  allChecks.forEach(c => {
-    if (!c.checked && c.dataset.note) {
-      unselected.push({
-        groupId: c.value,
-        groupName: c.dataset.groupName || '',
-        note: c.dataset.note
-      });
-    }
-  });
-
-  if (adopted.length === 0) {
-    delete data.resolutions[ws][key];
-  } else {
-    data.resolutions[ws][key] = adopted.length === 1 ? adopted[0] : adopted;
-  }
-  saveData();
-  document.getElementById('resolveModal').style.display = 'none';
-
-  if (unselected.length > 0) {
-    // 显示未采纳排班弹窗
-    showReassignModal(unselected);
-  } else {
-    resolveTarget = null;
-    const names = adopted.length > 0
-      ? adopted.map(gid => weekGroups().find(g => g.id === gid)?.name || '?').join('、')
-      : '无';
-    toast(`已采纳：${names}`);
-    switchGroup('__overview__');
-  }
-}
-
-// ========================= 未采纳排班改期弹窗 =========================
-let reassignQueue = [];
-
-function showReassignModal(items) {
-  reassignQueue = items;
-  renderReassignModal();
-  document.getElementById('reassignModal').style.display = 'flex';
-}
-
-function renderReassignModal() {
-  const list = document.getElementById('reassignList');
-  if (reassignQueue.length === 0) {
-    document.getElementById('reassignModal').style.display = 'none';
-    resolveTarget = null;
-    toast('所有未采纳排班已处理完毕');
-    switchGroup('__overview__');
-    return;
-  }
-  list.innerHTML = reassignQueue.map((u, i) => {
-    const personName = findPersonInAll(resolveTarget.personId)?.name || '?';
-    const dateLabel = fmtDate(new Date(resolveTarget.dateStr + 'T00:00:00'));
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
-      <div>
-        <span style="font-weight:500;">${esc(u.groupName)}</span>
-        <span style="color:var(--text2);margin-left:8px;font-size:12px;">${esc(personName)} · ${dateLabel}</span>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${esc(u.note.substring(0, 40))}${u.note.length > 40 ? '...' : ''}</div>
-      </div>
-      <button class="btn btn-p" style="font-size:12px;padding:4px 12px;white-space:nowrap;"
-        onclick="startOvPlacementItem(${i})">改到其他排期</button>
-    </div>`;
-  }).join('');
-}
-
-function skipAllReassign() {
-  document.getElementById('reassignModal').style.display = 'none';
-  reassignQueue = [];
-  resolveTarget = null;
-  toast('已跳过所有未采纳排班');
-  switchGroup('__overview__');
-}
-
-function startOvPlacementItem(index) {
-  const item = reassignQueue[index];
-  reassignQueue.splice(index, 1); // 从队列中移除
-  document.getElementById('reassignModal').style.display = 'none';
-
-  ovPlacement = {
-    personId: resolveTarget.personId,
-    dateStr: resolveTarget.dateStr,
-    groupId: item.groupId,
-    groupName: item.groupName,
-    val: item.note
-  };
-
-  const personName = findPersonInAll(resolveTarget.personId)?.name || '?';
-  const dateLabel = fmtDate(new Date(resolveTarget.dateStr + 'T00:00:00'));
-  const banner = document.getElementById('ovPlaceBanner');
-  banner.querySelector('#ovPlaceBannerText').textContent =
-    `请为【${item.groupName}】的「${personName}」(${dateLabel}) 选择新的排期，点击单元格即可`;
-  banner.style.display = 'block';
-  switchGroup('__overview__');
-}
-
-function handleOvPlacementClick(ovCell) {
-  if (!ovPlacement) return false;
-
-  const tPid = ovCell.dataset.pid;
-  const tDate = ovCell.dataset.date;
-  const tGid = ovCell.dataset.gid;
-  if (!tPid || !tDate) return true;
-
-  const tInfo = getScheduleInfo(tPid, tDate);
-  if (tInfo.type !== 'empty') {
-    // 目标有内容 → 弹窗询问
-    ovPlacement._targetPid = tPid;
-    ovPlacement._targetDate = tDate;
-    ovPlacement._targetGid = tGid;
-    ovPlacement._targetInfo = tInfo;
-    document.getElementById('ovActionInfo').textContent =
-      `目标位置已有内容「${tInfo.type === 'conflict' ? '冲突' : (tInfo.note || '已排班')}」`;
-    document.getElementById('ovActionModal').style.display = 'flex';
-    return true;
-  }
-
-  // 目标为空，直接移动
-  commitOvPlacement(ovPlacement, tPid, tDate, tGid);
-  return true;
-}
-
-function commitOvPlacement(op, tPid, tDate, tGid) {
-  const changes = [];
-  setGroupCell(op.groupId, tPid, tDate, op.val);
-  changes.push({ personId: tPid, dateStr: tDate, oldVal: '', newVal: op.val, groupId: op.groupId });
-  setGroupCell(op.groupId, op.personId, op.dateStr, '');
-  changes.push({ personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: '', groupId: op.groupId });
-  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-  pushUndo(changes);
-  saveData();
-
-  const pName = findPersonInAll(op.personId)?.name || '?';
-  const dLabel = fmtDate(new Date(tDate + 'T00:00:00'));
-  toast(`已将【${op.groupName}】「${pName}」改到 ${dLabel} 的 ${findPersonInAll(tPid)?.name || '?'}`);
-
-  finishOvPlacement();
-}
-
-function commitOvPlacementSwap(op) {
-  const tInfo = op._targetInfo;
-  const tPid = op._targetPid;
-  const tDate = op._targetDate;
-
-  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
-                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
-  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
-                     tInfo.type === 'resolved' ? tInfo.groupId : op._targetGid;
-  const targetVal = targetEntry ? targetEntry.note : '';
-
-  const srcGid2 = op.groupId;
-  const tgtGid2 = targetGid;
-  const srcPid2 = op.personId;
-  const srcDate2 = op.dateStr;
-  const srcVal2 = op.val;
-
-  setGroupCell(srcGid2, tPid, tDate, srcVal2);
-  setGroupCell(tgtGid2, srcPid2, srcDate2, targetVal);
-  weekGroups().forEach(g => {
-    if (g.id === srcGid2) setGroupCell(srcGid2, srcPid2, srcDate2, '');
-    if (g.id === tgtGid2) setGroupCell(tgtGid2, tPid, tDate, '');
-  });
+// ========================= 总览单块拖动 =========================
+// 拖动一个小组块到别处：源位置移除该块，目标位置叠加该块（空/非空都直接加，不再弹窗、无交换/加入概念）
+// 即使目标已存在同一小组的块，也作为「另一个独立块」追加，不会覆盖。
+function moveBlock(groupId, srcPid, srcDate, srcIdx, tPid, tDate) {
+  if (srcPid === tPid && srcDate === tDate) return; // 同一格不处理
+  const srcEntries = getEntries(groupId, srcPid, srcDate);
+  if (srcIdx < 0 || srcIdx >= srcEntries.length) return;
+  const moved = srcEntries[srcIdx];
+  if (!moved || !moved.note) return;
+  const tgtEntries = getEntries(groupId, tPid, tDate);
 
   const changes = [];
-  changes.push({ personId: tPid, dateStr: tDate, oldVal: targetVal, newVal: srcVal2, groupId: srcGid2 });
-  changes.push({ personId: srcPid2, dateStr: srcDate2, oldVal: srcVal2, newVal: targetVal, groupId: tgtGid2 });
-  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
+  // 目标：追加新块
+  const newTgt = tgtEntries.concat([{ note: moved.note }]);
+  setEntries(groupId, tPid, tDate, newTgt);
+  changes.push({ personId: tPid, dateStr: tDate, groupId, oldVal: tgtEntries, newVal: newTgt });
+  // 源：移除被拖走的块
+  const newSrc = srcEntries.filter((_, i) => i !== srcIdx);
+  setEntries(groupId, srcPid, srcDate, newSrc);
+  changes.push({ personId: srcPid, dateStr: srcDate, groupId, oldVal: srcEntries, newVal: newSrc });
+
   pushUndo(changes);
   saveData();
-
-  const pName = findPersonInAll(op.personId)?.name || '?';
-  toast(`已将【${op.groupName}】「${pName}」交换排期`);
-  document.getElementById('ovActionModal').style.display = 'none';
-  finishOvPlacement();
-}
-
-function commitOvPlacementJoin(op) {
-  const tInfo = op._targetInfo;
-  const tPid = op._targetPid;
-  const tDate = op._targetDate;
-
-  const targetEntry = tInfo.type === 'single' ? getGroupCell(tInfo.groupId, tPid, tDate) :
-                       tInfo.type === 'resolved' ? getGroupCell(tInfo.groupId, tPid, tDate) : null;
-  const targetGid = tInfo.type === 'single' ? tInfo.groupId :
-                     tInfo.type === 'resolved' ? tInfo.groupId : op._targetGid;
-  const oldTargetVal = targetEntry ? targetEntry.note : '';
-  const newTargetVal = oldTargetVal + '\n' + op.val;
-
-  setGroupCell(targetGid, tPid, tDate, newTargetVal);
-  setGroupCell(op.groupId, op.personId, op.dateStr, '');
-  const changes = [
-    { personId: tPid, dateStr: tDate, oldVal: oldTargetVal, newVal: newTargetVal, groupId: targetGid },
-    { personId: op.personId, dateStr: op.dateStr, oldVal: op.val, newVal: '', groupId: op.groupId },
-  ];
-  changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-  pushUndo(changes);
-  saveData();
-
-  const pName = findPersonInAll(op.personId)?.name || '?';
-  toast(`已将【${op.groupName}】「${pName}」加入排期`);
-  document.getElementById('ovActionModal').style.display = 'none';
-  finishOvPlacement();
-}
-
-function finishOvPlacement() {
-  ovPlacement = null;
-  document.getElementById('ovPlaceBanner').style.display = 'none';
-  if (reassignQueue.length > 0) {
-    renderReassignModal();
-    document.getElementById('reassignModal').style.display = 'flex';
-  } else {
-    resolveTarget = null;
-    toast('所有未采纳排班已处理完毕');
-    switchGroup('__overview__');
-  }
-}
-
-function cancelOvPlacement() {
-  // 把当前这个放回队列，继续处理其他的
-  if (ovPlacement) {
-    reassignQueue.unshift({
-      groupId: ovPlacement.groupId,
-      groupName: ovPlacement.groupName,
-      note: ovPlacement.val
-    });
-  }
-  ovPlacement = null;
-  document.getElementById('ovPlaceBanner').style.display = 'none';
-  document.getElementById('ovActionModal').style.display = 'none';
-  if (reassignQueue.length > 0) {
-    renderReassignModal();
-    document.getElementById('reassignModal').style.display = 'flex';
-  } else {
-    resolveTarget = null;
-    switchGroup('__overview__');
-  }
-}
-
-// 保留旧接口兼容
-function doResolve(groupId, el) { doMultiResolve(); }
-
-// 冲突详情弹窗 - 事件委托
-document.addEventListener('click', function(e) {
-  const dot = e.target.closest('.conflict-dot');
-  if (!dot) return;
-  const tip = dot.getAttribute('data-tip');
-  if (!tip) return;
-  e.stopPropagation();
-  showConflictDetail(tip);
-});
-
-function showConflictDetail(conflictText) {
-  const modal = document.getElementById('conflictDetailModal');
-  const body = document.getElementById('conflictDetailBody');
-  const items = conflictText.replace(/^冲突：/, '').split('；');
-  body.innerHTML = items.map((item, i) => {
-    const colon = item.indexOf(': ');
-    const gname = colon > 0 ? item.substring(0, colon) : item;
-    const note = colon > 0 ? item.substring(colon + 2) : '';
-    const gi = weekGroups().findIndex(g => g.name === gname);
-    const color = gi >= 0 ? COLORS[gi % COLORS.length] : '#888';
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--bg);border-radius:8px;border-left:3px solid ${color};">
-      <span style="font-weight:600;color:${color};white-space:nowrap;">${esc(gname)}</span>
-      <span style="color:var(--text);line-height:1.5;word-break:break-word;">${esc(note)}</span>
-    </div>`;
-  }).join('');
-  modal.style.display = 'flex';
-}
-
-function closeResolveModal() {
-  document.getElementById('resolveModal').style.display = 'none';
-  document.getElementById('reassignModal').style.display = 'none';
-  reassignQueue = [];
-  resolveTarget = null;
 }
 
 // ========================= 管理弹窗 =========================
@@ -3103,41 +2604,81 @@ function renderManageTab() {
   }
 }
 
-function addPerson(cat) {
-  const inpId = cat === 'internal' ? 'newInternalInput' : 'newExternalInput';
+function addPerson(cat, name) {
   const list = cat === 'internal' ? data.internalPeople : data.externalPeople;
-  const inp = document.getElementById(inpId);
-  const name = inp.value.trim();
+  name = (name || '').trim();
   if (!name) return;
   if (list.find(p => p.name === name) || data[cat === 'internal' ? 'externalPeople' : 'internalPeople'].find(p => p.name === name)) {
     alert('已存在'); return;
   }
   const prefix = cat === 'internal' ? 'p' : 'e';
   list.push({ id: prefix + Date.now(), name });
-  inp.value = '';
   saveData();
   renderManageTab();
 }
 
+function addPersonFromInput(cat) {
+  const inpId = cat === 'internal' ? 'newInternalInput' : 'newExternalInput';
+  const inp = document.getElementById(inpId);
+  addPerson(cat, inp.value);
+  inp.value = '';
+}
+
 function renamePerson(id) {
-  const info = findPersonList(id);
-  if (!info) return;
-  const p = info.list.find(x => x.id === id);
+  // 管理界面只操作常用模板（internal/external），避免 findPersonList 优先命中本周快照
+  let p = data.internalPeople.find(x => x.id === id);
+  let listName = 'internal';
+  if (!p) {
+    p = data.externalPeople.find(x => x.id === id);
+    listName = 'external';
+  }
   if (!p) return;
-  const n = prompt('修改姓名：', p.name);
-  if (!n||!n.trim()||n.trim()===p.name) return;
-  // 检查所有人员列表中的重名
-  if (allPeople().find(x => x.name===n.trim())) { alert('已存在'); return; }
-  p.name = n.trim(); saveData(); renderManageTab();
+  showNameInputModal('修改姓名', p.name, val => {
+    const name = (val || '').trim();
+    if (!name || name === p.name) return;
+    // 检查另一侧模板中的重名（同一列表内的重名通过 id 自排除）
+    const otherList = listName === 'internal' ? data.externalPeople : data.internalPeople;
+    if (otherList.find(x => x.name === name)) { alert('已存在'); return; }
+    p.name = name;
+    renamePersonInAllWeeks(id, name);
+    saveData(); renderManageTab(); renderAll();
+  });
 }
 
 function removePerson(id) {
-  if (!confirm('确定从常用模板中删除该人员？\n已有各周的排班数据不受影响。')) return;
-  const info = findPersonList(id);
-  if (!info) return;
-  info.list.splice(info.list.findIndex(p => p.id === id), 1);
+  if (!confirm('确定从常用模板及所有周人员列表中删除该人员？\n排班数据仍保留，但表格中不再显示。')) return;
+  let idx = data.internalPeople.findIndex(p => p.id === id);
+  let list = null;
+  if (idx >= 0) {
+    list = data.internalPeople;
+  } else {
+    idx = data.externalPeople.findIndex(p => p.id === id);
+    if (idx >= 0) list = data.externalPeople;
+  }
+  if (!list) return;
+  list.splice(idx, 1);
+  removePersonFromAllWeeks(id);
   clearSelection();
-  saveData(); renderManageTab();
+  saveData(); renderManageTab(); renderAll();
+}
+
+// 同步改名到所有周的人员快照
+function renamePersonInAllWeeks(id, newName) {
+  if (!data.weekPeople) return;
+  for (const arr of Object.values(data.weekPeople)) {
+    const p = arr.find(x => x.id === id);
+    if (p) p.name = newName;
+  }
+}
+
+// 从所有周的人员快照中移除
+function removePersonFromAllWeeks(id) {
+  if (!data.weekPeople) return;
+  for (const ws of Object.keys(data.weekPeople)) {
+    const arr = data.weekPeople[ws];
+    const idx = arr.findIndex(x => x.id === id);
+    if (idx >= 0) arr.splice(idx, 1);
+  }
 }
 function addGroup() {
   const inp = document.getElementById('newGroupInput');
@@ -3153,23 +2694,51 @@ function addGroup() {
   saveData(); renderManageTab(); renderAll();
 }
 
+// 多行文本输入弹窗（支持换行），用于添加人员姓名
+function showNameInputModal(title, defaultVal, onConfirm) {
+  const old = document.getElementById('nameInputModal');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'nameInputModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:600;';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:14px;padding:20px 22px;width:360px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,.18);border:1.5px solid var(--border);">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--text);">${title}</div>
+      <textarea id="nameInputArea" placeholder="按Enter换行" style="width:100%;min-height:96px;resize:vertical;border:1.5px solid var(--border);border-radius:10px;padding:10px;font-size:14px;font-family:inherit;color:var(--text);box-sizing:border-box;white-space:pre-wrap;word-break:break-word;"></textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <button class="btn" onclick="document.getElementById('nameInputModal').remove()">取消</button>
+        <button class="btn btn-p" id="nameInputConfirm">确定</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const ta = overlay.querySelector('#nameInputArea');
+  ta.value = defaultVal || '';
+  ta.focus();
+  const doConfirm = () => { const v = ta.value; overlay.remove(); onConfirm(v); };
+  overlay.querySelector('#nameInputConfirm').addEventListener('click', doConfirm);
+  ta.addEventListener('keydown', e => {
+    // 阻止事件冒泡，避免触发表格全局快捷键（如 Ctrl+A / Enter 等）
+    e.stopPropagation();
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doConfirm(); }
+    if (e.key === 'Escape') { e.preventDefault(); overlay.remove(); }
+  });
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.remove(); });
+}
+
 // 快速添加人员（表格底部+号）
 function quickAddPerson(cat) {
   const label = cat === 'internal' ? '内部' : '外协';
-  const name = prompt(`添加${label}人员姓名（仅本周）：`);
-  if (!name || !name.trim()) return;
-
-  // 只检查当前周是否重名
-  if (weekPeople().find(p => p.name === name.trim())) { alert('本周已存在'); return; }
-
-  const prefix = cat === 'internal' ? 'p' : 'e';
-  const newPerson = { id: prefix + Date.now(), name: name.trim(), _cat: cat };
-
-  // 只添加到当前周
-  weekPeople().push(newPerson);
-  lockWeekPeople();
-  saveData();
-  renderAll();
+  showNameInputModal(`添加${label}人员姓名（仅本周）`, '', val => {
+    if (!val || !val.trim()) return;
+    // 整体作为一个人员（多行作为该人员姓名的一部分），不在管理里增删
+    if (weekPeople().find(p => p.name === val.trim())) { alert('本周已存在'); return; }
+    const prefix = cat === 'internal' ? 'p' : 'e';
+    const newPerson = { id: prefix + Date.now(), name: val.trim(), _cat: cat };
+    weekPeople().push(newPerson);
+    lockWeekPeople();
+    saveData();
+    renderAll();
+  });
 }
 function removePersonFromWeek(personId) {
   const wp = weekPeople();
@@ -3392,8 +2961,6 @@ function hexToRgba(hex, alpha) {
 }
 
 document.getElementById('manageModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeManageModal(); });
-document.getElementById('resolveModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeResolveModal(); });
-document.getElementById('conflictDetailModal').addEventListener('click', e => { if (e.target===e.currentTarget) e.currentTarget.style.display='none'; });
 // 点击取色器外部关闭
 document.addEventListener('click', function(e) {
   const picker = document.getElementById('condColorPicker');
@@ -3426,13 +2993,12 @@ function clearGroup() {
   if (data.schedules[ws] && data.schedules[ws][activeGroupId]) {
     Object.entries(data.schedules[ws][activeGroupId]).forEach(([key, entry]) => {
       const [personId, dateStr] = key.split(/_(.+)/);
-      changes.push({ personId, dateStr, oldVal: entry.note, newVal: '' });
+      changes.push({ personId, dateStr, oldVal: entry, newVal: [] });
     });
     delete data.schedules[ws][activeGroupId];
   }
   if (changes.length > 0) {
-    changes.forEach(ch => clearResolution(ch.personId, ch.dateStr));
-    pushUndo(changes);
+        pushUndo(changes);
   }
   saveData();
   clearSelection();
@@ -3489,10 +3055,9 @@ function exportExcel() {
   exportPeople.forEach(p => {
     const row = [p.name];
     dates.forEach(d => {
-      const info = getScheduleInfo(p.id, fmtFull(d));
-      if (info.type === 'empty') row.push('');
-      else if (info.type === 'single' || info.type === 'resolved') row.push(`${info.groupName}: ${info.note || ''}`);
-      else row.push('冲突:'+info.groups.map(g=>g.groupName).join('/'));
+      const blocks = getScheduleInfo(p.id, fmtFull(d));
+      if (blocks.length === 0) row.push('');
+      else row.push(blocks.map(b => b.note || '').join('\n'));
     });
     exportData.push(row);
   });
@@ -3539,7 +3104,7 @@ async function buildExportCanvas() {
   container.appendChild(title);
 
   const dates = weekDates(currentWeek);
-  const weekStr = `${fmtDate(currentWeek)} ~ ${fmtDate(new Date(currentWeek.getTime()+6*86400000))}`;
+  const weekStr = `${fmtExportDate(currentWeek)} ~ ${fmtExportDate(new Date(currentWeek.getTime()+6*86400000))}`;
   const subtitle = document.createElement('div');
   subtitle.textContent = weekStr;
   subtitle.style.cssText = 'text-align:center;margin:0 0 16px;font-size:12px;color:#999;';
@@ -3555,7 +3120,7 @@ async function buildExportCanvas() {
   headerRow.appendChild(thName);
   dates.forEach((d, i) => {
     const th = document.createElement('th');
-    th.innerHTML = `${fmtDate(d)}<br><small>${DAY_NAMES[i]}</small>`;
+    th.innerHTML = `${fmtExportDate(d)}<br><small>${DAY_NAMES[i]}</small>`;
     th.style.cssText = 'border:1px solid #ccc;padding:8px 6px;background:#f9f9f9;font-weight:600;font-size:11px;min-width:70px;';
     headerRow.appendChild(th);
   });
@@ -3587,21 +3152,25 @@ async function buildExportCanvas() {
     tr.appendChild(tdName);
     dates.forEach(d => {
       const td = document.createElement('td');
-      const info = getScheduleInfo(p.id, fmtFull(d));
-      let content = '';
-      if (info.type === 'single' || info.type === 'resolved' || info.type === 'partial') {
-        content = (info.note || '').replace(/\n/g, '<br>');
-      } else if (info.type === 'conflict') {
-        content = '⚠冲突';
+      const blocks = getScheduleInfo(p.id, fmtFull(d));
+      const minH = Math.max(70, blocks.length * 35);
+      td.style.cssText = `border:1px solid #ccc;padding:0;text-align:center;vertical-align:top;font-size:10px;word-break:break-word;position:relative;height:${minH}px;`;
+      if (blocks.length > 0) {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;justify-content:center;height:100%;box-sizing:border-box;';
+        blocks.forEach(b => {
+          const div = document.createElement('div');
+          div.textContent = b.note || '';
+          let ds = 'flex:1 1 auto;display:flex;align-items:center;justify-content:center;text-align:center;padding:3px 4px;border-radius:4px;line-height:1.4;white-space:pre-wrap;word-break:break-word;min-height:0;';
+          const condColor = getConditionColor(b.note);
+          if (condColor) {
+            ds += `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:700;`;
+          }
+          div.style.cssText = ds;
+          wrapper.appendChild(div);
+        });
+        td.appendChild(wrapper);
       }
-      td.innerHTML = content;
-      let cellStyle = 'border:1px solid #ccc;padding:6px 4px;text-align:center;font-size:10px;word-break:break-word;';
-      // 条件格式着色
-      if (content && !info.type.startsWith('conflict') && !info.type.startsWith('empty')) {
-        const condColor = getConditionColor(content);
-        if (condColor) cellStyle += `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:700;`;
-      }
-      td.style.cssText = cellStyle;
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -3634,10 +3203,9 @@ function copyToClipboard() {
   exportPeople.forEach(p => {
     const cells = [p.name];
     dates.forEach(d => {
-      const info = getScheduleInfo(p.id, fmtFull(d));
-      if (info.type === 'empty') cells.push('');
-      else if (info.type === 'single' || info.type === 'resolved') cells.push(info.note || '');
-      else cells.push('冲突:'+info.groups.map(g=>g.groupName).join('/'));
+      const blocks = getScheduleInfo(p.id, fmtFull(d));
+      if (blocks.length === 0) cells.push('');
+      else cells.push(blocks.map(b => b.note || '').join('\n'));
     });
     lines.push(cells.join('\t'));
   });
@@ -3662,6 +3230,19 @@ function updateWeekUI() {
   // 下一周期显示「排班周」标签
   const nextMonday = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
   document.getElementById('weekBadge').style.display = (wsKey() === nextMonday) ? 'inline' : 'none';
+}
+
+function goToScheduleWeek() {
+  if (editing) commitEdit();
+  const scheduleWeek = getMonday(new Date(Date.now() + 7*86400000));
+  if (fmtFull(currentWeek) === fmtFull(scheduleWeek)) {
+    toast('已在排班周');
+    return;
+  }
+  currentWeek = scheduleWeek;
+  clearSelection();
+  updateWeekUI();
+  renderAll();
 }
 
 function prevWeek() {
@@ -3691,12 +3272,60 @@ function jumpToWeek(dateVal) {
   renderAll();
 }
 
+// ========================= 小组表悬浮提示 =========================
+function initCellTooltip() {
+  const tooltip = document.createElement('div');
+  tooltip.id = 'cellTooltip';
+  tooltip.className = 'cell-tooltip';
+  document.body.appendChild(tooltip);
+
+  const editTable = document.getElementById('editTable');
+  if (!editTable) return;
+
+  function positionTooltip(e) {
+    const pad = 12;
+    let left = e.clientX + pad;
+    let top = e.clientY + pad;
+    const rect = tooltip.getBoundingClientRect();
+    if (left + rect.width > window.innerWidth - pad) left = e.clientX - rect.width - pad;
+    if (top + rect.height > window.innerHeight - pad) top = e.clientY - rect.height - pad;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+
+  editTable.addEventListener('mouseover', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell || cell.classList.contains('editing')) { tooltip.style.display = 'none'; return; }
+    const pid = cell.dataset.pid;
+    const ds = cell.dataset.date;
+    if (!pid || !ds) { tooltip.style.display = 'none'; return; }
+    const conflicts = getCrossGroupBlocks(pid, ds);
+    if (conflicts.length === 0) { tooltip.style.display = 'none'; return; }
+    const items = conflicts.map(b => {
+      const note = esc(b.note || '').replace(/\n/g, '<br>');
+      return `<div class="tip-item"><span class="tip-group">${esc(b.groupName)}</span><div class="tip-content">${note}</div></div>`;
+    }).join('');
+    tooltip.innerHTML = `<div class="tip-title">⚠ 其它小组已在此处排期</div>${items}<div class="tip-message">已在此处填写排期，请大家先自行协调安排，如解决不了填入后等待排班负责人协调~</div>`;
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  });
+
+  editTable.addEventListener('mousemove', e => {
+    if (tooltip.style.display === 'block') positionTooltip(e);
+  });
+
+  editTable.addEventListener('mouseout', e => {
+    if (e.target.closest('.cell')) tooltip.style.display = 'none';
+  });
+}
+
 // ========================= 启动 =========================
 (async function init() {
   await loadData();
   updateWeekUI();
   if (weekGroups().length > 0) activeGroupId = weekGroups()[0].id;
   renderAll();
+  initCellTooltip();
   updateUndoHint();
 })();
 </script>
