@@ -130,7 +130,7 @@ function readDB() {
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
     return JSON.parse(raw);
   } catch (e) {
-    return { internalPeople:[], externalPeople:[], groups:[], schedules:{}, _updated: 0 };
+    return { internalPeople:[], externalPeople:[], groups:[], schedules:{}, users:{}, history:[], _updated: 0 };
   }
 }
 
@@ -179,6 +179,10 @@ app.post('/api/state', (req, res) => {
     });
   }
 
+  // 用户身份与审计历史：服务端权威，不被整份 state 覆盖（由专属接口写入）
+  if (oldData.users) merged.users = oldData.users;
+  if (oldData.history) merged.history = oldData.history;
+
   writeDB(merged);
   res.json({ ok: true, _updated: merged._updated });
 });
@@ -187,6 +191,73 @@ app.post('/api/state', (req, res) => {
 app.get('/api/ping', (req, res) => {
   const db = readDB();
   res.json({ _updated: db._updated || 0 });
+});
+
+// ========================= 用户身份 & 审计历史 =========================
+
+// 按"真实姓名"为唯一键识别用户（换设备输入同名 = 登录原身份，不新建）
+app.post('/api/user/identify', (req, res) => {
+  const name = (req.body && req.body.name || '').toString().trim();
+  if (!name) return res.status(400).json({ ok: false, error: 'name required' });
+  const db = readDB();
+  if (!db.users) db.users = {};
+  const now = new Date().toISOString();
+  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString();
+  let user = db.users[name];
+  if (user) {
+    user.lastSeenAt = now;
+    user.lastIp = ip;
+  } else {
+    user = { id: 'u' + Date.now(), name, firstSeenAt: now, lastSeenAt: now, lastIp: ip };
+    db.users[name] = user;
+  }
+  writeDB(db);
+  res.json({ ok: true, user });
+});
+
+// 追加审计历史（支持单条或数组），服务端原子写入 + 同步 GitHub
+app.post('/api/history/append', (req, res) => {
+  const db = readDB();
+  if (!db.history) db.history = [];
+  let entries = Array.isArray(req.body) ? req.body : [req.body];
+  entries = entries.filter(Boolean).map(e => Object.assign({
+    id: 'h' + Date.now() + Math.random().toString(36).slice(2, 7),
+    ts: new Date().toISOString(),
+  }, e));
+  db.history = db.history.concat(entries);
+  if (db.history.length > 8000) db.history = db.history.slice(-8000); // 上限保护，避免无限膨胀
+  writeDB(db);
+  res.json({ ok: true, count: entries.length });
+});
+
+// 读取审计历史（按组 / 用户 / 关键词筛选，倒序返回）
+app.get('/api/history', (req, res) => {
+  const db = readDB();
+  let h = db.history || [];
+  const g = req.query.group, u = req.query.user, q = req.query.q;
+  if (g) h = h.filter(x => x.group === g || (g === '总览' && (!x.group || x.group === '总览')));
+  if (u) h = h.filter(x => x.user === u);
+  if (q) {
+    const lq = q.toLowerCase();
+    h = h.filter(x => [x.content, x.user, x.person, x.group].some(v => (v || '').toLowerCase().includes(lq)));
+  }
+  h = h.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  const limit = parseInt(req.query.limit, 10) || 500;
+  res.json({ ok: true, history: h.slice(0, limit) });
+});
+
+// 按操作批次(opId)删除审计记录（用于撤销的净态对账：撤销即移除对应记录）
+app.post('/api/history/remove', (req, res) => {
+  const db = readDB();
+  if (!db.history) db.history = [];
+  const opIds = (req.body && req.body.opIds) || [];
+  const set = new Set(opIds);
+  const removed = set.size ? db.history.filter(x => x.opId && set.has(x.opId)) : [];
+  if (removed.length) {
+    db.history = db.history.filter(x => !(x.opId && set.has(x.opId)));
+    writeDB(db);
+  }
+  res.json({ ok: true, removed });
 });
 
 // SPA fallback

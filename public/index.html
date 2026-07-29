@@ -420,6 +420,39 @@ body {
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 @keyframes ovBannerPulse { 0%,100% { box-shadow:0 4px 24px rgba(238,90,36,0.4); } 50% { box-shadow:0 4px 40px rgba(238,90,36,0.7); } }
+<style>
+/* ===== 修改记录抽屉 (3.0) ===== */
+.hd-overlay{position:fixed;inset:0;background:rgba(15,23,42,.35);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:500;}
+.hd-overlay.open{opacity:1;pointer-events:auto;}
+.hd-drawer{position:fixed;top:0;right:0;height:100%;width:390px;max-width:92vw;background:var(--card);backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);border-left:1px solid var(--border);box-shadow:-14px 0 44px rgba(0,0,0,.20);transform:translateX(100%);transition:transform .35s cubic-bezier(.16,1,.3,1);z-index:501;display:flex;flex-direction:column;}
+.hd-drawer.open{transform:translateX(0);}
+.hd-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;color:var(--text);}
+.hd-filters{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);}
+.hd-filters select,.hd-filters input{flex:1 1 120px;border:1.5px solid var(--border);border-radius:9px;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);min-width:0;}
+.hd-list{flex:1;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;}
+.hd-item{background:rgba(127,127,127,.06);border:1px solid var(--border);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.6;color:var(--text);}
+.hd-item .hd-meta{font-size:12.5px;color:var(--text2);margin-bottom:4px;}
+.hd-item .hd-user{font-weight:700;color:#ff6b9d;font-size:14px;}
+.hd-body{font-size:14px;line-height:1.55;}
+.hd-content{font-size:14px;}
+.hd-where{font-size:13px;color:var(--text2);margin-top:5px;}
+.hd-tag{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:7px;margin:0 2px;}
+.hd-tag.add{background:rgba(34,197,94,.16);color:#16a34a;}
+.hd-tag.modify{background:rgba(59,130,246,.16);color:#2563eb;}
+.hd-tag.delete{background:rgba(239,68,68,.16);color:#dc2626;}
+.hd-tag.addPerson{background:rgba(168,85,247,.16);color:#9333ea;}
+.hd-tag.renamePerson{background:rgba(234,179,8,.18);color:#ca8a04;}
+.hd-tag.removePerson{background:rgba(239,68,68,.16);color:#dc2626;}
+.hd-tag.removeFromWeek{background:rgba(239,68,68,.14);color:#dc2626;}
+.hd-tag.move{background:rgba(139,92,246,.16);color:#7c3aed;}
+.hd-empty{color:var(--text2);font-size:13px;text-align:center;padding:30px 0;}
+/* ===== 身份弹窗 (3.0) ===== */
+#identityModal .id-card{background:var(--card);border-radius:16px;padding:24px 26px;width:380px;max-width:92vw;box-shadow:0 16px 50px rgba(0,0,0,.22);border:1.5px solid var(--border);}
+#identityModal .id-title{font-size:17px;font-weight:800;margin-bottom:6px;color:var(--text);}
+#identityModal .id-sub{font-size:13px;color:var(--text2);margin-bottom:16px;}
+#identityModal input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);box-sizing:border-box;}
+#userGreeting:hover{opacity:.75;}
+.user-menu-btn{width:100%;text-align:left;}
 </style></head>
 <body>
 
@@ -437,8 +470,9 @@ body {
   </div>
   <div class="topbar-r">
     <span id="undoHint" style="font-size:12px;color:var(--text2);margin-right:8px;"></span>
+    <span id="userGreeting" title="点击切换用户" style="font-size:13px;font-weight:600;color:var(--text);margin-right:6px;cursor:pointer;user-select:none;" onclick="openUserMenu()">　</span>
     <button class="btn btn-g" onclick="openManageModal()">⚙ 管理</button>
-    <button class="btn" onclick="exportImage()">🖼 导出图片</button>
+    <button class="btn" onclick="openHistoryDrawer()">🕘 查看修改记录</button>
     <button class="btn" onclick="copyImageToClipboard()">📋 复制图片</button>
   </div>
 </div>
@@ -630,6 +664,7 @@ async function loadData() {
       // 合并本地新增字段，防止服务器覆盖
       if (!d.conditionRules && data.conditionRules) d.conditionRules = data.conditionRules;
       if (!d.weekPeople && data.weekPeople) d.weekPeople = data.weekPeople;
+      delete d.history; delete d.users; // 审计/身份服务端权威，不入编辑态
       data = d;
       saveLocal();
     }
@@ -704,6 +739,7 @@ function startPolling() {
             // 合并本地新增字段
             if (!fresh.conditionRules && data.conditionRules) fresh.conditionRules = data.conditionRules;
             if (!fresh.weekPeople && data.weekPeople) fresh.weekPeople = data.weekPeople;
+            delete fresh.history; delete fresh.users;
             data = fresh;
             saveLocal();
             renderAll();
@@ -910,15 +946,18 @@ function toast(msg) {
 }
 
 // ========================= 撤销/重做 =========================
-function pushUndo(changes) {
+let _opSeq = 0;
+function pushUndo(changes, opMeta) {
   if (changes.length === 0) return;
-  undoStack.push({ changes, groupId: activeGroupId, week: wsKey() });
+  const opId = 'op_' + Date.now() + '_' + (++_opSeq) + '_' + Math.random().toString(36).slice(2, 6);
+  logChanges(changes, opId, opMeta);
+  undoStack.push({ changes, groupId: activeGroupId, week: wsKey(), opId });
   if (undoStack.length > MAX_UNDO) undoStack.shift();
   redoStack = [];
   updateUndoHint();
 }
 
-function undo() {
+async function undo() {
   if (editing) commitEdit();
   if (undoStack.length === 0) { toast('没有可撤销的操作'); return; }
   const action = undoStack.pop();
@@ -945,10 +984,22 @@ function undo() {
   clearSelection();
   updateUndoHint();
   if (needRerender) renderAll(); else if (activeGroupId === '__overview__') renderOverview(); else renderEditTable();
+
+  // 净态对账：撤销即移除对应的历史记录，使历史永远等于屏幕最终态
+  if (action.opId) {
+    try {
+      const r = await fetch(`${API_BASE}/api/history/remove`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opIds: [action.opId] })
+      });
+      const j = await r.json();
+      action.removedEntries = (j && j.removed) || [];
+    } catch (e) { action.removedEntries = []; }
+  }
   toast('已撤销');
 }
 
-function redo() {
+async function redo() {
   if (editing) commitEdit();
   if (redoStack.length === 0) { toast('没有可重做的操作'); return; }
   const action = redoStack.pop();
@@ -974,6 +1025,11 @@ function redo() {
   clearSelection();
   updateUndoHint();
   if (needRerender) renderAll(); else if (activeGroupId === '__overview__') renderOverview(); else renderEditTable();
+
+  // 净态对账：重做即把被撤销的记录加回（保留原 id/opId/ts）
+  if (action.removedEntries && action.removedEntries.length) {
+    appendHistory(action.removedEntries);
+  }
   toast('已重做');
 }
 
@@ -1823,7 +1879,7 @@ document.addEventListener('mouseup', function(e) {
       setEntries(cellDrag.gid, cellDrag.personId, cellDrag.dateStr, newSrc);
       changes.push({ personId: cellDrag.personId, dateStr: cellDrag.dateStr, groupId: cellDrag.gid, oldVal: srcEntries, newVal: newSrc });
 
-      pushUndo(changes);
+      pushUndo(changes, { type:'move', groupId: cellDrag.gid, content: moved, fromPerson: cellDrag.personId, fromDate: cellDrag.dateStr, toPerson: tPid, toDate: tDate });
       saveData();
     }
     clearSelection();
@@ -1952,9 +2008,8 @@ document.addEventListener('dblclick', function(e) {
     if (!ovCell) return;
     const pid = ovCell.dataset.pid;
     const ds = ovCell.dataset.date;
-    const gid = ovCell.dataset.gid || (weekGroups().length > 0 ? weekGroups()[0].id : '');
     if (!pid || !ds) return;
-    ovEntryEdit(ovCell, pid, ds, gid, -1); // 空单元格 → 新增一个块
+    ovPickGroupForNew(pid, ds, ovCell); // 空单元格 → 先选小组再新增（保证归属正确）
     return;
   }
 
@@ -2461,8 +2516,40 @@ function moveBlock(groupId, srcPid, srcDate, srcIdx, tPid, tDate) {
   setEntries(groupId, srcPid, srcDate, newSrc);
   changes.push({ personId: srcPid, dateStr: srcDate, groupId, oldVal: srcEntries, newVal: newSrc });
 
-  pushUndo(changes);
+  pushUndo(changes, { type:'move', groupId, content: (moved && moved.note) || '', fromPerson: srcPid, fromDate: srcDate, toPerson: tPid, toDate: tDate });
   saveData();
+}
+
+// 总览空白格：先选小组再录入，保证归属正确（避免默认落到第一个组）
+let ovPickCell = null;
+function ovPickGroupForNew(pid, ds, cellEl) {
+  closeOvGroupPick();
+  const groups = weekGroups();
+  if (!groups.length) { ovEntryEdit(cellEl, pid, ds, '', -1); return; }
+  ovPickCell = cellEl;
+  const rect = cellEl.getBoundingClientRect();
+  const pick = document.createElement('div');
+  pick.id = 'ovGroupPick';
+  pick.style.cssText = 'position:absolute;z-index:800;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2);min-width:170px;';
+  pick.innerHTML = `<div style="font-size:12px;color:var(--text2);margin:2px 4px 8px;">选择要加入的小组</div>` +
+    groups.map((g, i) => `<button class="btn" style="display:block;width:100%;margin:3px 0;text-align:left;color:${COLORS[i % COLORS.length]};font-weight:600;" onclick="ovGroupPickChoose('${pid}','${ds}','${g.id}')">${esc(g.name)}</button>`).join('');
+  pick.style.left = (window.scrollX + rect.left) + 'px';
+  pick.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+  document.body.appendChild(pick);
+  setTimeout(() => document.addEventListener('mousedown', ovGroupPickOutside, { once: true }), 0);
+}
+function ovGroupPickChoose(pid, ds, gid) {
+  const cell = ovPickCell;
+  closeOvGroupPick();
+  if (cell) ovEntryEdit(cell, pid, ds, gid, -1);
+}
+function ovGroupPickOutside(e) {
+  if (!e.target.closest('#ovGroupPick')) closeOvGroupPick();
+}
+function closeOvGroupPick() {
+  const p = document.getElementById('ovGroupPick');
+  if (p) p.remove();
+  ovPickCell = null;
 }
 
 // ========================= 管理弹窗 =========================
@@ -2485,10 +2572,12 @@ function switchManageTab(tab) {
   document.querySelector(`.mtab[onclick="switchManageTab('${tab}')"]`).classList.add('active');
   document.querySelectorAll('.manage-panel').forEach(p => p.style.display = 'none');
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = '';
-  document.getElementById('manageHint').textContent =
-    tab === 'people' ? '默认人员模板，新周自动沿用；历史周不变。' :
+  const hint = tab === 'people' ? '默认人员模板，新周自动沿用；历史周不变。' :
     tab === 'groups' ? '编辑排班小组。' :
-    tab === 'conditions' ? '内容包含指定文字时自动着色。' : '选择配色主题与字体样式。';
+    tab === 'conditions' ? '' : '选择配色主题与字体样式。';
+  const hintEl = document.getElementById('manageHint');
+  hintEl.textContent = hint;
+  hintEl.style.display = hint ? '' : 'none';
   renderManageTab();
 }
 
@@ -2613,6 +2702,7 @@ function addPerson(cat, name) {
   }
   const prefix = cat === 'internal' ? 'p' : 'e';
   list.push({ id: prefix + Date.now(), name });
+  logPersonAction('addPerson', name);
   saveData();
   renderManageTab();
 }
@@ -2639,8 +2729,10 @@ function renamePerson(id) {
     // 检查另一侧模板中的重名（同一列表内的重名通过 id 自排除）
     const otherList = listName === 'internal' ? data.externalPeople : data.internalPeople;
     if (otherList.find(x => x.name === name)) { alert('已存在'); return; }
+    const oldName = p.name;
     p.name = name;
     renamePersonInAllWeeks(id, name);
+    logPersonAction('renamePerson', oldName + ' → ' + name);
     saveData(); renderManageTab(); renderAll();
   });
 }
@@ -2656,8 +2748,10 @@ function removePerson(id) {
     if (idx >= 0) list = data.externalPeople;
   }
   if (!list) return;
+  const personName = (list[idx] && list[idx].name) || '未知';
   list.splice(idx, 1);
   removePersonFromAllWeeks(id);
+  logPersonAction('removePerson', personName);
   clearSelection();
   saveData(); renderManageTab(); renderAll();
 }
@@ -2736,6 +2830,7 @@ function quickAddPerson(cat) {
     const newPerson = { id: prefix + Date.now(), name: val.trim(), _cat: cat };
     weekPeople().push(newPerson);
     lockWeekPeople();
+    logPersonAction('addPerson', val.trim(), '本周');
     saveData();
     renderAll();
   });
@@ -2748,6 +2843,7 @@ function removePersonFromWeek(personId) {
   if (!confirm(`确定从本周删除「${person.name}」？\n其他周和常用模板不受影响。`)) return;
   wp.splice(idx, 1);
   lockWeekPeople();
+  logPersonAction('removeFromWeek', person.name);
   saveData();
   renderAll();
 }
@@ -2819,6 +2915,7 @@ const COLOR_SERIES = {
   }
 };
 let currentColorSeries = 'basic';
+let selectedCondColor = '#ef4444'; // 新增条件时默认取色（修复：此前未声明导致条件/色系面板打开即抛错）
 
 function getCondColorPickerHTML() {
   let html = '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">';
@@ -3320,6 +3417,309 @@ function initCellTooltip() {
 }
 
 // ========================= 启动 =========================
+// ========================= 3.0: 用户身份 & 审计历史 =========================
+let currentUser = null;
+const USER_KEY = 'schedule_user_v1';
+
+function userName() { return (currentUser && currentUser.name) || '匿名'; }
+
+function appendHistory(entries) {
+  if (!entries || !entries.length) return;
+  try {
+    fetch(`${API_BASE}/api/history/append`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entries)
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+function resolvePersonName(pid) {
+  if (!pid) return '';
+  let p = (data.internalPeople || []).find(x => x.id === pid) || (data.externalPeople || []).find(x => x.id === pid);
+  if (!p && data.weekPeople) {
+    for (const arr of Object.values(data.weekPeople)) {
+      const f = arr.find(x => x.id === pid);
+      if (f) { p = f; break; }
+    }
+  }
+  return p ? p.name : (pid || '');
+}
+
+function resolveGroupName(gid) {
+  if (!gid || gid === '__overview__') return '总览';
+  const g = (data.groups || []).find(x => x.id === gid) || (weekGroups().find(x => x.id === gid));
+  return g ? g.name : '未知组';
+}
+
+function summarizeEntries(entries) {
+  if (!entries || !entries.length) return '';
+  return entries.map(e => {
+    if (!e) return '';
+    if (e.note != null) return e.note;
+    if (e.blockData) return '[多块]';
+    return '';
+  }).filter(Boolean).join(' / ');
+}
+
+function weekdayName(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+}
+
+function logChanges(changes, opId, opMeta) {
+  if (!changes || !changes.length) return;
+  const week = wsKey();
+  let entries;
+  if (opMeta && opMeta.type === 'move') {
+    // 拖拽 = 一次移动，合并为单条记录
+    const fromLabel = `${resolvePersonName(opMeta.fromPerson)}·${weekdayName(opMeta.fromDate)}`;
+    const toLabel = `${resolvePersonName(opMeta.toPerson)}·${weekdayName(opMeta.toDate)}`;
+    entries = [{
+      user: userName(),
+      ts: new Date().toISOString(),
+      week,
+      group: resolveGroupName(opMeta.groupId),
+      person: '', date: '', weekday: '',
+      action: 'move',
+      content: opMeta.content || '',
+      fromLabel, toLabel,
+      opId
+    }];
+  } else {
+    entries = changes.map(ch => {
+      const oldV = ch.oldVal || [], newV = ch.newVal || [];
+      const had = oldV.length > 0, has = newV.length > 0;
+      let action = 'modify';
+      if (!had && has) action = 'add';
+      else if (had && !has) action = 'delete';
+      const gid = ch.groupId || activeGroupId;
+      const dateStr = ch.dateStr || '';
+      return {
+        user: userName(),
+        ts: new Date().toISOString(),
+        week,
+        group: resolveGroupName(gid),
+        person: resolvePersonName(ch.personId),
+        date: dateStr,
+        weekday: weekdayName(dateStr),
+        action,
+        content: (action === 'delete') ? summarizeEntries(oldV) : summarizeEntries(newV),
+        detail: { old: summarizeEntries(oldV), new: summarizeEntries(newV) },
+        opId
+      };
+    });
+  }
+  appendHistory(entries);
+}
+
+function logPersonAction(action, personName, group) {
+  appendHistory([{
+    user: userName(), ts: new Date().toISOString(), week: wsKey(),
+    group: group || '人员管理', person: personName, action, content: personName,
+    date: '', weekday: ''
+  }]);
+}
+
+// ---- 用户身份 ----
+async function identifyUser(name) {
+  const res = await fetch(`${API_BASE}/api/user/identify`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error('identify failed');
+  const r = await res.json();
+  return r.user;
+}
+
+function renderGreeting() {
+  const el = document.getElementById('userGreeting');
+  if (el) el.textContent = (currentUser ? currentUser.name : '') + '，您好';
+}
+
+// 点击问候栏弹出用户菜单（切换用户）
+function openUserMenu() {
+  if (document.getElementById('userMenu')) { closeUserMenu(); return; }
+  const g = document.getElementById('userGreeting');
+  const rect = g.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.id = 'userMenu';
+  menu.style.cssText = 'position:fixed;z-index:720;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;min-width:160px;';
+  menu.style.top = (rect.bottom + 8) + 'px';
+  menu.style.left = Math.max(8, rect.right - 168) + 'px';
+  menu.innerHTML = `
+    <div style="font-size:12px;color:var(--text2);padding:6px 10px 8px;">当前：${esc(currentUser ? currentUser.name : '未登录')}</div>
+    <button class="btn btn-p" style="width:100%;font-size:13px;justify-content:flex-start;" onclick="closeUserMenu();showIdentityModal()">🔄 切换用户</button>`;
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', outsideCloseUserMenu), 0);
+}
+function outsideCloseUserMenu(e) {
+  const m = document.getElementById('userMenu');
+  if (m && !m.contains(e.target) && e.target.id !== 'userGreeting') closeUserMenu();
+}
+function closeUserMenu() {
+  const m = document.getElementById('userMenu');
+  if (m) m.remove();
+  document.removeEventListener('click', outsideCloseUserMenu);
+}
+
+function showIdentityModal() {
+  if (document.getElementById('identityModal')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'identityModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:700;';
+  overlay.innerHTML = `
+    <div class="id-card">
+      <div class="id-title">👋 欢迎使用视频排班</div>
+      <div class="id-sub">首次使用，请填写你的真实姓名，用于记录每一次排班修改（换设备输入同名将自动登录原身份）。</div>
+      <input id="identityNameInput" placeholder="请输入真实姓名" />
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+        <button class="btn btn-p" id="identityConfirm">确定</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const inp = overlay.querySelector('#identityNameInput');
+  inp.focus();
+  const doConfirm = async () => {
+    const name = (inp.value || '').trim();
+    if (!name) { inp.style.borderColor = '#ef4444'; return; }
+    try {
+      const u = await identifyUser(name);
+      currentUser = u;
+      localStorage.setItem(USER_KEY, name);
+      renderGreeting();
+      overlay.remove();
+    } catch (e) { alert('提交失败，请重试'); }
+  };
+  overlay.querySelector('#identityConfirm').addEventListener('click', doConfirm);
+  inp.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); doConfirm(); }
+    if (e.key === 'Escape') { e.preventDefault(); overlay.remove(); }
+  });
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function initIdentity() {
+  const saved = localStorage.getItem(USER_KEY);
+  if (saved) {
+    try {
+      const u = await identifyUser(saved);
+      if (u) { currentUser = u; renderGreeting(); return; }
+    } catch (e) {}
+  }
+  showIdentityModal();
+}
+
+// ---- 修改记录抽屉 ----
+const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
+
+function openHistoryDrawer() {
+  const sel = document.getElementById('historyGroupFilter');
+  if (sel && sel.options.length <= 1) {
+    const baseOpts = '<option value="">全部组</option><option value="总览">总览</option>';
+    const gOpts = (data.groups || []).map(g => `<option value="${esc(g.name)}">${esc(g.name)}</option>`).join('');
+    const wgOpts = (weekGroups() || []).filter(wg => !(data.groups || []).find(g => g.id === wg.id))
+      .map(g => `<option value="${esc(g.name)}">${esc(g.name)}</option>`).join('');
+    sel.innerHTML = baseOpts + gOpts + wgOpts;
+  }
+  document.getElementById('historyOverlay').classList.add('open');
+  document.getElementById('historyDrawer').classList.add('open');
+  loadAllHistory();
+}
+
+function closeHistoryDrawer() {
+  document.getElementById('historyOverlay').classList.remove('open');
+  document.getElementById('historyDrawer').classList.remove('open');
+}
+
+// 周标注：本周 / 排班周（=当前编辑周）始终标注，未来周仅在有数据时出现在筛选里
+function weekLabelOf(wk) {
+  if (!wk) return '—';
+  const thisWeekKey = fmtFull(getMonday(new Date()));
+  const scheduleWeekKey = fmtFull(getMonday(new Date(Date.now() + 7 * 86400000)));
+  const start = new Date(wk + 'T00:00:00');
+  const end = new Date(start.getTime() + 6 * 86400000);
+  const range = `${fmtDate(start)}~${fmtDate(end)}`;
+  if (wk === thisWeekKey && wk === scheduleWeekKey) return '本周/排班周 ' + range;
+  if (wk === thisWeekKey) return '本周 ' + range;
+  if (wk === scheduleWeekKey) return '排班周 ' + range;
+  return range;
+}
+
+let allHistory = [];
+
+async function loadAllHistory() {
+  const list = document.getElementById('historyList');
+  if (!list) return;
+  list.innerHTML = '<div class="hd-empty">加载中…</div>';
+  try {
+    const res = await fetch(`${API_BASE}/api/history?limit=8000`);
+    if (!res.ok) throw new Error('fail');
+    const r = await res.json();
+    allHistory = r.history || [];
+    buildWeekFilter();
+    renderHistoryList();
+  } catch (e) {
+    list.innerHTML = '<div class="hd-empty">加载失败</div>';
+  }
+}
+
+function buildWeekFilter() {
+  const sel = document.getElementById('historyWeekFilter');
+  if (!sel) return;
+  const thisWeekKey = fmtFull(getMonday(new Date()));
+  const scheduleWeekKey = fmtFull(getMonday(new Date(Date.now() + 7 * 86400000)));
+  const weeks = new Set();
+  weeks.add(thisWeekKey);
+  weeks.add(scheduleWeekKey);
+  (allHistory || []).forEach(h => { if (h.week) weeks.add(h.week); });
+  const opts = ['<option value="">全部周</option>'];
+  [...weeks].sort().forEach(wk => {
+    opts.push(`<option value="${wk}">${weekLabelOf(wk)}</option>`);
+  });
+  sel.innerHTML = opts.join('');
+}
+
+function renderHistoryList() {
+  const list = document.getElementById('historyList');
+  if (!list) return;
+  const g = document.getElementById('historyGroupFilter').value;
+  const wk = document.getElementById('historyWeekFilter').value;
+  const q = document.getElementById('historySearch').value.trim().toLowerCase();
+  let h = allHistory || [];
+  if (g) h = h.filter(x => (x.group || '') === g);
+  if (wk) h = h.filter(x => (x.week || '') === wk);
+  if (q) h = h.filter(x => ((x.user || '') + (x.person || '') + (x.content || '') + (x.week || '')).toLowerCase().includes(q));
+  h = h.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  if (!h.length) { list.innerHTML = '<div class="hd-empty">暂无修改记录</div>'; return; }
+  list.innerHTML = h.map(e => {
+    const t = new Date(e.ts);
+    const time = isNaN(t) ? e.ts : t.toLocaleString('zh-CN', { hour12: false });
+    const label = ACTION_LABEL[e.action] || e.action;
+    const cls = ACTION_LABEL[e.action] ? e.action : 'modify';
+    let bodyHtml;
+    if (e.action === 'move') {
+      bodyHtml = `<span class="hd-user">${esc(e.user || '匿名')}</span> <span class="hd-tag move">移动</span><span class="hd-content"> 将「${esc(e.content || '')}」从 ${esc(e.fromLabel || '')} 移动到 ${esc(e.toLabel || '')}</span>`;
+    } else if (e.action === 'modify') {
+      const old = (e.detail && e.detail.old) || '';
+      const nw = (e.detail && e.detail.new) || '';
+      bodyHtml = `<span class="hd-user">${esc(e.user || '匿名')}</span> <span class="hd-tag modify">修改</span><span class="hd-content"> 将「${esc(old)}」修改成「${esc(nw)}」</span>`;
+    } else if (e.action === 'delete') {
+      bodyHtml = `<span class="hd-user">${esc(e.user || '匿名')}</span> <span class="hd-tag delete">删除</span><span class="hd-content"> 了「${esc(e.content || '')}」</span>`;
+    } else {
+      const content = e.content ? ` 了「${esc(e.content)}」` : '';
+      bodyHtml = `<span class="hd-user">${esc(e.user || '匿名')}</span> <span class="hd-tag ${cls}">${label}</span><span class="hd-content">${content}</span>`;
+    }
+    const where = (e.person || e.group) ? `📍 ${esc(e.person || e.group || '')}${e.weekday ? (' 的' + esc(e.weekday)) : ''}` : '';
+    return `<div class="hd-item">
+      <div class="hd-meta">${time} · ${weekLabelOf(e.week)} · ${esc(e.group || '')}</div>
+      <div class="hd-body">${bodyHtml}</div>
+      ${where ? `<div class="hd-where">${where}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
 (async function init() {
   await loadData();
   updateWeekUI();
@@ -3327,7 +3727,18 @@ function initCellTooltip() {
   renderAll();
   initCellTooltip();
   updateUndoHint();
+  initIdentity();
 })();
 </script>
+<div id="historyOverlay" class="hd-overlay" onclick="if(event.target===this)closeHistoryDrawer()"></div>
+<aside id="historyDrawer" class="hd-drawer">
+  <div class="hd-head"><span>🕘 修改记录</span><button class="btn" onclick="closeHistoryDrawer()">✕</button></div>
+  <div class="hd-filters">
+    <select id="historyGroupFilter" onchange="renderHistoryList()"><option value="">全部组</option></select>
+    <select id="historyWeekFilter" onchange="renderHistoryList()"><option value="">全部周</option></select>
+    <input id="historySearch" placeholder="搜索姓名/内容" oninput="renderHistoryList()">
+  </div>
+  <div id="historyList" class="hd-list"></div>
+</aside>
 </body>
 </html>
