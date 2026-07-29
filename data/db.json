@@ -979,7 +979,7 @@
   "resolutions": {
     "2026-07-27": {}
   },
-  "_updated": 1785309322722,
+  "_updated": 1785309330982,
   "conditionRules": [
     {
       "id": "cr1784696233570",
@@ -2120,6 +2120,18 @@
       "person": "毓慧 → 毓慧\n（伍毓慧）",
       "action": "renamePerson",
       "content": "毓慧 → 毓慧\n（伍毓慧）",
+      "date": "",
+      "weekday": ""
+    },
+    {
+      "id": "h1785309330982lbet5",
+      "ts": "2026-07-29T07:15:30.595Z",
+      "user": "张雅镜",
+      "week": "2026-07-27",
+      "group": "人员管理",
+      "person": "涂涂 → 涂涂\n（涂玉铉）",
+      "action": "renamePerson",
+      "content": "涂涂 → 涂涂\n（涂玉铉）",
       "date": "",
       "weekday": ""
     }
