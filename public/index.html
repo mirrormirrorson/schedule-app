@@ -3563,11 +3563,11 @@ function closeUserMenu() {
   document.removeEventListener('click', outsideCloseUserMenu);
 }
 
-function showIdentityModal() {
+function showIdentityModal(forced = false) {
   if (document.getElementById('identityModal')) return;
   const overlay = document.createElement('div');
   overlay.id = 'identityModal';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:700;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:700;' + (forced ? 'cursor:default;' : '');
   overlay.innerHTML = `
     <div class="id-card">
       <div class="id-title">👋 欢迎使用视频排班</div>
@@ -3595,9 +3595,12 @@ function showIdentityModal() {
   inp.addEventListener('keydown', e => {
     e.stopPropagation();
     if (e.key === 'Enter') { e.preventDefault(); doConfirm(); }
-    if (e.key === 'Escape') { e.preventDefault(); overlay.remove(); }
+    if (e.key === 'Escape') { e.preventDefault(); if (!forced) overlay.remove(); }
   });
-  overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.remove(); });
+  // 强制模式下禁止点击遮罩关闭（避免匿名账户，无法追溯谁改过排班）
+  if (!forced) {
+    overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.remove(); });
+  }
 }
 
 async function initIdentity() {
@@ -3608,7 +3611,7 @@ async function initIdentity() {
       if (u) { currentUser = u; renderGreeting(); return; }
     } catch (e) {}
   }
-  showIdentityModal();
+  showIdentityModal(true);
 }
 
 // ---- 修改记录抽屉 ----
