@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>视频排班汇总</title>
+<title>【内部】运营一部视频制作排期表</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
@@ -24,34 +24,78 @@
   --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
 }
 [data-theme="blue"] {
-  --bg: #eff6ff; --bg2: #f5f9ff; --card: #fff; --border: #bfdbfe;
-  --text: #1e3a5f; --text2: #5a7a9a; --primary: #3b82f6; --primary-hover: #2563eb;
+  /* 蓝白专业 · 高端质感：浅蓝渐变底 + 冰蓝玻璃卡 + 柔和辉光 */
+  --bg: #eaf2ff; --bg2: #f3f8ff;
+  --card: rgba(255, 255, 255, 0.72);                 /* 冰蓝玻璃卡 */
+  --border: rgba(59, 130, 246, 0.22);                /* 冷蓝描边 */
+  --text: #16294a; --text2: #5b759a;
+  --primary: #2563eb; --primary-hover: #1d4ed8;      /* 沉稳宝蓝 */
   --danger: #ef4444; --danger-bg: #fef2f2; --success: #10b981; --warning: #f59e0b;
-  --thead-bg: linear-gradient(180deg, #f0f7ff, #dbeafe);
-  --thead-border: #bfdbfe; --cell-border: #dbeafe; --cell-hover-bg: #eff6ff;
-  --cell-hover-bd: #93c5fd; --cell-select-bg: #eff6ff; --cell-select-bd: #93c5fd;
-  --cell-active-bg: #dbeafe; --section-bg: linear-gradient(90deg, #f0f7ff, #dbeafe, #f0f7ff);
-  --topbar-bg: linear-gradient(135deg, #3b82f6, #2563eb, #4f8ff7);
-  --topbar-border: #1d4ed8; --tag-bg: #eff6ff; --name-col-bg: #f8faff;
+  --thead-bg: linear-gradient(180deg, rgba(240,247,255,0.95), rgba(219,234,254,0.95));
+  --thead-border: rgba(59,130,246,0.28);
+  --cell-border: rgba(59,130,246,0.14);
+  --cell-hover-bg: rgba(59,130,246,0.07);
+  --cell-hover-bd: rgba(59,130,246,0.45);
+  --cell-select-bg: rgba(59,130,246,0.10);
+  --cell-select-bd: #2563eb;
+  --cell-active-bg: rgba(59,130,246,0.14);
+  --section-bg: linear-gradient(90deg, rgba(240,247,255,0.7), rgba(219,234,254,0.7), rgba(240,247,255,0.7));
+  --topbar-bg: linear-gradient(135deg, #2563eb, #4f8ff7, #3b82f6);
+  --topbar-border: rgba(37,99,235,0.5);
+  --tag-bg: rgba(255,255,255,0.65); --name-col-bg: rgba(248,250,255,0.8);
   --external-name-col-bg: #fefce8; --external-row-bg: #fffbeb;
-  --radius: 12px; --radius-sm: 8px;
-  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04);
+  --radius: 14px; --radius-sm: 10px;
+  --shadow: 0 8px 28px rgba(37,99,235,0.10), 0 1px 3px rgba(37,99,235,0.06);
   --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
 }
+/* 高端浅蓝背景：极淡辉光 */
+/* 玻璃质感（仅蓝白主题） */
+body[data-theme="blue"] .topbar {
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: 0 6px 22px rgba(37,99,235,0.18), 0 0 16px rgba(59,130,246,0.10);
+}
+body[data-theme="blue"] [style*="var(--card)"] {
+  backdrop-filter: blur(12px) saturate(135%);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+}
 [data-theme="dark"] {
-  --bg: #0f172a; --bg2: #1e293b; --card: #1e293b; --border: #334155;
-  --text: #e2e8f0; --text2: #94a3b8; --primary: #60a5fa; --primary-hover: #3b82f6;
-  --danger: #f87171; --danger-bg: #3b1520; --success: #34d399; --warning: #fbbf24;
-  --thead-bg: linear-gradient(180deg, #1e293b, #0f172a);
-  --thead-border: #334155; --cell-border: #334155; --cell-hover-bg: #1e293b;
-  --cell-hover-bd: #475569; --cell-select-bg: #1e293b; --cell-select-bd: #60a5fa;
-  --cell-active-bg: #1e3a5f; --section-bg: linear-gradient(90deg, #1e293b, #0f172a, #1e293b);
-  --topbar-bg: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
-  --topbar-border: #334155; --tag-bg: #1e293b; --name-col-bg: #1e293b;
-  --external-name-col-bg: #2d2410; --external-row-bg: #1e1a10;
-  --radius: 12px; --radius-sm: 8px;
-  --shadow: 0 1px 4px rgba(0,0,0,0.2), 0 1px 8px rgba(0,0,0,0.15);
+  /* 科技感 · 专业高级暗色：深空黑底 + 电光青/靛蓝渐变 + 玻璃质感 */
+  --bg: #070b16; --bg2: #0b1120;
+  --card: rgba(18, 26, 46, 0.66);                     /* 半透明玻璃卡 */
+  --border: rgba(96, 132, 214, 0.22);                 /* 冷光描边 */
+  --text: #e9eefc; --text2: #93a3c9;
+  --primary: #38bdf8; --primary-hover: #5ccbf5;       /* 电光青 */
+  --danger: #fb7185; --danger-bg: rgba(251, 113, 133, 0.10);
+  --success: #34d399; --warning: #fbbf24;
+  --thead-bg: linear-gradient(180deg, rgba(26,38,66,0.92), rgba(11,17,32,0.92));
+  --thead-border: rgba(96,132,214,0.30);
+  --cell-border: rgba(96,132,214,0.14);
+  --cell-hover-bg: rgba(56,189,248,0.08);
+  --cell-hover-bd: rgba(56,189,248,0.45);
+  --cell-select-bg: rgba(56,189,248,0.13);
+  --cell-select-bd: #38bdf8;
+  --cell-active-bg: rgba(56,189,248,0.18);
+  --section-bg: linear-gradient(90deg, rgba(22,32,56,0.55), rgba(11,17,32,0.55), rgba(22,32,56,0.55));
+  --topbar-bg: linear-gradient(135deg, #0ea5e9, #6366f1, #22d3ee);
+  --topbar-border: rgba(56,189,248,0.55);
+  --tag-bg: rgba(18,26,46,0.6); --name-col-bg: rgba(14,20,36,0.7);
+  --external-name-col-bg: rgba(40,32,12,0.45); --external-row-bg: rgba(28,22,10,0.35);
+  --radius: 14px; --radius-sm: 10px;
+  --shadow: 0 6px 28px rgba(0,0,0,0.5), 0 0 0 1px rgba(56,189,248,0.05);
   --font: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+}
+/* 科技背景：深空辉光 + 精密网格 */
+/* 玻璃质感（仅暗色主题生效） */
+body[data-theme="dark"] .topbar {
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  background: linear-gradient(135deg, rgba(14,165,233,0.92), rgba(99,102,241,0.92), rgba(34,211,238,0.92));
+  box-shadow: 0 6px 24px rgba(8,12,28,0.55), 0 0 22px rgba(56,189,248,0.18);
+}
+body[data-theme="dark"] [style*="var(--card)"] {
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 [data-theme="mint"] {
   --bg: #ecfdf5; --bg2: #f0fdf6; --card: #fff; --border: #a7f3d0;
@@ -71,11 +115,17 @@
 
 * { margin:0; padding:0; box-sizing:border-box; }
 
+html { background: var(--bg); }
 body {
   font-family: var(--font);
-  background: var(--bg);
+  background: transparent;
   color: var(--text); line-height: 1.6; min-height: 100vh;
   font-size: 14px; user-select: none;
+}
+/* 程序化高级背景画布（固定铺满、置于内容之下、不拦截点击） */
+#bgCanvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: -1; pointer-events: none; display: block;
 }
 
 .topbar {
@@ -456,9 +506,11 @@ body {
 </style></head>
 <body>
 
+<canvas id="bgCanvas"></canvas>
+
 <div class="topbar">
   <div class="topbar-l">
-    <div class="logo"><span class="logo-dot"></span>🎀 视频排班汇总</div>
+    <div class="logo"><span class="logo-dot"></span>🎀 【内部】运营一部视频制作排期表</div>
     <button class="btn btn-w" onclick="goToScheduleWeek()" style="padding:5px 12px;font-size:13px;white-space:nowrap;">📋 去排班</button>
     <div class="week-nav">
       <button class="btn btn-g" onclick="prevWeek()" style="padding:2px 8px;font-size:14px;">◀</button>
@@ -595,7 +647,7 @@ body {
 // ========================= 数据（本地+远程同步） =========================
 const STORAGE_KEY = 'schedule_v4';
 const API_BASE = window.location.origin;
-const COLORS = ['#4f46e5','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316'];
+const COLORS = ['#4f46e5','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#14b8a6','#a855f7','#eab308','#0ea5e9','#d946ef','#22c55e','#f43f5e','#6366f1'];
 const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日'];
 
 let data = defaultData();
@@ -892,7 +944,7 @@ function findPersonList(id) {
 // 单元格数据统一为 entries 数组：data.schedules[ws][groupId][key] = [{note}, ...]
 // 兼容旧格式（单个 {note} 对象或字符串），读取时自动归一化。
 function normEntries(v) {
-  const cleanNote = n => typeof n === 'string' ? n.replace(/\u2424/g, '\n') : n;
+  const cleanNote = n => typeof n === 'string' ? n.replace(/\u2424/g, '\n').replace(/\r/g, '').replace(/^\n+|\n+$/g, '') : n;
   if (!v) return [];
   if (Array.isArray(v)) return v.map(e => ({ note: cleanNote((e && (typeof e === 'string' ? e : e.note)) || '') })).filter(e => e.note && e.note.trim());
   if (typeof v === 'string') return v.trim() ? [{ note: cleanNote(v) }] : [];
@@ -913,7 +965,7 @@ function setEntries(groupId, personId, dateStr, arr) {
   const key = skey(personId, dateStr);
   const clean = (arr || [])
     .filter(e => { const n = e && (e.note !== undefined ? e.note : e); return n && typeof n.trim === 'function' && n.trim(); })
-    .map(e => ({ note: (e.note !== undefined ? e.note : e).replace(/\u2424/g, '\n') }));
+    .map(e => ({ note: (e.note !== undefined ? e.note : e).replace(/\u2424/g, '\n').replace(/\r/g, '').replace(/^\n+|\n+$/g, '') }));
   if (clean.length) data.schedules[ws][groupId][key] = clean;
   else delete data.schedules[ws][groupId][key];
 }
@@ -1535,7 +1587,7 @@ function renderEditTable() {
             const style = condColor
               ? `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:600;`
               : `color:${color};background:${hexToRgba(color,0.12)};border-left:3px solid ${color};`;
-            html += `<div class="et-block" style="${style}" data-idx="${idx}">${esc(e.note).replace(/\n/g, '<br>')}</div>`;
+            html += `<div class="et-block" style="${style}" data-idx="${idx}">${esc(e.note.replace(/\r/g, '').replace(/^\n+|\n+$/g, '')).replace(/\n/g, '<br>')}</div>`;
           });
         }
         html += '</div></td>';
@@ -2393,7 +2445,7 @@ function renderOverview() {
             const condColor = ovConditionMode ? getConditionColor(b.note) : null;
             const style = condColor
               ? `color:#222;background:${hexToRgba(condColor, 0.30)};font-weight:600;`
-              : `color:${COLORS[gi%COLORS.length]};background:${hexToRgba(COLORS[gi%COLORS.length], 0.12)};border-left:3px solid ${COLORS[gi%COLORS.length]};`;
+              : `color:${(weekGroups()[gi].color || COLORS[gi%COLORS.length])};background:${hexToRgba((weekGroups()[gi].color || COLORS[gi%COLORS.length]), 0.12)};border-left:3px solid ${(weekGroups()[gi].color || COLORS[gi%COLORS.length])};`;
             const noteAttr = esc(b.note).replace(/"/g, '&quot;');
             html += `<div class="ov-block" style="${style}"
               data-gid="${b.groupId}" data-idx="${b.idx}" data-pid="${p.id}" data-date="${ds}" data-note="${noteAttr}"
@@ -2532,7 +2584,7 @@ function ovPickGroupForNew(pid, ds, cellEl) {
   pick.id = 'ovGroupPick';
   pick.style.cssText = 'position:absolute;z-index:800;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2);min-width:170px;';
   pick.innerHTML = `<div style="font-size:12px;color:var(--text2);margin:2px 4px 8px;">选择要加入的小组</div>` +
-    groups.map((g, i) => `<button class="btn" style="display:block;width:100%;margin:3px 0;text-align:left;color:${COLORS[i % COLORS.length]};font-weight:600;" onclick="ovGroupPickChoose('${pid}','${ds}','${g.id}')">${esc(g.name)}</button>`).join('');
+    groups.map((g, i) => `<button class="btn" style="display:block;width:100%;margin:3px 0;text-align:left;color:${(g.color || COLORS[i % COLORS.length])};font-weight:600;" onclick="ovGroupPickChoose('${pid}','${ds}','${g.id}')">${esc(g.name)}</button>`).join('');
   pick.style.left = (window.scrollX + rect.left) + 'px';
   pick.style.top = (window.scrollY + rect.bottom + 4) + 'px';
   document.body.appendChild(pick);
@@ -2584,8 +2636,8 @@ function switchManageTab(tab) {
 // 主题定义
 const THEMES = [
   { id:'pink', name:'柔和粉', colors:['#ff6b9d','#f8c8d8','#fff0f5','#fff'] },
-  { id:'blue', name:'蓝白专业', colors:['#3b82f6','#bfdbfe','#eff6ff','#fff'] },
-  { id:'dark', name:'深蓝暗色', colors:['#60a5fa','#334155','#0f172a','#1e293b'] },
+  { id:'blue', name:'蓝白专业', colors:['#2563eb','#60a5fa','#dbeafe','#eaf2ff'] },
+  { id:'dark', name:'科技深空', colors:['#38bdf8','#6366f1','#0b1120','#070b16'] },
   { id:'mint', name:'薄荷清新', colors:['#10b981','#a7f3d0','#ecfdf5','#fff'] },
 ];
 // 字体选项
@@ -2774,6 +2826,24 @@ function removePersonFromAllWeeks(id) {
     if (idx >= 0) arr.splice(idx, 1);
   }
 }
+function ensureGroupColors() {
+  const wg = weekGroups();
+  const used = new Set();
+  wg.forEach(g => { if (g.color && COLORS.includes(g.color)) used.add(g.color); });
+  wg.forEach(g => {
+    if (!g.color || !COLORS.includes(g.color)) {
+      const c = COLORS.find(x => !used.has(x));
+      g.color = c || COLORS[used.size % COLORS.length];
+      if (c) used.add(c);
+    }
+  });
+  (data.groups || []).forEach(dg => {
+    const w = wg.find(x => x.id === dg.id);
+    if (w && w.color) dg.color = w.color;
+  });
+  lockWeekGroups();
+}
+
 function addGroup() {
   const inp = document.getElementById('newGroupInput');
   const name = inp.value.trim();
@@ -2785,6 +2855,7 @@ function addGroup() {
   const wg = weekGroups();
   if (!wg.find(x => x.id === g.id)) wg.push({ id: g.id, name: g.name });
   lockWeekGroups();
+  ensureGroupColors();
   saveData(); renderManageTab(); renderAll();
 }
 
@@ -2899,7 +2970,7 @@ function pickCondColor(el, color) {
 const COLOR_SERIES = {
   'basic': {
     name: '常用',
-    colors: ['#ef4444','#f97316','#eab308','#22c55e','#10b981','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#84cc16','#14b8a6','#0ea5e9','#64748b'],
+    colors: ['#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#fbbf24','#16a34a','#0891b2'],
   },
   'morandi': {
     name: '莫兰迪',
@@ -2911,7 +2982,7 @@ const COLOR_SERIES = {
   },
   'earth': {
     name: '大地',
-    colors: ['#8b6914','#a0522d','#cd853f','#daa520','#bc8f8f','#6b8e23','#556b2f','#8fbc8f','#bdb76b','#d2b48c','#a0522d','#cd5c5c'],
+    colors: ['#8b6914','#a0522d','#cd853f','#daa520','#bc8f8f','#6b8e23','#556b2f','#8fbc8f','#bdb76b','#d2b48c','#cd5c5c','#c08552','#8f9779','#b5651d'],
   }
 };
 let currentColorSeries = 'basic';
@@ -3132,7 +3203,7 @@ function renderGroupTabs() {
       activeGroupId = weekActiveGroup[ws];
     }
     html += weekGroups().map((g, i) => {
-      const color = COLORS[i % COLORS.length];
+      const color = (g.color || COLORS[i % COLORS.length]);
       const count = sched[g.id] ? Object.keys(sched[g.id]).length : 0;
       const active = activeGroupId === g.id;
       return `<button class="gtab${active?' active':''}" style="${active?`background:${color};color:#fff;`:`border-left:3px solid ${color};`}" onclick="switchGroup('${g.id}')">${esc(g.name)}<span class="cnt">${count}</span></button>`;
@@ -3161,7 +3232,7 @@ function exportExcel() {
   const wb = XLSX.utils.book_new();
   wb.SheetNames.push('排班汇总');
   wb.Sheets['排班汇总'] = XLSX.utils.aoa_to_sheet(exportData);
-  XLSX.writeFile(wb, `视频排班汇总_${wsKey()}.xlsx`);
+  XLSX.writeFile(wb, `【内部】运营一部视频制作排期表_${wsKey()}.xlsx`);
 }
 
 async function exportImage() {
@@ -3725,6 +3796,7 @@ function renderHistoryList() {
 
 (async function init() {
   await loadData();
+  ensureGroupColors();
   updateWeekUI();
   if (weekGroups().length > 0) activeGroupId = weekGroups()[0].id;
   renderAll();
@@ -3743,5 +3815,126 @@ function renderHistoryList() {
   </div>
   <div id="historyList" class="hd-list"></div>
 </aside>
+<script>
+/* ===== 程序化高级背景：主题化实时渲染（暗色=深空星云，浅色=柔和极光） ===== */
+(function () {
+  var cv = document.getElementById('bgCanvas');
+  if (!cv || !cv.getContext) return;
+  var ctx = cv.getContext('2d');
+  var W = 0, H = 0, dpr = 1, raf = null, running = false, blobs = [];
+  var palette = { isDark: false, prim: '#38bdf8', bgc: '#070b16' };
+
+  function hexToRgb(hex) {
+    hex = (hex || '').trim();
+    if (hex[0] !== '#') {
+      var m = hex.match(/\d+/g);
+      if (m && m.length >= 3) return [+m[0], +m[1], +m[2]];
+      return [56, 189, 248];
+    }
+    var h = hex.slice(1);
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgba(hex, a) {
+    var c = hexToRgb(hex);
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  }
+
+  function readPalette() {
+    var cs = getComputedStyle(document.documentElement);
+    var theme = document.documentElement.getAttribute('data-theme') || 'pink';
+    palette.isDark = (theme === 'dark');
+    palette.prim = (cs.getPropertyValue('--primary').trim()) || '#38bdf8';
+    palette.bgc = (cs.getPropertyValue('--bg').trim()) || '#070b16';
+  }
+
+  function buildBlobs() {
+    var cols = palette.isDark
+      ? [palette.prim, '#6366f1', '#22d3ee', palette.prim, '#8b5cf6']
+      : [palette.prim, '#a5b4fc', '#f9a8d4', '#6ee7b7', '#fcd34d'];
+    blobs = cols.map(function (c) {
+      return {
+        color: c,
+        bx: Math.random(), by: Math.random(),
+        r: 0.30 + Math.random() * 0.22,
+        sx: (Math.random() * 2 - 1) * 0.00005,
+        sy: (Math.random() * 2 - 1) * 0.00005,
+        ph: Math.random() * Math.PI * 2,
+        sp: 0.0005 + Math.random() * 0.0006,
+        maxA: palette.isDark ? 0.22 : 0.16
+      };
+    });
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.floor(W * dpr); cv.height = Math.floor(H * dpr);
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function draw(now) {
+    if (!running) return;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = palette.bgc;
+    ctx.fillRect(0, 0, W, H);
+    var R = Math.max(W, H);
+    ctx.globalCompositeOperation = palette.isDark ? 'lighter' : 'source-over';
+    for (var i = 0; i < blobs.length; i++) {
+      var b = blobs[i];
+      b.bx += b.sx * 16; b.by += b.sy * 16;
+      if (b.bx < -0.25 || b.bx > 1.25) b.sx *= -1;
+      if (b.by < -0.25 || b.by > 1.25) b.sy *= -1;
+      var pulse = 0.65 + 0.35 * Math.sin(now * b.sp + b.ph);
+      var cx = b.bx * W, cy = b.by * H, rad = b.r * R * pulse;
+      var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      g.addColorStop(0, rgba(b.color, b.maxA));
+      g.addColorStop(1, rgba(b.color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    if (palette.isDark) {
+      ctx.fillStyle = 'rgba(165,185,235,0.055)';
+      var step = 40, off = (now * 0.002) % step;
+      for (var x = off; x < W; x += step) {
+        for (var y = 0; y < H; y += step) {
+          ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+    raf = requestAnimationFrame(draw);
+  }
+
+  function start() {
+    readPalette(); resize(); buildBlobs();
+    if (!running) { running = true; raf = requestAnimationFrame(draw); }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+
+  // 主题切换时同步配色与光斑
+  if (window.MutationObserver) {
+    new MutationObserver(function () { readPalette(); buildBlobs(); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  // 视口变化：防抖重算尺寸
+  var rt;
+  window.addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(function () { resize(); buildBlobs(); }, 150);
+  });
+
+  // 标签页隐藏时暂停渲染，省电省 CPU
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { running = false; if (raf) cancelAnimationFrame(raf); }
+    else if (!running) { running = true; raf = requestAnimationFrame(draw); }
+  });
+})();
+</script>
 </body>
 </html>
