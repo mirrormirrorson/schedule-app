@@ -979,7 +979,7 @@
   "resolutions": {
     "2026-07-27": {}
   },
-  "_updated": 1785309210746,
+  "_updated": 1785309225928,
   "conditionRules": [
     {
       "id": "cr1784696233570",
@@ -2048,6 +2048,18 @@
       "person": "海豚🐬（张杰增） → 海豚🐬\n（张杰增）",
       "action": "renamePerson",
       "content": "海豚🐬（张杰增） → 海豚🐬\n（张杰增）",
+      "date": "",
+      "weekday": ""
+    },
+    {
+      "id": "h1785309225928ly3on",
+      "ts": "2026-07-29T07:13:45.533Z",
+      "user": "张雅镜",
+      "week": "2026-07-27",
+      "group": "人员管理",
+      "person": "梳子（颖蕙） → 梳子（张颖蕙）",
+      "action": "renamePerson",
+      "content": "梳子（颖蕙） → 梳子（张颖蕙）",
       "date": "",
       "weekday": ""
     }
