@@ -990,7 +990,7 @@
   "resolutions": {
     "2026-07-27": {}
   },
-  "_updated": 1785382036732,
+  "_updated": 1785382064470,
   "conditionRules": [
     {
       "id": "cr1784696233570",
@@ -2252,5 +2252,6 @@
       },
       "opId": "op_1785379464220_3_eym1"
     }
-  ]
+  ],
+  "_lastSyncSha": "1bce0a27c88f4b7eb96f16f07494c7684a2e9ecf"
 }
