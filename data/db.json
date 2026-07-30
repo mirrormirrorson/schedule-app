@@ -995,7 +995,7 @@
   "resolutions": {
     "2026-07-27": {}
   },
-  "_updated": 1785383598637,
+  "_updated": 1785383601462,
   "conditionRules": [
     {
       "id": "cr1784696233570",
@@ -2358,7 +2358,24 @@
         "new": "测试"
       },
       "opId": "op_1785383596311_1_ypif"
+    },
+    {
+      "id": "h1785383601462cbcvi",
+      "ts": "2026-07-30T03:53:20.322Z",
+      "user": "张雅镜",
+      "week": "2026-08-03",
+      "group": "臣妾组",
+      "person": "顺斌\n（曾顺斌）",
+      "date": "2026-08-06",
+      "weekday": "周四",
+      "action": "delete",
+      "content": "测试",
+      "detail": {
+        "old": "测试",
+        "new": ""
+      },
+      "opId": "op_1785383600322_2_r45f"
     }
   ],
-  "_lastSyncSha": "a6e5f5f26f33dad067a0d79a626c536e25353d03"
+  "_lastSyncSha": "cb289e4af149d44d4384fbd520843d9f0ae3fb9a"
 }
