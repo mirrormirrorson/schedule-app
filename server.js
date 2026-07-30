@@ -81,11 +81,9 @@ async function pullFromGitHub() {
 
 // 同步 db.json 到 GitHub
 let lastSyncSha = null;
-let saving = false;
 
 async function syncToGitHub(data) {
   if (!GITHUB_TOKEN) return;
-  saving = true;
   try {
     const content = JSON.stringify(data, null, 2);
     const base64 = Buffer.from(content).toString('base64');
@@ -104,13 +102,12 @@ async function syncToGitHub(data) {
       lastSyncSha = result.body.content.sha;
       console.log('[sync] GitHub 同步成功');
     } else if (result.status === 409) {
-      // 冲突了，先拉取再推送
-      console.log('[sync] GitHub 冲突，重新拉取后推送...');
+      // 冲突了：以 GitHub 最新为基底，补回并发写入的 history/users，再推送
+      console.log('[sync] GitHub 冲突，重新拉取后合并推送...');
       const latest = await pullFromGitHub();
       if (latest) {
-        const merged = { ...data, _lastSyncSha: latest._lastSyncSha };
-        delete merged._lastSyncSha;
-        saving = false;
+        lastSyncSha = latest._lastSyncSha || null;
+        const merged = mergePreserve(data, latest);
         await syncToGitHub(merged);
         return;
       }
@@ -121,7 +118,16 @@ async function syncToGitHub(data) {
   } catch (e) {
     console.log('[sync] GitHub 同步异常:', e.message);
   }
-  saving = false;
+}
+
+// 合并：以 latest(GitHub 最新) 为基底，用 data 的排班/人员字段覆盖；
+// 但 history/users 始终以 GitHub 最新为准（避免丢失并发写入的审计记录）
+function mergePreserve(data, latest) {
+  const merged = { ...latest };
+  ['internalPeople', 'externalPeople', 'groups', 'conditionRules', 'weekPeople', 'schedules']
+    .forEach(k => { if (data[k] !== undefined) merged[k] = data[k]; });
+  delete merged._lastSyncSha;
+  return merged;
 }
 
 // 读取数据库（本地文件兜底）
@@ -134,16 +140,24 @@ function readDB() {
   }
 }
 
-// 写入数据库 + 同步到 GitHub
-function writeDB(data) {
+// 写锁：保证「拉最新 → 改 → 推 GitHub」串行，杜绝并发写互相覆盖（尤其是 history/append 被 state 覆盖）
+let writeChain = Promise.resolve();
+function withWriteLock(fn) {
+  const run = writeChain.then(fn, fn);
+  writeChain = run.then(() => {}, () => {});
+  return run;
+}
+
+// 写入数据库 + 同步到 GitHub（await 同步完成，确保锁内原子）
+async function writeDB(data) {
   data._updated = Date.now();
   dbCache = data; // 立即更新读缓存，避免读旧
   const dir = path.dirname(DB_PATH);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(DB_PATH + '.tmp', JSON.stringify(data, null, 2), 'utf-8');
   fs.renameSync(DB_PATH + '.tmp', DB_PATH);
-  // 异步同步到 GitHub，不阻塞响应
-  syncToGitHub(data);
+  // 同步到 GitHub，等待完成（写锁内保证原子）
+  await syncToGitHub(data);
 }
 
 // 取最新数据：优先 GitHub（权威），失败则回退缓存/本地。用于写操作前取基线。
@@ -163,40 +177,35 @@ app.get('/api/state', (req, res) => {
   res.json(getDB());
 });
 
-// 更新完整状态
+// 更新完整状态（写锁内：以 GitHub 最新为基线合并，避免覆盖他人修改）
 app.post('/api/state', async (req, res) => {
-  const oldData = await latestDB();   // 以 GitHub 最新为基线，避免覆盖他人修改
   const newData = req.body;
-
-  // 合并策略：取各 group 的 schedules，新数据覆盖对应 group
-  const merged = { ...oldData };
-
-  // 元信息始终用最新的
-  if (newData.internalPeople) merged.internalPeople = newData.internalPeople;
-  if (newData.externalPeople) merged.externalPeople = newData.externalPeople;
-  if (newData.groups) merged.groups = newData.groups;
-  if (newData.conditionRules) merged.conditionRules = newData.conditionRules;
-  if (newData.weekPeople) merged.weekPeople = newData.weekPeople;
-
-  // schedules 合并：取新数据中该周的 group 列表，删除旧数据中不再存在的 group
-  if (newData.schedules) {
-    if (!merged.schedules) merged.schedules = {};
-    Object.keys(newData.schedules).forEach(week => {
-      if (!merged.schedules[week]) merged.schedules[week] = {};
-      Object.keys(merged.schedules[week]).forEach(groupId => {
-        if (!newData.schedules[week][groupId]) delete merged.schedules[week][groupId];
+  const merged = await withWriteLock(async () => {
+    const oldData = await latestDB();
+    const m = { ...oldData };
+    if (newData.internalPeople) m.internalPeople = newData.internalPeople;
+    if (newData.externalPeople) m.externalPeople = newData.externalPeople;
+    if (newData.groups) m.groups = newData.groups;
+    if (newData.conditionRules) m.conditionRules = newData.conditionRules;
+    if (newData.weekPeople) m.weekPeople = newData.weekPeople;
+    if (newData.schedules) {
+      if (!m.schedules) m.schedules = {};
+      Object.keys(newData.schedules).forEach(week => {
+        if (!m.schedules[week]) m.schedules[week] = {};
+        Object.keys(m.schedules[week]).forEach(g => {
+          if (!newData.schedules[week][g]) delete m.schedules[week][g];
+        });
+        Object.keys(newData.schedules[week]).forEach(g => {
+          m.schedules[week][g] = newData.schedules[week][g];
+        });
       });
-      Object.keys(newData.schedules[week]).forEach(groupId => {
-        merged.schedules[week][groupId] = newData.schedules[week][groupId];
-      });
-    });
-  }
-
-  // 用户身份与审计历史：服务端权威，不被整份 state 覆盖（由专属接口写入）
-  if (oldData.users) merged.users = oldData.users;
-  if (oldData.history) merged.history = oldData.history;
-
-  writeDB(merged);
+    }
+    // 用户身份与审计历史：服务端权威，不被整份 state 覆盖（由专属接口写入）
+    if (oldData.users) m.users = oldData.users;
+    if (oldData.history) m.history = oldData.history;
+    await writeDB(m);
+    return m;
+  });
   res.json({ ok: true, _updated: merged._updated });
 });
 
@@ -212,35 +221,41 @@ app.get('/api/ping', (req, res) => {
 app.post('/api/user/identify', async (req, res) => {
   const name = (req.body && req.body.name || '').toString().trim();
   if (!name) return res.status(400).json({ ok: false, error: 'name required' });
-  const db = await latestDB();
-  if (!db.users) db.users = {};
-  const now = new Date().toISOString();
-  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString();
-  let user = db.users[name];
-  if (user) {
-    user.lastSeenAt = now;
-    user.lastIp = ip;
-  } else {
-    user = { id: 'u' + Date.now(), name, firstSeenAt: now, lastSeenAt: now, lastIp: ip };
-    db.users[name] = user;
-  }
-  writeDB(db);
-  res.json({ ok: true, user });
+  const result = await withWriteLock(async () => {
+    const db = await latestDB();
+    if (!db.users) db.users = {};
+    const now = new Date().toISOString();
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString();
+    let user = db.users[name];
+    if (user) {
+      user.lastSeenAt = now;
+      user.lastIp = ip;
+    } else {
+      user = { id: 'u' + Date.now(), name, firstSeenAt: now, lastSeenAt: now, lastIp: ip };
+      db.users[name] = user;
+    }
+    await writeDB(db);
+    return user;
+  });
+  res.json({ ok: true, user: result });
 });
 
 // 追加审计历史（支持单条或数组），服务端原子写入 + 同步 GitHub
 app.post('/api/history/append', async (req, res) => {
-  const db = await latestDB();
-  if (!db.history) db.history = [];
-  let entries = Array.isArray(req.body) ? req.body : [req.body];
-  entries = entries.filter(Boolean).map(e => Object.assign({
-    id: 'h' + Date.now() + Math.random().toString(36).slice(2, 7),
-    ts: new Date().toISOString(),
-  }, e));
-  db.history = db.history.concat(entries);
-  if (db.history.length > 8000) db.history = db.history.slice(-8000); // 上限保护，避免无限膨胀
-  writeDB(db);
-  res.json({ ok: true, count: entries.length });
+  const result = await withWriteLock(async () => {
+    const db = await latestDB();
+    if (!db.history) db.history = [];
+    let entries = Array.isArray(req.body) ? req.body : [req.body];
+    entries = entries.filter(Boolean).map(e => Object.assign({
+      id: 'h' + Date.now() + Math.random().toString(36).slice(2, 7),
+      ts: new Date().toISOString(),
+    }, e));
+    db.history = db.history.concat(entries);
+    if (db.history.length > 8000) db.history = db.history.slice(-8000); // 上限保护，避免无限膨胀
+    await writeDB(db);
+    return entries.length;
+  });
+  res.json({ ok: true, count: result });
 });
 
 // 读取审计历史（按组 / 用户 / 关键词筛选，倒序返回）
@@ -261,16 +276,19 @@ app.get('/api/history', (req, res) => {
 
 // 按操作批次(opId)删除审计记录（用于撤销的净态对账：撤销即移除对应记录）
 app.post('/api/history/remove', async (req, res) => {
-  const db = await latestDB();
-  if (!db.history) db.history = [];
-  const opIds = (req.body && req.body.opIds) || [];
-  const set = new Set(opIds);
-  const removed = set.size ? db.history.filter(x => x.opId && set.has(x.opId)) : [];
-  if (removed.length) {
-    db.history = db.history.filter(x => !(x.opId && set.has(x.opId)));
-    writeDB(db);
-  }
-  res.json({ ok: true, removed });
+  const result = await withWriteLock(async () => {
+    const db = await latestDB();
+    if (!db.history) db.history = [];
+    const opIds = (req.body && req.body.opIds) || [];
+    const set = new Set(opIds);
+    const removed = set.size ? db.history.filter(x => x.opId && set.has(x.opId)) : [];
+    if (removed.length) {
+      db.history = db.history.filter(x => !(x.opId && set.has(x.opId)));
+      await writeDB(db);
+    }
+    return removed;
+  });
+  res.json({ ok: true, removed: result });
 });
 
 // SPA fallback
