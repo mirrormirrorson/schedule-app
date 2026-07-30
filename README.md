@@ -15,7 +15,6 @@ PostgreSQL 保存排班、用户和历史记录。
 ## 本地运行
 
 ```bash
-corepack enable
 pnpm install --frozen-lockfile
 pnpm test
 pnpm start
