@@ -7,25 +7,33 @@ const app = express();
 const PORT = process.env.PORT || 3456;
 const DB_PATH = path.join(__dirname, 'data', 'db.json');
 
-// GitHub 同步配置
+// GitHub 仅作为"异步备份"，运行期间服务端内存 db 才是唯一真相
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_OWNER = 'mirrormirrorson';
 const GITHUB_REPO = 'schedule-app';
 const GITHUB_FILE = 'data/db.json';
+const PUSH_DEBOUNCE = 800; // ms：突发写入合并为一次 GitHub 推送，避免触发限流
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 内存缓存：作为快速读源。GitHub 始终是权威真相源。
-let dbCache = null;
+// ===== 权威内存模型 =====
+let db = null;
+let dbReady = false;
 
-// GitHub API 请求辅助
+// GitHub 异步推送队列（防抖 + 串行 + 重试），绝不在请求路径里同步推
+let pushTimer = null;
+let pushing = false;
+let pushDirty = false;
+let lastSyncSha = null;
+
+// ---------- GitHub 请求 ----------
 function ghRequest(method, apiPath, body) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.github.com',
       path: apiPath,
-      method: method,
+      method,
       headers: {
         'Authorization': `token ${GITHUB_TOKEN}`,
         'User-Agent': 'schedule-app',
@@ -33,232 +41,204 @@ function ghRequest(method, apiPath, body) {
         'Content-Type': 'application/json'
       }
     };
-
-    if (body) {
-      const json = JSON.stringify(body);
-      options.headers['Content-Length'] = Buffer.byteLength(json);
-    }
-
+    if (body) options.headers['Content-Length'] = Buffer.byteLength(JSON.stringify(body));
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', c => data += c);
       res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, body: JSON.parse(data) });
-        } catch (e) {
-          resolve({ status: res.statusCode, body: data });
-        }
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch (e) { resolve({ status: res.statusCode, body: data }); }
       });
     });
-
     req.on('error', reject);
     if (body) req.write(JSON.stringify(body));
     req.end();
   });
 }
 
-// 从 GitHub 拉取最新 db.json（返回最新数据或 null）
 async function pullFromGitHub() {
-  if (!GITHUB_TOKEN) {
-    return null;
-  }
+  if (!GITHUB_TOKEN) return null;
   try {
     const apiPath = `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
     const result = await ghRequest('GET', apiPath);
     if (result.status === 200 && result.body.content) {
       const content = Buffer.from(result.body.content, 'base64').toString('utf-8');
       const data = JSON.parse(content);
-      data._lastSyncSha = result.body.sha; // 记住 sha 用于后续推送
+      data._lastSyncSha = result.body.sha;
       return data;
     }
-    console.log('[sync] GitHub 拉取返回非 200:', result.status);
     return null;
-  } catch (e) {
-    console.log('[sync] GitHub 拉取异常:', e.message);
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
-// 同步 db.json 到 GitHub
-let lastSyncSha = null;
-
-async function syncToGitHub(data) {
-  if (!GITHUB_TOKEN) return;
-  try {
-    const content = JSON.stringify(data, null, 2);
-    const base64 = Buffer.from(content).toString('base64');
-    const apiPath = `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
-
-    const body = {
-      message: `[skip render] 数据同步 - ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
-      content: base64
-    };
-
-    // 如果知道 sha，使用它避免冲突
-    if (lastSyncSha) body.sha = lastSyncSha;
-
-    const result = await ghRequest('PUT', apiPath, body);
+// 推送当前内存 db 到 GitHub；409 时拉最新并把我们的 history/users 合并（并集，不丢）再推
+async function pushToGitHub(data) {
+  const apiPath = `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
+  const put = async (payload) => {
+    const result = await ghRequest('PUT', apiPath, payload);
     if (result.status === 200 || result.status === 201) {
       lastSyncSha = result.body.content.sha;
-      console.log('[sync] GitHub 同步成功');
-    } else if (result.status === 409) {
-      // 冲突了：以 GitHub 最新为基底，补回并发写入的 history/users，再推送
-      console.log('[sync] GitHub 冲突，重新拉取后合并推送...');
-      const latest = await pullFromGitHub();
-      if (latest) {
-        lastSyncSha = latest._lastSyncSha || null;
-        const merged = mergePreserve(data, latest);
-        await syncToGitHub(merged);
-        return;
-      }
-      console.log('[sync] GitHub 冲突解决失败');
-    } else {
-      console.log('[sync] GitHub 同步失败:', result.status, (result.body && result.body.message) || '');
+      return true;
     }
-  } catch (e) {
-    console.log('[sync] GitHub 同步异常:', e.message);
-  }
+    if (result.status === 409) return false; // 需要合并
+    throw new Error('push status ' + result.status);
+  };
+  const body = {
+    message: `[skip render] 数据同步 - ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
+    content: Buffer.from(JSON.stringify(data, null, 2)).toString('base64')
+  };
+  if (lastSyncSha) body.sha = lastSyncSha;
+  if (await put(body)) return;
+  // 冲突：拉最新，并集合并 history/users，再推一次
+  const latest = await pullFromGitHub();
+  if (!latest) throw new Error('409 后拉取失败');
+  lastSyncSha = latest._lastSyncSha || null;
+  const merged = mergeKeepAll(data, latest);
+  const body2 = {
+    message: `[skip render] 数据同步(merge) - ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
+    content: Buffer.from(JSON.stringify(merged, null, 2)).toString('base64')
+  };
+  if (lastSyncSha) body2.sha = lastSyncSha;
+  if (!(await put(body2))) throw new Error('409 合并后推送仍失败');
 }
 
-// 合并：以 latest(GitHub 最新) 为基底，用 data 的排班/人员字段覆盖；
-// 但 history/users 始终以 GitHub 最新为准（避免丢失并发写入的审计记录）
-function mergePreserve(data, latest) {
-  const merged = { ...latest };
-  ['internalPeople', 'externalPeople', 'groups', 'conditionRules', 'weekPeople', 'schedules']
-    .forEach(k => { if (data[k] !== undefined) merged[k] = data[k]; });
-  delete merged._lastSyncSha;
-  return merged;
+// 并集合并：以 ours 为基底，history(按 id)/users(按 key) 取并集，绝不丢并发写入
+function mergeKeepAll(ours, latest) {
+  const m = { ...ours };
+  const histMap = new Map();
+  (latest.history || []).forEach(h => { if (h.id) histMap.set(h.id, h); });
+  (ours.history || []).forEach(h => { if (h.id) histMap.set(h.id, h); });
+  m.history = Array.from(histMap.values());
+  m.users = { ...(latest.users || {}), ...(ours.users || {}) };
+  delete m._lastSyncSha;
+  return m;
 }
 
-// 读取数据库（本地文件兜底）
-function readDB() {
+function writeLocal(d) {
   try {
-    const raw = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(raw);
-  } catch (e) {
-    return { internalPeople:[], externalPeople:[], groups:[], schedules:{}, users:{}, history:[], _updated: 0 };
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    fs.writeFileSync(DB_PATH + '.tmp', JSON.stringify(d, null, 2), 'utf-8');
+    fs.renameSync(DB_PATH + '.tmp', DB_PATH);
+  } catch (e) {}
+}
+
+function schedulePush() {
+  if (pushTimer) return;
+  pushTimer = setTimeout(doPush, PUSH_DEBOUNCE);
+  if (pushTimer.unref) pushTimer.unref();
+}
+
+async function doPush() {
+  pushTimer = null;
+  if (pushing) { pushDirty = true; return; }
+  pushing = true;
+  try {
+    let attempt = 0;
+    while (true) {
+      try { await pushToGitHub(db); break; }
+      catch (e) {
+        attempt++;
+        if (attempt >= 4) { console.log('[push] 放弃重试:', e.message); break; }
+        await new Promise(r => setTimeout(r, 400 * attempt));
+      }
+    }
+  } finally {
+    pushing = false;
+    if (pushDirty) { pushDirty = false; schedulePush(); }
   }
 }
 
-// 写锁：保证「拉最新 → 改 → 推 GitHub」串行，杜绝并发写互相覆盖（尤其是 history/append 被 state 覆盖）
+// ---------- 启动加载（仅一次，之后内存即真相） ----------
+async function bootstrap() {
+  const g = await pullFromGitHub();
+  if (g) { delete g._lastSyncSha; db = g; }
+  else {
+    try { db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')); }
+    catch (e) { db = null; }
+  }
+  if (!db) db = { internalPeople: [], externalPeople: [], groups: [], schedules: {}, users: {}, history: [], _updated: 0 };
+  if (!db.history) db.history = [];
+  if (!db.users) db.users = {};
+  db._updated = Date.now();
+  dbReady = true;
+  writeLocal(db);
+  schedulePush(); // 把启动快照也备份到 GitHub
+  console.log('[startup] 数据已加载，内存模型为运行期唯一真相');
+}
+
+// ---------- 写锁：所有对内存 db 的变更串行 ----------
 let writeChain = Promise.resolve();
-function withWriteLock(fn) {
+function withLock(fn) {
   const run = writeChain.then(fn, fn);
   writeChain = run.then(() => {}, () => {});
   return run;
 }
 
-// 写入数据库 + 同步到 GitHub（await 同步完成，确保锁内原子）
-async function writeDB(data) {
-  data._updated = Date.now();
-  dbCache = data; // 立即更新读缓存，避免读旧
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(DB_PATH + '.tmp', JSON.stringify(data, null, 2), 'utf-8');
-  fs.renameSync(DB_PATH + '.tmp', DB_PATH);
-  // 同步到 GitHub，等待完成（写锁内保证原子）
-  await syncToGitHub(data);
+// 变更内存 db（权威）→ 触发异步推送；请求立即基于内存返回，不阻塞、不读 GitHub
+function mutate(fn) {
+  return withLock(async () => {
+    const result = await fn(db);
+    db._updated = Date.now();
+    schedulePush();
+    return result;
+  });
 }
 
-// 取最新数据：优先 GitHub（权威），失败则回退缓存/本地。用于写操作前取基线。
-async function latestDB() {
-  const g = await pullFromGitHub();
-  if (g) { dbCache = g; return g; }
-  return dbCache || readDB();
-}
+function getDB() { return db; }
 
-// 读缓存（快速读源，后台定时刷新）
-function getDB() {
-  return dbCache || readDB();
-}
-
-// 获取完整状态
+// ========================= 路由 =========================
 app.get('/api/state', (req, res) => {
+  if (!dbReady) return res.status(503).json({ ok: false });
   res.json(getDB());
 });
 
-// 更新完整状态（写锁内：以 GitHub 最新为基线合并，避免覆盖他人修改）
-app.post('/api/state', async (req, res) => {
-  const newData = req.body;
-  const merged = await withWriteLock(async () => {
-    const oldData = await latestDB();
-    const m = { ...oldData };
-    if (newData.internalPeople) m.internalPeople = newData.internalPeople;
-    if (newData.externalPeople) m.externalPeople = newData.externalPeople;
-    if (newData.groups) m.groups = newData.groups;
-    if (newData.conditionRules) m.conditionRules = newData.conditionRules;
-    if (newData.weekPeople) m.weekPeople = newData.weekPeople;
-    if (newData.schedules) {
-      if (!m.schedules) m.schedules = {};
-      Object.keys(newData.schedules).forEach(week => {
-        if (!m.schedules[week]) m.schedules[week] = {};
-        Object.keys(m.schedules[week]).forEach(g => {
-          if (!newData.schedules[week][g]) delete m.schedules[week][g];
-        });
-        Object.keys(newData.schedules[week]).forEach(g => {
-          m.schedules[week][g] = newData.schedules[week][g];
-        });
-      });
-    }
-    // 用户身份与审计历史：服务端权威，不被整份 state 覆盖（由专属接口写入）
-    if (oldData.users) m.users = oldData.users;
-    if (oldData.history) m.history = oldData.history;
-    await writeDB(m);
-    return m;
-  });
-  res.json({ ok: true, _updated: merged._updated });
-});
-
-// 获取更新时间戳（用于轮询）
 app.get('/api/ping', (req, res) => {
-  const db = getDB();
-  res.json({ _updated: db._updated || 0 });
+  res.json({ _updated: (db && db._updated) || 0 });
 });
 
-// ========================= 用户身份 & 审计历史 =========================
+// 更新排班/人员状态（不触碰 history/users，服务端权威）
+app.post('/api/state', async (req, res) => {
+  const nd = req.body || {};
+  const m = await mutate(d => {
+    ['internalPeople', 'externalPeople', 'groups', 'conditionRules', 'weekPeople', 'schedules']
+      .forEach(k => { if (nd[k] !== undefined) d[k] = nd[k]; });
+    return d;
+  });
+  res.json({ ok: true, _updated: m._updated });
+});
 
-// 按"真实姓名"为唯一键识别用户（换设备输入同名 = 登录原身份，不新建）
+// 用户身份识别（按真实姓名唯一键）
 app.post('/api/user/identify', async (req, res) => {
-  const name = (req.body && req.body.name || '').toString().trim();
+  const name = ((req.body && req.body.name) || '').toString().trim();
   if (!name) return res.status(400).json({ ok: false, error: 'name required' });
-  const result = await withWriteLock(async () => {
-    const db = await latestDB();
-    if (!db.users) db.users = {};
+  const user = await mutate(d => {
+    if (!d.users) d.users = {};
     const now = new Date().toISOString();
     const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString();
-    let user = db.users[name];
-    if (user) {
-      user.lastSeenAt = now;
-      user.lastIp = ip;
-    } else {
-      user = { id: 'u' + Date.now(), name, firstSeenAt: now, lastSeenAt: now, lastIp: ip };
-      db.users[name] = user;
-    }
-    await writeDB(db);
-    return user;
+    let u = d.users[name];
+    if (u) { u.lastSeenAt = now; u.lastIp = ip; }
+    else { u = { id: 'u' + Date.now(), name, firstSeenAt: now, lastSeenAt: now, lastIp: ip }; d.users[name] = u; }
+    return u;
   });
-  res.json({ ok: true, user: result });
+  res.json({ ok: true, user });
 });
 
-// 追加审计历史（支持单条或数组），服务端原子写入 + 同步 GitHub
+// 追加审计历史（与 state 写入同一内存 db，绝不互相覆盖）
 app.post('/api/history/append', async (req, res) => {
-  const result = await withWriteLock(async () => {
-    const db = await latestDB();
-    if (!db.history) db.history = [];
+  const n = await mutate(d => {
+    if (!d.history) d.history = [];
     let entries = Array.isArray(req.body) ? req.body : [req.body];
     entries = entries.filter(Boolean).map(e => Object.assign({
       id: 'h' + Date.now() + Math.random().toString(36).slice(2, 7),
-      ts: new Date().toISOString(),
+      ts: new Date().toISOString()
     }, e));
-    db.history = db.history.concat(entries);
-    if (db.history.length > 8000) db.history = db.history.slice(-8000); // 上限保护，避免无限膨胀
-    await writeDB(db);
+    d.history = d.history.concat(entries);
+    if (d.history.length > 8000) d.history = d.history.slice(-8000);
     return entries.length;
   });
-  res.json({ ok: true, count: result });
+  res.json({ ok: true, count: n });
 });
 
-// 读取审计历史（按组 / 用户 / 关键词筛选，倒序返回）
 app.get('/api/history', (req, res) => {
   const db = getDB();
   let h = db.history || [];
@@ -274,65 +254,36 @@ app.get('/api/history', (req, res) => {
   res.json({ ok: true, history: h.slice(0, limit) });
 });
 
-// 按操作批次(opId)删除审计记录（用于撤销的净态对账：撤销即移除对应记录）
+// 按 opId 批量删除审计记录（撤销净态对账）
 app.post('/api/history/remove', async (req, res) => {
-  const result = await withWriteLock(async () => {
-    const db = await latestDB();
-    if (!db.history) db.history = [];
-    const opIds = (req.body && req.body.opIds) || [];
-    const set = new Set(opIds);
-    const removed = set.size ? db.history.filter(x => x.opId && set.has(x.opId)) : [];
-    if (removed.length) {
-      db.history = db.history.filter(x => !(x.opId && set.has(x.opId)));
-      await writeDB(db);
-    }
-    return removed;
+  const removed = await mutate(d => {
+    if (!d.history) d.history = [];
+    const set = new Set((req.body && req.body.opIds) || []);
+    const r = set.size ? d.history.filter(x => x.opId && set.has(x.opId)) : [];
+    if (r.length) d.history = d.history.filter(x => !(x.opId && set.has(x.opId)));
+    return r;
   });
-  res.json({ ok: true, removed: result });
+  res.json({ ok: true, removed });
 });
 
-// SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 启动时从 GitHub 拉取最新数据（失败重试，不静默回退到陈旧本地文件）
-async function startupPull(retries = 5, delay = 2000) {
-  for (let i = 0; i < retries; i++) {
-    const ghData = await pullFromGitHub();
-    if (ghData) {
-      lastSyncSha = ghData._lastSyncSha || null;
-      const cleanData = { ...ghData };
-      delete cleanData._lastSyncSha;
-      dbCache = cleanData;
-      writeDB(cleanData); // 写本地缓存 + 同步
-      console.log('[startup] 已从 GitHub 加载最新数据 (try ' + (i + 1) + ')');
-      return true;
-    }
-    console.log(`[startup] 第 ${i + 1} 次拉取失败，${i < retries - 1 ? '重试中...' : '放弃，使用本地文件'}`);
-    if (i < retries - 1) await new Promise(r => setTimeout(r, delay));
-  }
-  // 全部失败：尽量用本地文件，但标记告警
-  const local = readDB();
-  dbCache = local;
-  console.log('[startup][ERROR] GitHub 拉取全部失败，已回退本地文件（数据可能不是最新！）');
-  return false;
+// 优雅关闭：重新部署前把内存最新数据刷回 GitHub，避免丢失窗口内的写入
+async function flushNow() {
+  if (pushing) { return; }
+  try { await pushToGitHub(db); console.log('[shutdown] 已刷盘'); }
+  catch (e) { console.log('[shutdown] 刷盘失败:', e.message); }
 }
-
-// 后台保活：每 30s 从 GitHub 刷新读缓存，保持本地与云端一致
-setInterval(async () => {
-  const g = await pullFromGitHub();
-  if (g) {
-    lastSyncSha = g._lastSyncSha || lastSyncSha;
-    const clean = { ...g };
-    delete clean._lastSyncSha;
-    dbCache = clean;
-  }
-}, 30000).unref();
+function shutdown(sig) {
+  console.log('[shutdown] 收到 ' + sig);
+  flushNow().finally(() => process.exit(0));
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 (async function startup() {
-  await startupPull();
-  app.listen(PORT, () => {
-    console.log(`排班服务器已启动: http://localhost:${PORT}`);
-  });
+  await bootstrap();
+  app.listen(PORT, () => console.log(`排班服务器已启动: http://localhost:${PORT}`));
 })();
