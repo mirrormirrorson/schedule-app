@@ -995,7 +995,7 @@
   "resolutions": {
     "2026-07-27": {}
   },
-  "_updated": 1785383574474,
+  "_updated": 1785383580947,
   "conditionRules": [
     {
       "id": "cr1784696233570",
@@ -2324,7 +2324,24 @@
         "new": "111"
       },
       "opId": "op_1785383572359_2_mvaa"
+    },
+    {
+      "id": "h1785383580947b0c9n",
+      "ts": "2026-07-30T03:52:59.479Z",
+      "user": "张雅镜",
+      "week": "2026-08-03",
+      "group": "臣妾组",
+      "person": "顺斌\n（曾顺斌）",
+      "date": "2026-08-06",
+      "weekday": "周四",
+      "action": "delete",
+      "content": "111",
+      "detail": {
+        "old": "111",
+        "new": ""
+      },
+      "opId": "op_1785383579479_3_fysv"
     }
   ],
-  "_lastSyncSha": "61ea908b788067bdd6509359a0f3135aaabbc1be"
+  "_lastSyncSha": "0d035a38825b346224d077a951b4daae27d65c45"
 }
