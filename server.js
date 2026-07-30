@@ -1,4 +1,5 @@
 const express = require('express');
+// [deploy-force] 触发 Render 重建（内存权威模型已就绪）
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
