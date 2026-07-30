@@ -2,7 +2,7 @@ services:
   - type: web
     name: schedule-app
     runtime: node
-    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    buildCommand: pnpm install --frozen-lockfile
     startCommand: node server.js
     healthCheckPath: /api/health
     envVars:
