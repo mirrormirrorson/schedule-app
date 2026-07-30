@@ -3700,9 +3700,14 @@ function openHistoryDrawer() {
   document.getElementById('historyOverlay').classList.add('open');
   document.getElementById('historyDrawer').classList.add('open');
   loadAllHistory();
+  if (historyRefreshTimer) clearInterval(historyRefreshTimer);
+  historyRefreshTimer = setInterval(() => {
+    if (document.getElementById('historyDrawer').classList.contains('open')) loadAllHistory();
+  }, 4000);
 }
 
 function closeHistoryDrawer() {
+  if (historyRefreshTimer) { clearInterval(historyRefreshTimer); historyRefreshTimer = null; }
   document.getElementById('historyOverlay').classList.remove('open');
   document.getElementById('historyDrawer').classList.remove('open');
 }
@@ -3722,11 +3727,13 @@ function weekLabelOf(wk) {
 }
 
 let allHistory = [];
+let historyRefreshTimer = null;
 
 async function loadAllHistory() {
   const list = document.getElementById('historyList');
   if (!list) return;
-  list.innerHTML = '<div class="hd-empty">加载中…</div>';
+  const prevScroll = list.scrollTop;
+  if (!list.innerHTML.includes('hd-item')) list.innerHTML = '<div class="hd-empty">加载中…</div>';
   try {
     const res = await fetch(`${API_BASE}/api/history?limit=8000`);
     if (!res.ok) throw new Error('fail');
@@ -3734,8 +3741,9 @@ async function loadAllHistory() {
     allHistory = r.history || [];
     buildWeekFilter();
     renderHistoryList();
+    list.scrollTop = prevScroll;
   } catch (e) {
-    list.innerHTML = '<div class="hd-empty">加载失败</div>';
+    if (!list.innerHTML.includes('hd-item')) list.innerHTML = '<div class="hd-empty">加载失败</div>';
   }
 }
 
