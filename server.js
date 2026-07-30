@@ -7,7 +7,9 @@ const { Pool } = require('pg');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3456);
-const DB_PATH = path.join(__dirname, 'data', 'db.json');
+const DB_PATH = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.join(__dirname, 'data', 'db.json');
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const MAX_HISTORY = 8000;
 const MAX_PATCHES = 3000;

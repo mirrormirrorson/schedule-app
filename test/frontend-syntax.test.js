@@ -4,16 +4,33 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('all inline browser scripts parse as JavaScript', () => {
+test('all browser scripts parse as JavaScript', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
-  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
+  const scriptPaths = [...html.matchAll(/<script[^>]*\bsrc=["']([^"']+)["'][^>]*><\/script>/gi)]
     .map(match => match[1])
-    .filter(source => source.trim());
-  assert.ok(scripts.length > 0);
-  scripts.forEach((source, index) => {
+    .filter(source => source.startsWith('/js/'));
+  assert.deepEqual(scriptPaths, [
+    '/js/state-sync.js',
+    '/js/schedule-core.js',
+    '/js/management.js',
+    '/js/view-export.js',
+    '/js/identity-history.js',
+    '/js/bootstrap.js',
+    '/js/background.js',
+  ]);
+  scriptPaths.forEach(scriptPath => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'public', scriptPath), 'utf8');
     assert.doesNotThrow(
-      () => new vm.Script(source, { filename: `index-inline-${index + 1}.js` }),
-      `inline script ${index + 1} should parse`,
+      () => new vm.Script(source, { filename: scriptPath }),
+      `${scriptPath} should parse`,
     );
   });
+});
+
+test('frontend entrypoint references extracted stylesheet and contains no large inline code blocks', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  assert.match(html, /<link rel="stylesheet" href="\/css\/app\.css">/);
+  assert.match(html, /<link rel="stylesheet" href="\/css\/enhancements\.css">/);
+  assert.doesNotMatch(html, /<style>/i);
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>[\s\S]{200,}<\/script>/i);
 });
