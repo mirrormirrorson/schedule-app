@@ -2,8 +2,11 @@ services:
   - type: web
     name: schedule-app
     runtime: node
-    buildCommand: npm install
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
     startCommand: node server.js
+    healthCheckPath: /api/health
     envVars:
       - key: PORT
         value: "3456"
+      - key: DATABASE_URL
+        sync: false

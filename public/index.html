@@ -652,6 +652,12 @@ const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日
 
 let data = defaultData();
 let serverUpdated = 0;
+let serverRevision = 0;
+let lastServerData = null;
+let syncInFlight = false;
+let syncRequested = false;
+let syncRetryTimer = null;
+let pendingHistoryEntries = [];
 let pollingTimer = null;
 let currentWeek = getMonday(new Date()); // 默认本周排班（当前现实周，已排完）
 let activeGroupId = null;
@@ -713,11 +719,14 @@ async function loadData() {
     if (res.ok) {
       const d = await res.json();
       serverUpdated = d._updated || 0;
+      serverRevision = d._revision || 0;
       // 合并本地新增字段，防止服务器覆盖
       if (!d.conditionRules && data.conditionRules) d.conditionRules = data.conditionRules;
       if (!d.weekPeople && data.weekPeople) d.weekPeople = data.weekPeople;
       delete d.history; delete d.users; // 审计/身份服务端权威，不入编辑态
+      delete d._updated; delete d._revision;
       data = d;
+      lastServerData = editableSnapshot(data);
       saveLocal();
     }
   } catch(e) { /* 离线模式 */ }
@@ -753,27 +762,213 @@ function normalizePlaceholders() {
 }
 
 function saveData() {
-  
   saveLocal();
-  pushToServer();
+  requestSync();
 }
 
 function saveLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-async function pushToServer() {
-  try {
-    const payload = { ...data };
-    const res = await fetch(`${API_BASE}/api/state`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      const r = await res.json();
-      serverUpdated = r._updated || Date.now();
+const EDITABLE_ROOTS = [
+  'internalPeople', 'externalPeople', 'groups', 'conditionRules',
+  'weekPeople', 'weekPeopleLocked', 'weekGroups', 'weekGroupLocked',
+  'groupColors', 'schedules', 'resolutions'
+];
+
+function cloneValue(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function editableSnapshot(source) {
+  const result = {};
+  EDITABLE_ROOTS.forEach(key => {
+    if (source && source[key] !== undefined) result[key] = cloneValue(source[key]);
+  });
+  return result;
+}
+
+function valueEqual(left, right) {
+  if (left === right) return true;
+  if (typeof left !== typeof right || left === null || right === null) return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => valueEqual(value, right[index]));
+  }
+  if (typeof left === 'object') {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every(key => Object.prototype.hasOwnProperty.call(right, key) && valueEqual(left[key], right[key]));
+  }
+  return false;
+}
+
+function makeSnapshot(exists, value) {
+  return exists ? { exists: true, value: cloneValue(value) } : { exists: false };
+}
+
+// 对象递归到叶子，数组（包括单元格 entries）按一个原子值处理。
+function buildPatches(beforeRoot, afterRoot) {
+  const patches = [];
+  function walk(beforeExists, before, afterExists, after, path) {
+    if (beforeExists && afterExists && valueEqual(before, after)) return;
+    const bothPlainObjects = beforeExists && afterExists
+      && before && after
+      && typeof before === 'object' && typeof after === 'object'
+      && !Array.isArray(before) && !Array.isArray(after);
+    if (bothPlainObjects) {
+      const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+      keys.forEach(key => {
+        walk(
+          Object.prototype.hasOwnProperty.call(before, key), before[key],
+          Object.prototype.hasOwnProperty.call(after, key), after[key],
+          path.concat(key)
+        );
+      });
+      return;
     }
-  } catch(e) {}
+    patches.push({
+      path,
+      before: makeSnapshot(beforeExists, before),
+      after: makeSnapshot(afterExists, after)
+    });
+  }
+  const before = editableSnapshot(beforeRoot || {});
+  const after = editableSnapshot(afterRoot || {});
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  keys.forEach(key => {
+    walk(
+      Object.prototype.hasOwnProperty.call(before, key), before[key],
+      Object.prototype.hasOwnProperty.call(after, key), after[key],
+      [key]
+    );
+  });
+  return patches;
+}
+
+function applyPatchToData(target, patch) {
+  let current = target;
+  for (let index = 0; index < patch.path.length - 1; index++) {
+    const key = patch.path[index];
+    if (!current[key] || typeof current[key] !== 'object' || Array.isArray(current[key])) current[key] = {};
+    current = current[key];
+  }
+  const leaf = patch.path[patch.path.length - 1];
+  if (patch.after.exists) current[leaf] = cloneValue(patch.after.value);
+  else delete current[leaf];
+}
+
+function newMutationId() {
+  if (window.crypto && window.crypto.randomUUID) return `m_${window.crypto.randomUUID()}`;
+  return `m_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function requestSync() {
+  syncRequested = true;
+  if (syncRetryTimer) {
+    clearTimeout(syncRetryTimer);
+    syncRetryTimer = null;
+  }
+  drainSyncQueue();
+}
+
+async function handleSyncConflict(payload, sentHistory) {
+  const serverState = editableSnapshot(payload.state || {});
+  const localState = editableSnapshot(data);
+  try {
+    localStorage.setItem('schedule_conflict_backup_v1', JSON.stringify({
+      savedAt: new Date().toISOString(),
+      state: localState,
+      conflicts: payload.conflicts || []
+    }));
+  } catch (e) {}
+
+  const count = (payload.conflicts || []).length;
+  const keepMine = confirm(
+    `检测到 ${count || 1} 处内容在你编辑期间已被同事修改。\n\n`
+    + '为避免静默覆盖，系统已暂停保存并在本机保留了你的版本。\n'
+    + '点“确定”保留我的修改；点“取消”采用服务器上的同事版本。'
+  );
+
+  serverRevision = Number((payload.state && payload.state._revision) || serverRevision);
+  serverUpdated = Number((payload.state && payload.state._updated) || Date.now());
+  lastServerData = cloneValue(serverState);
+
+  if (keepMine) {
+    pendingHistoryEntries = sentHistory.concat(pendingHistoryEntries);
+    syncRequested = true;
+  } else {
+    data = cloneValue(serverState);
+    saveLocal();
+    renderAll();
+    toast('已采用服务器版本');
+  }
+}
+
+async function drainSyncQueue() {
+  if (syncInFlight || !lastServerData) return;
+  syncInFlight = true;
+  try {
+    while (syncRequested) {
+      syncRequested = false;
+      const sentData = editableSnapshot(data);
+      const changes = buildPatches(lastServerData, sentData);
+      const sentHistory = pendingHistoryEntries.splice(0);
+      if (!changes.length && !sentHistory.length) continue;
+
+      let res;
+      try {
+        res = await fetch(`${API_BASE}/api/state/patch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mutationId: newMutationId(),
+            baseRevision: serverRevision,
+            changes,
+            historyEntries: sentHistory
+          })
+        });
+      } catch (error) {
+        pendingHistoryEntries = sentHistory.concat(pendingHistoryEntries);
+        throw error;
+      }
+
+      const payload = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        await handleSyncConflict(payload, sentHistory);
+        continue;
+      }
+      if (!res.ok || !payload.state) {
+        pendingHistoryEntries = sentHistory.concat(pendingHistoryEntries);
+        throw new Error(payload.error || 'save failed');
+      }
+
+      const latestLocal = editableSnapshot(data);
+      const unsentChanges = buildPatches(sentData, latestLocal);
+      const serverState = editableSnapshot(payload.state);
+      const remoteChanges = buildPatches(sentData, serverState);
+      lastServerData = cloneValue(serverState);
+      data = cloneValue(serverState);
+      unsentChanges.forEach(patch => applyPatchToData(data, patch));
+      serverRevision = Number(payload.state._revision || serverRevision);
+      serverUpdated = Number(payload.state._updated || Date.now());
+      saveLocal();
+
+      if (remoteChanges.length && !editing) renderAll();
+      if (unsentChanges.length || pendingHistoryEntries.length) syncRequested = true;
+    }
+  } catch (error) {
+    toast('网络异常，修改已保存在本机，正在重试');
+    syncRequested = true;
+    syncRetryTimer = setTimeout(() => {
+      syncRetryTimer = null;
+      drainSyncQueue();
+    }, 3000);
+  } finally {
+    syncInFlight = false;
+    if (syncRequested && !syncRetryTimer) drainSyncQueue();
+  }
 }
 
 function startPolling() {
@@ -782,17 +977,20 @@ function startPolling() {
     try {
       const res = await fetch(`${API_BASE}/api/ping`);
       if (res.ok) {
-        const { _updated } = await res.json();
-        if (_updated > serverUpdated) {
+        const { _updated, _revision } = await res.json();
+        if ((_revision || 0) > serverRevision && !syncInFlight && buildPatches(lastServerData, data).length === 0) {
           const full = await fetch(`${API_BASE}/api/state`);
           if (full.ok) {
             const fresh = await full.json();
             serverUpdated = fresh._updated || _updated;
+            serverRevision = fresh._revision || _revision || 0;
             // 合并本地新增字段
             if (!fresh.conditionRules && data.conditionRules) fresh.conditionRules = data.conditionRules;
             if (!fresh.weekPeople && data.weekPeople) fresh.weekPeople = data.weekPeople;
             delete fresh.history; delete fresh.users;
+            delete fresh._updated; delete fresh._revision;
             data = fresh;
+            lastServerData = editableSnapshot(fresh);
             saveLocal();
             renderAll();
           }
@@ -3496,12 +3694,12 @@ function userName() { return (currentUser && currentUser.name) || '匿名'; }
 
 function appendHistory(entries) {
   if (!entries || !entries.length) return;
-  try {
-    fetch(`${API_BASE}/api/history/append`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entries)
-    }).catch(() => {});
-  } catch (e) {}
+  pendingHistoryEntries.push(...entries.map(entry => {
+    const item = cloneValue(entry);
+    if (!item.id) item.id = `h_${newMutationId()}`;
+    return item;
+  }));
+  requestSync();
 }
 
 function resolvePersonName(pid) {
