@@ -27,7 +27,7 @@ function presenceWeekLabel() {
 function buildPresenceContext({ mode = 'group', status = 'selected', personId, dateStr, groupId, taskIndex = -1 }) {
   return {
     mode,
-    status: status === 'editing' ? 'editing' : 'selected',
+    status: status === 'dragging' ? 'dragging' : status === 'editing' ? 'editing' : 'selected',
     action: taskIndex < 0 ? 'add' : 'edit',
     weekStart: wsKey(),
     weekLabel: presenceWeekLabel(),
@@ -43,6 +43,11 @@ function buildPresenceContext({ mode = 'group', status = 'selected', personId, d
 
 function presenceStartEditing(context) {
   presenceActivity = buildPresenceContext({ ...(context || {}), status: 'editing' });
+  requestPresencePulse();
+}
+
+function presenceStartDragging(context) {
+  presenceActivity = buildPresenceContext({ ...(context || {}), status: 'dragging' });
   requestPresencePulse();
 }
 
@@ -180,22 +185,28 @@ function renderRemoteCellPresence() {
     if (context.mode !== 'group' || context.weekStart !== wsKey() || context.groupId !== activeGroupId) return;
     if (!context.personId || !context.dateStr) return;
     const key = `${context.personId}\u0000${context.dateStr}`;
-    if (!locations.has(key)) locations.set(key, []);
-    const names = locations.get(key);
-    if (!names.includes(editor.userName)) names.push(editor.userName);
+    if (!locations.has(key)) locations.set(key, new Map());
+    const people = locations.get(key);
+    const previous = people.get(editor.userName);
+    const status = context.status === 'dragging' ? 'dragging' : 'editing';
+    if (!previous || status === 'dragging') people.set(editor.userName, status);
   });
 
-  locations.forEach((names, key) => {
+  locations.forEach((people, key) => {
     const [personId, dateStr] = key.split('\u0000');
     const cell = cells.find(item => item.dataset.pid === personId && item.dataset.date === dateStr);
-    if (!cell || !names.length) return;
+    const entries = [...people.entries()];
+    if (!cell || !entries.length) return;
+    const names = entries.map(([name]) => name);
     const color = presenceAvatarColor(names[0]);
     cell.classList.add('remote-presence-cell');
     cell.style.setProperty('--remote-presence-color', color);
     const tag = document.createElement('span');
     tag.className = 'remote-presence-tag';
     tag.style.setProperty('--remote-presence-color', color);
-    tag.textContent = `${names.join('、')}正在编辑`;
+    tag.textContent = entries
+      .map(([name, status]) => `${name}${status === 'dragging' ? '正在移动' : '正在编辑'}`)
+      .join('、');
     tag.title = tag.textContent;
     cell.appendChild(tag);
   });

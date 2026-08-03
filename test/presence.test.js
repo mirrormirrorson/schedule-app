@@ -43,6 +43,14 @@ test('presence payload keeps location metadata but never arbitrary fields', () =
     sessionId: 'p_online_123456', active: true, userName: '在线用户',
   });
   assert.equal(onlineOnly.context, null);
+
+  const dragging = normalizePresencePayload({
+    sessionId: 'p_dragging_1234', active: true, userName: '拖动用户',
+    context: {
+      status: 'dragging', groupId: 'g1', personId: 'p2', dateStr: '2026-08-06',
+    },
+  });
+  assert.equal(dragging.context.status, 'dragging');
 });
 
 test('expired presence sessions are pruned from the snapshot', () => {

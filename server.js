@@ -71,7 +71,9 @@ function normalizePresencePayload(source) {
     userName,
     context: hasContext ? {
       mode: context.mode === 'overview' ? 'overview' : 'group',
-      status: context.status === 'editing' ? 'editing' : 'selected',
+      status: context.status === 'dragging'
+        ? 'dragging'
+        : context.status === 'editing' ? 'editing' : 'selected',
       action: context.action === 'add' ? 'add' : 'edit',
       weekStart: cleanPresenceText(context.weekStart, 10),
       weekLabel: cleanPresenceText(context.weekLabel, 40),

@@ -96,6 +96,8 @@ test('live presence lists online people and renders same-group cell cursors', ()
   assert.match(presence, /groupPresenceByPerson/);
   assert.match(presence, /renderRemoteCellPresence/);
   assert.match(presence, /remote-presence-tag/);
+  assert.match(presence, /presenceStartDragging/);
+  assert.match(presence, /正在移动/);
   assert.match(presence, /editor\.sessionId === presenceSessionId/);
   assert.match(presence, /context\.weekStart !== wsKey\(\)/);
   assert.match(presence, /context\.groupId !== activeGroupId/);
@@ -103,6 +105,8 @@ test('live presence lists online people and renders same-group cell cursors', ()
   assert.match(presence, /navigator\.sendBeacon/);
   assert.doesNotMatch(presence, /\.note\b|textarea\.value|editInput/);
   assert.match(schedule, /presenceSelectCell/);
+  assert.match(schedule, /syncDraggingCell/);
+  assert.match(schedule, /syncPresenceCell\(personId, dateStr, 'dragging'\)/);
   assert.match(schedule, /presenceStartEditing\(\{ mode: 'group'/);
   assert.match(schedule, /presenceStopEditing\(\)/);
   assert.match(css, /\.presence-hub:hover \.presence-popover/);

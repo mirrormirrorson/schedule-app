@@ -294,16 +294,19 @@ function clearSelection() {
 }
 
 function syncPresenceActiveCell() {
-  if (typeof presenceSelectCell !== 'function' || !activeCell || activeGroupId === '__overview__') return;
+  if (!activeCell || activeGroupId === '__overview__') return;
   const people = weekPeople();
   const dates = weekDates(currentWeek);
   const person = people[activeCell.r];
   const date = dates[activeCell.c];
   if (!person || !date) return;
-  presenceSelectCell({
-    mode: 'group', personId: person.id, dateStr: fmtFull(date),
-    groupId: activeGroupId, taskIndex: -1,
-  });
+  syncPresenceCell(person.id, fmtFull(date));
+}
+
+function syncPresenceCell(personId, dateStr, status = 'selected') {
+  const handler = status === 'dragging' ? window.presenceStartDragging : window.presenceSelectCell;
+  if (typeof handler !== 'function' || activeGroupId === '__overview__' || !personId || !dateStr) return;
+  handler({ mode: 'group', personId, dateStr, groupId: activeGroupId, taskIndex: -1 });
 }
 
 function selectCell(r, c) {
@@ -910,6 +913,17 @@ function estimateCellFromPoint(x, y) {
   return cellEl;
 }
 
+function syncDraggingCell(cellEl) {
+  if (!cellDrag || !cellEl) return;
+  const personId = cellEl.dataset.pid;
+  const dateStr = cellEl.dataset.date;
+  if (!personId || !dateStr) return;
+  const key = `${personId}\u0000${dateStr}`;
+  if (cellDrag.presenceTargetKey === key) return;
+  cellDrag.presenceTargetKey = key;
+  syncPresenceCell(personId, dateStr, 'dragging');
+}
+
 // 全局 mousemove：检测抓手区域 + 拖拽/选区
 document.addEventListener('mousemove', function(e) {
   // 总览拖拽
@@ -962,6 +976,7 @@ document.addEventListener('mousemove', function(e) {
       cellDrag.sourceEl.style.opacity = '0.3';
       cellDrag.sourceEl.style.border = '2px dashed var(--primary)';
       cellDrag.sourceEl.style.cursor = 'grabbing';
+      syncDraggingCell(cellDrag.sourceEl);
       if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
     }
 
@@ -972,6 +987,7 @@ document.addEventListener('mousemove', function(e) {
         el.style.border = '';
       });
       const targetEl = findCellAtPoint(e.clientX, e.clientY);
+      syncDraggingCell(targetEl || cellDrag.sourceEl);
       if (targetEl && targetEl !== cellDrag.sourceEl) {
         targetEl.classList.add('drag-target');
         targetEl.style.background = '#eef2ff';
@@ -1010,6 +1026,7 @@ document.addEventListener('mousemove', function(e) {
   if (r !== mouseDownCell.r || c !== mouseDownCell.c) {
     mouseMoved = true;
     selectRange(r, c);
+    syncPresenceCell(cellEl.dataset.pid, cellEl.dataset.date);
     updateSelectionVisual();
   }
 });
@@ -1127,7 +1144,9 @@ document.addEventListener('mouseup', function(e) {
 
   // 拖拽移动释放（小组表）：源移除被拖块，目标追加该块（即使同组也作为独立块，不覆盖）
   if (cellDrag && dragStarted) {
+    const sourceSnapshot = { r: cellDrag.r, c: cellDrag.c, personId: cellDrag.personId, dateStr: cellDrag.dateStr };
     const targetEl = findCellAtPoint(e.clientX, e.clientY);
+    let selectedAfterDrop = sourceSnapshot;
     if (targetEl && targetEl !== cellDrag.sourceEl) {
       const tPid = targetEl.dataset.pid;
       const tDate = targetEl.dataset.date;
@@ -1145,10 +1164,15 @@ document.addEventListener('mouseup', function(e) {
 
       pushUndo(changes, { type:'move', groupId: cellDrag.gid, content: moved, fromPerson: cellDrag.personId, fromDate: cellDrag.dateStr, toPerson: tPid, toDate: tDate });
       saveData();
+      selectedAfterDrop = {
+        r: parseInt(targetEl.dataset.r), c: parseInt(targetEl.dataset.c),
+        personId: tPid, dateStr: tDate,
+      };
     }
-    clearSelection();
     cleanupDrag();
     mouseDownCell = null;
+    selExtra = new Set();
+    selectCell(selectedAfterDrop.r, selectedAfterDrop.c);
     renderEditTable();
     return;
   }
