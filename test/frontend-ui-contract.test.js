@@ -114,3 +114,22 @@ test('live presence lists online people and renders same-group cell cursors', ()
   assert.match(css, /\.cell\.remote-presence-cell/);
   assert.match(css, /\.remote-presence-tag/);
 });
+
+test('person introductions are editable in management and visible from every schedule row head', () => {
+  const management = read('public/js/management.js');
+  const schedule = read('public/js/schedule-core.js');
+  const bootstrap = read('public/js/bootstrap.js');
+  const css = read('public/css/app.css');
+
+  assert.match(management, /function editPersonIntro\(id\)/);
+  assert.match(management, /if \(intro\) p\.intro = intro/);
+  assert.match(management, /delete p\.intro/);
+  assert.match(management, /编辑人物介绍/);
+  assert.match(schedule, /function resolvePersonIntro\(personId\)/);
+  assert.match(schedule, /function personNameHTML\(person\)/);
+  assert.match(schedule, /function initPersonIntroTooltip\(\)/);
+  assert.equal((schedule.match(/\$\{personNameHTML\(/g) || []).length, 2);
+  assert.match(bootstrap, /initPersonIntroTooltip\(\)/);
+  assert.match(css, /\.person-name\.has-intro/);
+  assert.match(css, /\.person-intro-tooltip\.visible/);
+});

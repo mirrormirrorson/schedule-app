@@ -17,7 +17,7 @@ function switchManageTab(tab) {
   document.querySelector(`.mtab[onclick="switchManageTab('${tab}')"]`).classList.add('active');
   document.querySelectorAll('.manage-panel').forEach(p => p.style.display = 'none');
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = '';
-  const hint = tab === 'people' ? '默认人员模板，新周自动沿用；历史周不变。' :
+  const hint = tab === 'people' ? '默认人员模板，新周自动沿用；点击 ⓘ 编辑人物介绍，排班表姓名悬停即可查看。' :
     tab === 'groups' ? '编辑排班小组。' :
     tab === 'conditions' ? '用关键词和颜色快速标记重要排班内容。' : '选择配色主题与字体样式。';
   const hintEl = document.getElementById('manageHint');
@@ -103,10 +103,15 @@ function renderThemeTab() {
 }
 
 function managePersonHTML(person, color) {
+  const intro = String(person.intro || '').trim();
   return `<div class="manage-item">
     <span class="manage-item-color" style="background:${color}"></span>
-    <span class="manage-item-name">${esc(person.name)}</span>
+    <span class="manage-person-main">
+      <span class="manage-item-name">${esc(person.name)}</span>
+      <span class="manage-person-intro${intro ? '' : ' empty'}">${intro ? esc(intro) : '未填写人物介绍'}</span>
+    </span>
     <span class="manage-item-actions">
+      <button class="manage-icon-btn" onclick="editPersonIntro('${person.id}')" title="编辑人物介绍" aria-label="编辑 ${esc(person.name)} 的人物介绍">ⓘ</button>
       <button class="manage-icon-btn" onclick="renamePerson('${person.id}')" title="修改姓名" aria-label="修改 ${esc(person.name)}">✎</button>
       <button class="manage-icon-btn danger" onclick="removePerson('${person.id}')" title="删除人员" aria-label="删除 ${esc(person.name)}">×</button>
     </span>
@@ -265,6 +270,26 @@ function ensureGroupColors(persist = true) {
   });
   if (changed && persist) saveData();
   return changed;
+}
+
+function editPersonIntro(id) {
+  const p = data.internalPeople.find(x => x.id === id)
+    || data.externalPeople.find(x => x.id === id);
+  if (!p) return;
+  showNameInputModal('编辑人物介绍（最多 500 字）', p.intro || '', val => {
+    const intro = String(val || '').trim();
+    if (intro.length > 500) {
+      alert('人物介绍最多 500 字');
+      return;
+    }
+    if (intro === String(p.intro || '').trim()) return;
+    if (intro) p.intro = intro;
+    else delete p.intro;
+    saveData();
+    renderManageTab();
+    renderAll();
+    toast(intro ? '人物介绍已保存' : '人物介绍已清空');
+  });
 }
 
 function addGroup() {

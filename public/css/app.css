@@ -238,6 +238,35 @@ body {
 .row-del:hover { color: var(--danger); }
 .schedule-table tr.row-external td:first-child { background: var(--external-name-col-bg); }
 .person-name { white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
+.person-name.has-intro {
+  cursor: help;
+  text-decoration: underline dotted color-mix(in srgb, var(--primary) 52%, transparent) 1px;
+  text-underline-offset: 4px;
+}
+.person-name.has-intro:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+.person-intro-tooltip {
+  position: fixed;
+  z-index: 850;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 20px));
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--card) 96%, var(--primary));
+  box-shadow: 0 12px 30px rgba(15,23,42,.18);
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.person-intro-tooltip.visible { opacity: 1; transform: translateY(0); }
+.person-intro-tooltip-name { display: block; margin-bottom: 5px; color: var(--primary); font-size: 13px; }
+.person-intro-tooltip-text { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.65; }
 .schedule-table tr.row-external td { background: var(--external-row-bg); }
 
 .cell {
@@ -782,6 +811,18 @@ body {
 }
 .manage-item-color { width: 4px; align-self: stretch; border-radius: 4px; background: var(--primary); }
 .manage-item-name { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); font-size: 13px; font-weight: 650; }
+.manage-person-main { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
+.manage-person-intro {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text2);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.manage-person-intro.empty { opacity: .68; font-style: italic; }
 .manage-item-actions { display: flex; gap: 5px; }
 .manage-icon-btn {
   width: 30px;

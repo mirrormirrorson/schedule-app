@@ -293,6 +293,80 @@ function clearSelection() {
   if (typeof presenceClearCell === 'function') presenceClearCell();
 }
 
+function resolvePersonIntro(personId) {
+  if (!personId) return '';
+  const templatePerson = (data.internalPeople || []).find(p => p.id === personId)
+    || (data.externalPeople || []).find(p => p.id === personId);
+  if (templatePerson && templatePerson.intro) return String(templatePerson.intro).trim();
+  for (const people of Object.values(data.weekPeople || {})) {
+    const weekPerson = people.find(p => p.id === personId);
+    if (weekPerson && weekPerson.intro) return String(weekPerson.intro).trim();
+  }
+  return '';
+}
+
+function personNameHTML(person) {
+  const intro = resolvePersonIntro(person.id);
+  const introClass = intro ? ' has-intro' : '';
+  const introAttrs = intro
+    ? ' tabindex="0" aria-describedby="personIntroTooltip"'
+    : '';
+  return `<span class="person-name${introClass}"${introAttrs} data-person-id="${esc(person.id)}">${esc(person.name)}</span>`;
+}
+
+function initPersonIntroTooltip() {
+  if (document.getElementById('personIntroTooltip')) return;
+  const tooltip = document.createElement('div');
+  tooltip.id = 'personIntroTooltip';
+  tooltip.className = 'person-intro-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.setAttribute('aria-hidden', 'true');
+  tooltip.innerHTML = '<strong class="person-intro-tooltip-name"></strong><div class="person-intro-tooltip-text"></div>';
+  document.body.appendChild(tooltip);
+
+  let activeTarget = null;
+  const hide = () => {
+    activeTarget = null;
+    tooltip.classList.remove('visible');
+    tooltip.setAttribute('aria-hidden', 'true');
+  };
+  const show = target => {
+    const intro = resolvePersonIntro(target.dataset.personId);
+    if (!intro) { hide(); return; }
+    activeTarget = target;
+    tooltip.querySelector('.person-intro-tooltip-name').textContent = target.textContent.trim();
+    tooltip.querySelector('.person-intro-tooltip-text').textContent = intro;
+    tooltip.classList.add('visible');
+    tooltip.setAttribute('aria-hidden', 'false');
+    const anchor = target.getBoundingClientRect();
+    const box = tooltip.getBoundingClientRect();
+    let left = anchor.left + anchor.width / 2 - box.width / 2;
+    let top = anchor.bottom + 10;
+    left = Math.max(10, Math.min(left, window.innerWidth - box.width - 10));
+    if (top + box.height > window.innerHeight - 10) top = anchor.top - box.height - 10;
+    tooltip.style.left = `${Math.max(10, left)}px`;
+    tooltip.style.top = `${Math.max(10, top)}px`;
+  };
+
+  document.addEventListener('mouseover', event => {
+    const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
+    if (target && target !== activeTarget) show(target);
+  });
+  document.addEventListener('mouseout', event => {
+    const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
+    if (target && !target.contains(event.relatedTarget)) hide();
+  });
+  document.addEventListener('focusin', event => {
+    const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
+    if (target) show(target);
+  });
+  document.addEventListener('focusout', event => {
+    if (event.target.closest && event.target.closest('.person-name[data-person-id]')) hide();
+  });
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+}
+
 function syncPresenceActiveCell() {
   if (!activeCell || activeGroupId === '__overview__') return;
   const people = weekPeople();
@@ -779,7 +853,7 @@ function renderEditTable() {
         html += `<tr class="section-row"><td colspan="8" style="padding:8px 16px;background:#f3f4f6;font-size:12px;font-weight:600;color:var(--text2);text-align:left;border-bottom:2px solid var(--border);">${label}</td></tr>`;
         lastCat = person._cat;
       }
-      html += `<tr class="${person._cat === 'external' ? 'row-external' : ''}"><td><span class="person-name">${esc(person.name)}</span><span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${person.id}')" title="从本周移除">×</span></td>`;
+      html += `<tr class="${person._cat === 'external' ? 'row-external' : ''}"><td>${personNameHTML(person)}<span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${person.id}')" title="从本周移除">×</span></td>`;
       dates.forEach((date, c) => {
         const ds = fmtFull(date);
         const entries = getCellEntries(person.id, ds);
@@ -1675,7 +1749,7 @@ function renderOverview() {
         html += `<tr class="section-row"><td colspan="8" style="padding:8px 16px;background:#f3f4f6;font-size:12px;font-weight:600;color:var(--text2);text-align:left;border-bottom:2px solid var(--border);">${label}</td></tr>`;
         lastCat = p._cat;
       }
-      html += `<tr class="${p._cat === 'external' ? 'row-external' : ''}"><td><span class="person-name">${esc(p.name)}</span><span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${p.id}')" title="从本周移除">×</span></td>`;
+      html += `<tr class="${p._cat === 'external' ? 'row-external' : ''}"><td>${personNameHTML(p)}<span class="row-del" onclick="event.stopPropagation();removePersonFromWeek('${p.id}')" title="从本周移除">×</span></td>`;
       dates.forEach((d, c) => {
         const ds = fmtFull(d);
         const blocks = getScheduleInfo(p.id, ds);
