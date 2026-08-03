@@ -144,3 +144,19 @@ test('shared radar fields and per-person scores render from every schedule row h
   assert.match(server, /'personRadarFields'/);
   assert.match(server, /'personRadarScores'/);
 });
+
+test('radar management is last in personnel settings and restricted by current user name', () => {
+  const html = read('public/index.html');
+  const management = read('public/js/management.js');
+  const externalList = html.indexOf('id="manageExternalTags"');
+  const radarSection = html.indexOf('class="modal-section radar-field-section"');
+
+  assert.ok(externalList >= 0 && radarSection > externalList);
+  assert.match(management, /new Set\(\['张雅镜', '林俊凯'\]\)/);
+  assert.match(management, /function canManagePersonRadar\(\)/);
+  assert.match(management, /alert\('暂无权限，请联系林俊凯修改'\)/);
+  assert.match(management, /function addRadarField\(\) \{\s+if \(!requireRadarPermission\(\)\) return;/);
+  assert.match(management, /function updateRadarField\(id, value\) \{\s+if \(!requireRadarPermission\(\)\)/);
+  assert.match(management, /function removeRadarField\(id\) \{\s+if \(!requireRadarPermission\(\)\) return;/);
+  assert.match(management, /function editPersonRadar\(id\) \{\s+if \(!requireRadarPermission\(\)\) return;/);
+});

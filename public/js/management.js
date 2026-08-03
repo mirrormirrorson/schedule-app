@@ -1,5 +1,16 @@
 // ========================= 管理弹窗 =========================
 let manageActiveTab = 'people';
+const PERSON_RADAR_ADMINS = new Set(['张雅镜', '林俊凯']);
+
+function canManagePersonRadar() {
+  return PERSON_RADAR_ADMINS.has(String(userName() || '').trim());
+}
+
+function requireRadarPermission() {
+  if (canManagePersonRadar()) return true;
+  alert('暂无权限，请联系林俊凯修改');
+  return false;
+}
 
 function openManageModal() {
   document.getElementById('manageModal').style.display = 'flex';
@@ -17,7 +28,7 @@ function switchManageTab(tab) {
   document.querySelector(`.mtab[onclick="switchManageTab('${tab}')"]`).classList.add('active');
   document.querySelectorAll('.manage-panel').forEach(p => p.style.display = 'none');
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = '';
-  const hint = tab === 'people' ? '先设置所有人员共用的雷达字段，再为每个人单独评分；排班表姓名悬停即可查看。' :
+  const hint = tab === 'people' ? '人员列表下方可维护全员共用的雷达字段；排班表姓名悬停即可查看。' :
     tab === 'groups' ? '编辑排班小组。' :
     tab === 'conditions' ? '用关键词和颜色快速标记重要排班内容。' : '选择配色主题与字体样式。';
   const hintEl = document.getElementById('manageHint');
@@ -167,17 +178,22 @@ function renderManageTab() {
 
 function renderRadarFieldSettings() {
   const fields = getRadarFields();
+  const canEdit = canManagePersonRadar();
   document.getElementById('radarFieldCount').textContent = `${fields.length} 项`;
+  const addInput = document.getElementById('newRadarFieldInput');
+  addInput.readOnly = !canEdit;
+  addInput.setAttribute('aria-disabled', canEdit ? 'false' : 'true');
   document.getElementById('radarFieldList').innerHTML = fields.length
     ? fields.map((field, index) => `<div class="radar-field-item">
         <span class="radar-field-index">${index + 1}</span>
-        <input type="text" maxlength="12" value="${esc(field.name)}" aria-label="雷达字段 ${index + 1}" onchange="updateRadarField('${field.id}',this.value)">
+        <input type="text" maxlength="12" value="${esc(field.name)}" aria-label="雷达字段 ${index + 1}" ${canEdit ? '' : 'readonly aria-disabled="true"'} onclick="if(!canManagePersonRadar())requireRadarPermission()" onchange="updateRadarField('${field.id}',this.value)">
         <button class="manage-icon-btn danger" onclick="removeRadarField('${field.id}')" title="删除字段" aria-label="删除 ${esc(field.name)}">×</button>
       </div>`).join('')
     : '<div class="manage-empty radar-field-empty">暂无字段，请至少添加 3 个字段</div>';
 }
 
 function addRadarField() {
+  if (!requireRadarPermission()) return;
   const input = document.getElementById('newRadarFieldInput');
   const name = String(input.value || '').trim();
   const fields = getRadarFields();
@@ -193,6 +209,7 @@ function addRadarField() {
 }
 
 function updateRadarField(id, value) {
+  if (!requireRadarPermission()) { renderManageTab(); return; }
   const fields = getRadarFields();
   const field = fields.find(item => item.id === id);
   const name = String(value || '').trim().slice(0, 12);
@@ -209,6 +226,7 @@ function updateRadarField(id, value) {
 }
 
 function removeRadarField(id) {
+  if (!requireRadarPermission()) return;
   const fields = getRadarFields();
   const field = fields.find(item => item.id === id);
   if (!field || !confirm(`确定删除雷达字段「${field.name}」？\n所有人员在该字段上的分数会一并移除。`)) return;
@@ -224,6 +242,7 @@ function removeRadarField(id) {
 }
 
 function editPersonRadar(id) {
+  if (!requireRadarPermission()) return;
   const person = data.internalPeople.find(item => item.id === id)
     || data.externalPeople.find(item => item.id === id);
   const fields = getRadarFields();
