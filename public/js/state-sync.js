@@ -472,7 +472,10 @@ async function drainSyncQueue() {
           body: JSON.stringify({
             mutationId: newMutationId(),
             changes,
-            historyEntries: sentHistory
+            historyEntries: sentHistory,
+            actor: typeof currentUser !== 'undefined' && currentUser
+              ? { id: currentUser.id, name: currentUser.name }
+              : null
           })
         });
       } catch (error) {
@@ -485,6 +488,36 @@ async function drainSyncQueue() {
       if (res.status === 409) {
         inFlightHistoryEntries = [];
         await handleSyncConflict(payload, sentHistory);
+        continue;
+      }
+      if (res.status === 403 && payload.error === 'radar permission denied') {
+        inFlightHistoryEntries = [];
+        pendingHistoryEntries = sentHistory.concat(pendingHistoryEntries);
+        const deniedRoots = new Set(Array.isArray(payload.deniedRoots) ? payload.deniedRoots : []);
+        deniedRoots.forEach(root => {
+          if (!lastServerData || !Object.prototype.hasOwnProperty.call(lastServerData, root)) delete data[root];
+          else data[root] = cloneValue(lastServerData[root]);
+        });
+        if (typeof currentUser !== 'undefined' && currentUser) {
+          currentUser = payload.user || {
+            ...currentUser,
+            isPermissionAdmin: false,
+            permissions: { canScoreRadar: false, canManageRadarFields: false },
+          };
+          if (typeof renderGreeting === 'function') renderGreeting();
+        }
+        saveLocal();
+        if (!editing) renderAll();
+        if (typeof renderManageTab === 'function') renderManageTab();
+        toast('权限已变更，未授权的雷达修改没有保存');
+        syncRequested = pendingHistoryEntries.length > 0
+          || (lastServerData && buildPatches(lastServerData, data).length > 0);
+        if (!syncRequested) {
+          clearPersistentOutbox();
+          setSaveStatus('saved', '未授权修改已撤回');
+        } else {
+          writePersistentOutbox();
+        }
         continue;
       }
       if (!res.ok || !payload.state) {

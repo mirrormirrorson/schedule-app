@@ -6,7 +6,7 @@
 <title>【内部】运营一部视频制作排期表</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<link rel="stylesheet" href="/css/app.css?v=person-radar-20260803-2">
+<link rel="stylesheet" href="/css/app.css?v=account-permissions-20260803">
 <link rel="stylesheet" href="/css/enhancements.css">
 </head>
 <body>
@@ -110,6 +110,7 @@
       <button class="mtab" onclick="switchManageTab('groups')">👥 小组</button>
       <button class="mtab" onclick="switchManageTab('conditions')">🎨 条件</button>
       <button class="mtab" onclick="switchManageTab('theme')">🖌 主题</button>
+      <button class="mtab" id="permissionManageTab" style="display:none" onclick="switchManageTab('permissions')">🔐 权限</button>
     </div>
     <p style="font-size:11px;color:var(--text2);margin-bottom:12px;" id="manageHint">常用人员模板，新周初始化用；不影响已有各周。</p>
 
@@ -143,7 +144,7 @@
           <span class="manage-count" id="radarFieldCount">0 项</span>
         </div>
         <div class="modal-row">
-          <input type="text" id="newRadarFieldInput" maxlength="12" placeholder="输入字段名称，例如：执行力" onfocus="if(!canManagePersonRadar()){this.blur();requireRadarPermission();}" onkeydown="event.stopPropagation();if(event.key==='Enter'&&!event.isComposing){event.preventDefault();addRadarField();}">
+          <input type="text" id="newRadarFieldInput" maxlength="12" placeholder="输入字段名称，例如：执行力" onfocus="if(!canManageRadarFields()){this.blur();requireRadarPermission('fields');}" onkeydown="event.stopPropagation();if(event.key==='Enter'&&!event.isComposing){event.preventDefault();addRadarField();}">
           <button class="btn btn-p" onclick="addRadarField()">添加字段</button>
         </div>
         <div class="radar-field-list" id="radarFieldList"></div>
@@ -206,6 +207,15 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="themeOptions"></div>
     </div>
 
+    <div class="manage-panel" id="panelPermissions" style="display:none">
+      <div class="permission-panel-head">
+        <div><h4>账号权限</h4><p>管理登录账号的雷达评分与字段维护权限</p></div>
+        <div><span class="manage-count" id="permissionUserCount">0 个账号</span><button class="btn" onclick="loadPermissionUsers()">刷新</button></div>
+      </div>
+      <div class="permission-user-list" id="permissionUserList"><div class="manage-empty">正在读取账号权限…</div></div>
+      <p class="permission-panel-note">删除账号不会删除人员名单、排班或修改历史；张雅镜、林俊凯、简慧仪为受保护的权限管理员。</p>
+    </div>
+
     <div class="manage-footer">
       <span>所有修改都会显示在顶部保存状态中</span>
       <button class="btn btn-p" onclick="closeManageModal()">完成</button>
@@ -218,6 +228,7 @@
 <script src="/js/management.js" defer></script>
 <script src="/js/view-export.js" defer></script>
 <script src="/js/identity-history.js" defer></script>
+<script src="/js/permissions.js" defer></script>
 <script src="/js/presence.js" defer></script>
 <script src="/js/bootstrap.js" defer></script>
 <div id="historyOverlay" class="hd-overlay" onclick="if(event.target===this)closeHistoryDrawer()"></div>

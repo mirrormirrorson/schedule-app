@@ -15,6 +15,7 @@ const MAX_HISTORY = 8000;
 const MAX_PATCHES = 3000;
 const PRESENCE_TTL_MS = 15_000;
 const MAX_PRESENCE_SESSIONS = 200;
+const PERMISSION_ADMIN_NAMES = new Set(['张雅镜', '林俊凯', '简慧仪']);
 const EDITABLE_ROOTS = new Set([
   'internalPeople',
   'externalPeople',
@@ -49,6 +50,33 @@ function nowIso() {
 
 function cloneJson(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function isPermissionAdminName(name) {
+  return PERMISSION_ADMIN_NAMES.has(String(name || '').trim());
+}
+
+function normalizeAccountPermissions(source, name = '') {
+  const isAdmin = isPermissionAdminName(name);
+  return {
+    canScoreRadar: isAdmin || source?.canScoreRadar === true || source?.can_score_radar === true,
+    canManageRadarFields: isAdmin || source?.canManageRadarFields === true || source?.can_manage_radar_fields === true,
+  };
+}
+
+function accountUserResponse(source) {
+  if (!source) return null;
+  const name = String(source.name || '').trim();
+  const firstSeen = source.firstSeenAt || source.first_seen_at;
+  const lastSeen = source.lastSeenAt || source.last_seen_at;
+  return {
+    id: source.id,
+    name,
+    firstSeenAt: firstSeen instanceof Date ? firstSeen.toISOString() : String(firstSeen || ''),
+    lastSeenAt: lastSeen instanceof Date ? lastSeen.toISOString() : String(lastSeen || ''),
+    isPermissionAdmin: isPermissionAdminName(name),
+    permissions: normalizeAccountPermissions(source.permissions || source, name),
+  };
 }
 
 function cleanPresenceText(value, maxLength = 100) {
@@ -323,14 +351,55 @@ class FileStore {
       const timestamp = nowIso();
       let user = this.users[name];
       if (!user) {
-        user = { id: `u_${crypto.randomUUID()}`, name, firstSeenAt: timestamp, lastSeenAt: timestamp };
+        user = {
+          id: `u_${crypto.randomUUID()}`,
+          name,
+          firstSeenAt: timestamp,
+          lastSeenAt: timestamp,
+          permissions: normalizeAccountPermissions({}, name),
+        };
         this.users[name] = user;
       } else {
         user.lastSeenAt = timestamp;
+        user.permissions = normalizeAccountPermissions(user.permissions || user, name);
         delete user.lastIp;
       }
       await this.persist();
-      return cloneJson(user);
+      return accountUserResponse(user);
+    });
+  }
+
+  async getUserById(id) {
+    const user = Object.values(this.users).find(item => item && item.id === id);
+    return accountUserResponse(user);
+  }
+
+  async listUsers() {
+    return Object.values(this.users)
+      .map(accountUserResponse)
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.lastSeenAt) - new Date(a.lastSeenAt));
+  }
+
+  async updateUserPermissions(id, permissions) {
+    return this.withLock(async () => {
+      const user = Object.values(this.users).find(item => item && item.id === id);
+      if (!user) return null;
+      user.permissions = normalizeAccountPermissions(permissions, user.name);
+      await this.persist();
+      return accountUserResponse(user);
+    });
+  }
+
+  async deleteUser(id) {
+    return this.withLock(async () => {
+      const entry = Object.entries(this.users).find(([, item]) => item && item.id === id);
+      if (!entry) return null;
+      const [name, user] = entry;
+      if (isPermissionAdminName(name)) return { protected: true, user: accountUserResponse(user) };
+      delete this.users[name];
+      await this.persist();
+      return { protected: false, user: accountUserResponse(user) };
     });
   }
 
@@ -513,21 +582,59 @@ class PostgresStore {
   }
 
   async identify(name) {
+    const admin = isPermissionAdminName(name);
     const result = await this.pool.query(
-      `INSERT INTO app_users (name, id, first_seen_at, last_seen_at)
-       VALUES ($1, $2, NOW(), NOW())
+      `INSERT INTO app_users
+         (name, id, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields)
+       VALUES ($1, $2, NOW(), NOW(), $3, $3)
        ON CONFLICT (name)
-       DO UPDATE SET last_seen_at = NOW()
-       RETURNING id, name, first_seen_at, last_seen_at`,
-      [name, `u_${crypto.randomUUID()}`],
+       DO UPDATE SET
+         last_seen_at = NOW(),
+         can_score_radar = app_users.can_score_radar OR EXCLUDED.can_score_radar,
+         can_manage_radar_fields = app_users.can_manage_radar_fields OR EXCLUDED.can_manage_radar_fields
+       RETURNING id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields`,
+      [name, `u_${crypto.randomUUID()}`, admin],
     );
-    const row = result.rows[0];
-    return {
-      id: row.id,
-      name: row.name,
-      firstSeenAt: row.first_seen_at.toISOString(),
-      lastSeenAt: row.last_seen_at.toISOString(),
-    };
+    return accountUserResponse(result.rows[0]);
+  }
+
+  async getUserById(id) {
+    const result = await this.pool.query(
+      `SELECT id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields
+       FROM app_users WHERE id = $1`,
+      [id],
+    );
+    return accountUserResponse(result.rows[0]);
+  }
+
+  async listUsers() {
+    const result = await this.pool.query(
+      `SELECT id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields
+       FROM app_users ORDER BY last_seen_at DESC, name ASC`,
+    );
+    return result.rows.map(accountUserResponse);
+  }
+
+  async updateUserPermissions(id, permissions) {
+    const user = await this.getUserById(id);
+    if (!user) return null;
+    const normalized = normalizeAccountPermissions(permissions, user.name);
+    const result = await this.pool.query(
+      `UPDATE app_users
+       SET can_score_radar = $2, can_manage_radar_fields = $3
+       WHERE id = $1
+       RETURNING id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields`,
+      [id, normalized.canScoreRadar, normalized.canManageRadarFields],
+    );
+    return accountUserResponse(result.rows[0]);
+  }
+
+  async deleteUser(id) {
+    const user = await this.getUserById(id);
+    if (!user) return null;
+    if (isPermissionAdminName(user.name)) return { protected: true, user };
+    await this.pool.query('DELETE FROM app_users WHERE id = $1', [id]);
+    return { protected: false, user };
   }
 
   async listHistory({ group, user, query, limit }) {
@@ -670,6 +777,19 @@ class PostgresStore {
 const seed = loadSeed();
 const store = DATABASE_URL ? new PostgresStore(DATABASE_URL, seed) : new FileStore(seed);
 
+async function authorizedAccount(actor) {
+  const id = String(actor && actor.id || '').trim();
+  const name = String(actor && actor.name || '').trim();
+  if (!id || !name) return null;
+  const user = await store.getUserById(id);
+  return user && user.name === name ? user : null;
+}
+
+async function permissionAdminAccount(actor) {
+  const user = await authorizedAccount(actor);
+  return user && user.isPermissionAdmin ? user : null;
+}
+
 app.get('/api/health', async (req, res, next) => {
   try {
     const state = await store.getState();
@@ -709,6 +829,26 @@ app.post('/api/state/patch', async (req, res, next) => {
     }
     const changes = normalizeChanges(req.body.changes || []);
     const historyEntries = normalizeHistoryEntries(req.body.historyEntries || []);
+    const radarFieldChange = changes.some(change => change.path[0] === 'personRadarFields');
+    const radarScoreChange = changes.some(change => change.path[0] === 'personRadarScores');
+    if (radarFieldChange || radarScoreChange) {
+      const actor = await authorizedAccount(req.body && req.body.actor);
+      const deniedRoots = [];
+      if (!actor || (radarFieldChange && !actor.permissions.canManageRadarFields)) {
+        if (radarFieldChange) deniedRoots.push('personRadarFields');
+      }
+      if (!actor || (radarScoreChange && !actor.permissions.canScoreRadar)) {
+        if (radarScoreChange) deniedRoots.push('personRadarScores');
+      }
+      if (deniedRoots.length) {
+        return res.status(403).json({
+          ok: false,
+          error: 'radar permission denied',
+          deniedRoots,
+          user: actor,
+        });
+      }
+    }
     if (!changes.length && !historyEntries.length) {
       return res.json({ ok: true, state: await store.getState(), duplicate: false });
     }
@@ -751,6 +891,45 @@ app.post('/api/user/identify', async (req, res, next) => {
     res.json({ ok: true, user: await store.identify(name) });
   } catch (error) {
     next(error);
+  }
+});
+
+app.get('/api/admin/users', async (req, res, next) => {
+  try {
+    const actor = await permissionAdminAccount({
+      id: req.query.actorId,
+      name: req.query.actorName,
+    });
+    if (!actor) return res.status(403).json({ ok: false, error: 'permission admin required' });
+    return res.json({ ok: true, users: await store.listUsers() });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.patch('/api/admin/users/:id/permissions', async (req, res, next) => {
+  try {
+    const actor = await permissionAdminAccount(req.body && req.body.actor);
+    if (!actor) return res.status(403).json({ ok: false, error: 'permission admin required' });
+    const permissions = normalizeAccountPermissions(req.body && req.body.permissions);
+    const user = await store.updateUserPermissions(String(req.params.id || ''), permissions);
+    if (!user) return res.status(404).json({ ok: false, error: 'user not found' });
+    return res.json({ ok: true, user });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.delete('/api/admin/users/:id', async (req, res, next) => {
+  try {
+    const actor = await permissionAdminAccount(req.body && req.body.actor);
+    if (!actor) return res.status(403).json({ ok: false, error: 'permission admin required' });
+    const result = await store.deleteUser(String(req.params.id || ''));
+    if (!result) return res.status(404).json({ ok: false, error: 'user not found' });
+    if (result.protected) return res.status(409).json({ ok: false, error: 'protected permission admin' });
+    return res.json({ ok: true, user: result.user });
+  } catch (error) {
+    return next(error);
   }
 });
 
@@ -872,4 +1051,6 @@ module.exports = {
   prunePresence,
   getPresenceSnapshot,
   presenceSessions,
+  isPermissionAdminName,
+  normalizeAccountPermissions,
 };

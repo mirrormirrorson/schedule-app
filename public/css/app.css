@@ -911,12 +911,42 @@ body {
 }
 .person-radar-modal-foot > div { display: flex; gap: 8px; }
 .danger-text { color: var(--danger); }
+.permission-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px;
+}
+.permission-panel-head h4 { margin: 0 0 4px; color: var(--text); font-size: 15px; }
+.permission-panel-head p { margin: 0; color: var(--text2); font-size: 11px; }
+.permission-panel-head > div:last-child { display: flex; align-items: center; gap: 8px; }
+.permission-user-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.permission-user-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; align-items: center;
+  padding: 13px; border: 1px solid var(--border); border-radius: 11px;
+  background: color-mix(in srgb, var(--card) 94%, var(--bg));
+}
+.permission-user-head { min-width: 0; }
+.permission-user-head > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.permission-user-head strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.permission-user-head small { display: block; margin-top: 4px; color: var(--text2); font-size: 10px; }
+.permission-admin-badge { padding: 2px 6px; border-radius: 999px; color: var(--primary); background: var(--cell-select-bg); font-size: 9px; font-weight: 700; }
+.permission-switches { display: flex; grid-column: 1 / -1; flex-wrap: wrap; gap: 7px; }
+.permission-switches label {
+  display: flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text2); background: var(--card); cursor: pointer; font-size: 11px;
+}
+.permission-switches input { accent-color: var(--primary); }
+.permission-switches label:has(input:checked) { border-color: color-mix(in srgb, var(--primary) 48%, var(--border)); color: var(--primary); background: var(--cell-select-bg); }
+.permission-switches label:has(input:disabled) { cursor: not-allowed; opacity: .72; }
+.permission-delete { grid-column: 2; grid-row: 1; color: var(--danger); font-size: 11px; }
+.permission-delete:disabled { cursor: not-allowed; opacity: .45; }
+.permission-panel-note { margin: 12px 0 0; color: var(--text2); font-size: 10px; line-height: 1.6; }
 @media (max-width: 680px) {
   .radar-field-list { grid-template-columns: 1fr; }
   .person-radar-editor { grid-template-columns: 1fr; }
   .person-radar-preview { min-height: 250px; }
   .person-radar-modal-foot { align-items: stretch; flex-direction: column-reverse; }
   .person-radar-modal-foot > div { justify-content: flex-end; }
+  .permission-panel-head { align-items: flex-start; flex-direction: column; }
+  .permission-user-list { grid-template-columns: 1fr; }
 }
 .manage-footer {
   display: flex;

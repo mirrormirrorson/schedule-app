@@ -145,18 +145,44 @@ test('shared radar fields and per-person scores render from every schedule row h
   assert.match(server, /'personRadarScores'/);
 });
 
-test('radar management is last in personnel settings and restricted by current user name', () => {
+test('radar management is last in personnel settings and uses account permissions', () => {
   const html = read('public/index.html');
   const management = read('public/js/management.js');
+  const permissions = read('public/js/permissions.js');
+  const sync = read('public/js/state-sync.js');
+  const server = read('server.js');
+  const migration = read('migrations/001_init.sql');
   const externalList = html.indexOf('id="manageExternalTags"');
   const radarSection = html.indexOf('class="modal-section radar-field-section"');
 
   assert.ok(externalList >= 0 && radarSection > externalList);
-  assert.match(management, /new Set\(\['张雅镜', '林俊凯'\]\)/);
-  assert.match(management, /function canManagePersonRadar\(\)/);
-  assert.match(management, /alert\('暂无权限，请联系林俊凯修改'\)/);
-  assert.match(management, /function addRadarField\(\) \{\s+if \(!requireRadarPermission\(\)\) return;/);
-  assert.match(management, /function updateRadarField\(id, value\) \{\s+if \(!requireRadarPermission\(\)\)/);
-  assert.match(management, /function removeRadarField\(id\) \{\s+if \(!requireRadarPermission\(\)\) return;/);
-  assert.match(management, /function editPersonRadar\(id\) \{\s+if \(!requireRadarPermission\(\)\) return;/);
+  assert.match(permissions, /new Set\(\['张雅镜', '林俊凯', '简慧仪'\]\)/);
+  assert.match(permissions, /function canScoreRadar\(\)/);
+  assert.match(permissions, /function canManageRadarFields\(\)/);
+  assert.match(permissions, /alert\('暂无权限，请联系林俊凯修改'\)/);
+  assert.match(management, /function addRadarField\(\) \{\s+if \(!requireRadarPermission\('fields'\)\) return;/);
+  assert.match(management, /function editPersonRadar\(id\) \{\s+if \(!requireRadarPermission\('score'\)\) return;/);
+  assert.match(sync, /actor: typeof currentUser/);
+  assert.match(server, /radar permission denied/);
+  assert.match(sync, /未授权的雷达修改没有保存/);
+  assert.match(sync, /payload\.deniedRoots/);
+  assert.match(migration, /can_score_radar BOOLEAN/);
+  assert.match(migration, /can_manage_radar_fields BOOLEAN/);
+});
+
+test('permission panel is visible only to protected admins and manages account capabilities', () => {
+  const html = read('public/index.html');
+  const permissions = read('public/js/permissions.js');
+  const server = read('server.js');
+
+  assert.match(html, /id="permissionManageTab" style="display:none"/);
+  assert.match(html, /id="panelPermissions"/);
+  assert.match(html, /张雅镜、林俊凯、简慧仪为受保护的权限管理员/);
+  assert.match(permissions, /function isPermissionAdmin\(\)/);
+  assert.match(permissions, /function loadPermissionUsers\(\)/);
+  assert.match(permissions, /function updateManagedPermission\(userId, key, enabled\)/);
+  assert.match(permissions, /function deleteManagedAccount\(userId\)/);
+  assert.match(server, /app\.get\('\/api\/admin\/users'/);
+  assert.match(server, /app\.patch\('\/api\/admin\/users\/:id\/permissions'/);
+  assert.match(server, /app\.delete\('\/api\/admin\/users\/:id'/);
 });
