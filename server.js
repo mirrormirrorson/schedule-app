@@ -13,6 +13,8 @@ const DB_PATH = process.env.DB_PATH
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const MAX_HISTORY = 8000;
 const MAX_PATCHES = 3000;
+const PRESENCE_TTL_MS = 15_000;
+const MAX_PRESENCE_SESSIONS = 200;
 const EDITABLE_ROOTS = new Set([
   'internalPeople',
   'externalPeople',
@@ -27,6 +29,7 @@ const EDITABLE_ROOTS = new Set([
   'resolutions',
 ]);
 const FORBIDDEN_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
+const presenceSessions = new Map();
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '10mb' }));
@@ -44,6 +47,61 @@ function nowIso() {
 
 function cloneJson(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function cleanPresenceText(value, maxLength = 100) {
+  return String(value == null ? '' : value).trim().slice(0, maxLength);
+}
+
+function normalizePresencePayload(source) {
+  const body = source && typeof source === 'object' ? source : {};
+  const sessionId = cleanPresenceText(body.sessionId, 80);
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(sessionId)) throw new Error('invalid presence session');
+
+  const active = body.active === true;
+  const userName = cleanPresenceText(body.userName, 100);
+  if (active && !userName) throw new Error('presence user required');
+
+  const context = body.context && typeof body.context === 'object' ? body.context : {};
+  const taskIndexValue = Number.parseInt(context.taskIndex, 10);
+  return {
+    sessionId,
+    active,
+    userName,
+    context: {
+      mode: context.mode === 'overview' ? 'overview' : 'group',
+      action: context.action === 'add' ? 'add' : 'edit',
+      weekStart: cleanPresenceText(context.weekStart, 10),
+      weekLabel: cleanPresenceText(context.weekLabel, 40),
+      groupId: cleanPresenceText(context.groupId, 100),
+      groupName: cleanPresenceText(context.groupName, 100),
+      personId: cleanPresenceText(context.personId, 100),
+      personName: cleanPresenceText(context.personName, 100),
+      dateStr: cleanPresenceText(context.dateStr, 10),
+      weekday: cleanPresenceText(context.weekday, 10),
+      taskIndex: Number.isInteger(taskIndexValue) && taskIndexValue >= -1 && taskIndexValue <= 999
+        ? taskIndexValue
+        : -1,
+    },
+  };
+}
+
+function prunePresence(now = Date.now()) {
+  for (const [sessionId, session] of presenceSessions) {
+    if (!session || now - session.lastSeen > PRESENCE_TTL_MS) presenceSessions.delete(sessionId);
+  }
+}
+
+function getPresenceSnapshot(now = Date.now()) {
+  prunePresence(now);
+  return [...presenceSessions.values()]
+    .sort((a, b) => b.lastSeen - a.lastSeen)
+    .map(session => ({
+      sessionId: session.sessionId,
+      userName: session.userName,
+      context: cloneJson(session.context),
+      updatedAt: session.lastSeen,
+    }));
 }
 
 function defaultState() {
@@ -723,6 +781,43 @@ app.post('/api/history/remove', async (req, res, next) => {
   }
 });
 
+// 在线协作状态只保存在当前服务进程内存中，不写数据库、不进入修改历史。
+// 浏览器通过心跳续期；页面关闭、断网或服务重启后会自动过期，避免幽灵在线。
+app.get('/api/presence', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, editors: getPresenceSnapshot(), ttlMs: PRESENCE_TTL_MS });
+});
+
+app.post('/api/presence', (req, res) => {
+  try {
+    const payload = normalizePresencePayload(req.body);
+    const now = Date.now();
+    prunePresence(now);
+
+    if (!payload.active) {
+      presenceSessions.delete(payload.sessionId);
+    } else {
+      if (!presenceSessions.has(payload.sessionId) && presenceSessions.size >= MAX_PRESENCE_SESSIONS) {
+        return res.status(429).json({ ok: false, error: 'presence capacity reached' });
+      }
+      presenceSessions.set(payload.sessionId, {
+        sessionId: payload.sessionId,
+        userName: payload.userName,
+        context: payload.context,
+        lastSeen: now,
+      });
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ ok: true, editors: getPresenceSnapshot(now), ttlMs: PRESENCE_TTL_MS });
+  } catch (error) {
+    if (/presence/.test(error.message)) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+    return res.status(400).json({ ok: false, error: 'invalid presence payload' });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -765,4 +860,8 @@ module.exports = {
   editableState,
   normalizeChanges,
   applyChanges,
+  normalizePresencePayload,
+  prunePresence,
+  getPresenceSnapshot,
+  presenceSessions,
 };

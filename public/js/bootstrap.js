@@ -7,7 +7,8 @@
   renderAll();
   initCellTooltip();
   updateUndoHint();
-  initIdentity();
+  await initIdentity();
+  initPresence();
   if (hasPendingSync()) requestSync();
   else setSaveStatus('saved');
 })();

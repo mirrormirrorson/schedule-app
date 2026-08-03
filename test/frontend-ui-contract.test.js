@@ -80,3 +80,24 @@ test('background renderer remains on the pre-redesign implementation', () => {
   assert.doesNotMatch(background, /drawBow\(|drawHeart\(|drawLeaf\(/);
   assert.doesNotMatch(css, /整页风格主题|--shell-surface|body \.table-card::before/);
 });
+
+test('live presence appears in the top bar and follows cell edit lifecycle', () => {
+  const html = read('public/index.html');
+  const presence = read('public/js/presence.js');
+  const schedule = read('public/js/schedule-core.js');
+  const css = read('public/css/app.css');
+
+  assert.match(html, /id="presenceHub"/);
+  assert.match(html, /id="presencePopover"/);
+  assert.match(html, /\/js\/presence\.js/);
+  assert.match(presence, /PRESENCE_HEARTBEAT_MS = 4_000/);
+  assert.match(presence, /groupPresenceByPerson/);
+  assert.match(presence, /presenceCellLabel/);
+  assert.match(presence, /navigator\.sendBeacon/);
+  assert.doesNotMatch(presence, /\.note\b|textarea\.value|editInput/);
+  assert.match(schedule, /presenceStartEditing\(\{ mode: 'group'/);
+  assert.match(schedule, /presenceStartEditing\(\{ mode: 'overview'/);
+  assert.match(schedule, /presenceStopEditing\(\)/);
+  assert.match(css, /\.presence-hub:hover \.presence-popover/);
+  assert.match(css, /\.presence-person/);
+});

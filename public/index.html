@@ -6,7 +6,7 @@
 <title>【内部】运营一部视频制作排期表</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/app.css?v=presence-20260803">
 <link rel="stylesheet" href="/css/enhancements.css">
 </head>
 <body>
@@ -26,6 +26,24 @@
     </div>
   </div>
   <div class="topbar-r">
+    <div id="presenceHub" class="presence-hub">
+      <button id="presenceSummary" class="presence-summary" type="button" aria-haspopup="true" aria-expanded="false" title="查看谁正在编辑">
+        <span class="presence-summary-dot" aria-hidden="true"></span>
+        <span id="presenceAvatars" class="presence-avatars" aria-hidden="true"></span>
+        <span id="presenceLabel">0 人编辑</span>
+        <span class="presence-chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div id="presencePopover" class="presence-popover" role="dialog" aria-label="实时协作状态">
+        <div class="presence-popover-head">
+          <div><strong>实时协作</strong><span>显示当前正在修改单元格的同事</span></div>
+          <span id="presenceConnection" class="presence-connection">连接中</span>
+        </div>
+        <div id="presenceList" class="presence-list">
+          <div class="presence-empty">暂时没有人正在编辑</div>
+        </div>
+        <div class="presence-popover-foot">状态会在停止编辑或离开页面后自动消失</div>
+      </div>
+    </div>
     <div id="saveStatus" class="save-status loading" role="status" aria-live="polite">
       <span class="save-status-dot"></span>
       <span class="save-status-text">正在读取</span>
@@ -188,6 +206,7 @@
 <script src="/js/management.js" defer></script>
 <script src="/js/view-export.js" defer></script>
 <script src="/js/identity-history.js" defer></script>
+<script src="/js/presence.js" defer></script>
 <script src="/js/bootstrap.js" defer></script>
 <div id="historyOverlay" class="hd-overlay" onclick="if(event.target===this)closeHistoryDrawer()"></div>
 <aside id="historyDrawer" class="hd-drawer">

@@ -122,6 +122,7 @@ async function identifyUser(name) {
 function renderGreeting() {
   const el = document.getElementById('userGreeting');
   if (el) el.textContent = (currentUser ? currentUser.name : '') + '，您好';
+  if (typeof presenceIdentityChanged === 'function') presenceIdentityChanged();
 }
 
 // 点击问候栏弹出用户菜单（切换用户）

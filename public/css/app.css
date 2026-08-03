@@ -494,6 +494,156 @@ body {
 #userGreeting:hover{opacity:.75;}
 .user-menu-btn{width:100%;text-align:left;}
 
+/* ========================= 实时协作状态 ========================= */
+.presence-hub { position: relative; }
+.presence-summary {
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255,255,255,.58);
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  box-shadow: 0 3px 12px rgba(15,23,42,.08);
+  font: 700 12px/1.2 var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.presence-summary:hover { background: var(--card); transform: translateY(-1px); }
+.presence-summary-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,.13);
+}
+.presence-hub[data-connection="connecting"] .presence-summary-dot {
+  background: #3b82f6;
+  animation: savePulse 1s ease-in-out infinite;
+}
+.presence-hub[data-connection="offline"] .presence-summary-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,.14);
+}
+.presence-avatars { display: inline-flex; align-items: center; padding-left: 3px; }
+.presence-avatar-mini {
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  margin-left: -5px;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--avatar-color);
+  font-size: 10px;
+  font-weight: 800;
+}
+.presence-chevron { color: var(--text2); font-size: 12px; transition: transform .18s; }
+.presence-hub.open .presence-chevron { transform: rotate(180deg); }
+.presence-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 78px));
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-7px) scale(.985);
+  transform-origin: top right;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--card) 97%, transparent);
+  box-shadow: 0 18px 50px rgba(15,23,42,.22);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+  transition: opacity .16s, transform .16s, visibility .16s;
+  z-index: 780;
+}
+.presence-hub:hover .presence-popover,
+.presence-hub:focus-within .presence-popover,
+.presence-hub.open .presence-popover {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.presence-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.presence-popover-head strong { display: block; color: var(--text); font-size: 15px; }
+.presence-popover-head div > span { display: block; margin-top: 1px; color: var(--text2); font-size: 11px; font-weight: 500; }
+.presence-connection {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #15803d;
+  background: rgba(34,197,94,.11);
+  font-size: 10px;
+  font-weight: 800;
+}
+.presence-hub[data-connection="connecting"] .presence-connection { color: #1d4ed8; background: rgba(59,130,246,.11); }
+.presence-hub[data-connection="offline"] .presence-connection { color: #a16207; background: rgba(245,158,11,.13); }
+.presence-list { min-height: 104px; padding: 10px; overflow: auto; }
+.presence-empty {
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text2);
+  text-align: center;
+}
+.presence-empty > span { color: #22c55e; font-size: 22px; }
+.presence-empty strong { color: var(--text); font-size: 13px; }
+.presence-empty small { font-size: 11px; }
+.presence-person {
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--card) 92%, var(--tag-bg));
+}
+.presence-person + .presence-person { margin-top: 8px; }
+.presence-person-head { display: flex; align-items: center; gap: 9px; }
+.presence-avatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--avatar-color);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--avatar-color) 32%, transparent);
+  font-size: 14px;
+  font-weight: 800;
+}
+.presence-person-head strong { display: block; color: var(--text); font-size: 13px; }
+.presence-person-head div > span { display: flex; align-items: center; gap: 4px; color: var(--text2); font-size: 10px; }
+.presence-person-head i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: savePulse 1.4s ease-in-out infinite; }
+.presence-locations { display: grid; gap: 6px; margin-top: 9px; }
+.presence-location {
+  padding: 8px 9px;
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: rgba(127,127,127,.065);
+}
+.presence-location-top { display: flex; justify-content: space-between; gap: 10px; color: var(--text2); font-size: 10px; }
+.presence-location-top b { color: var(--primary); font-weight: 800; }
+.presence-cell-label { margin-top: 3px; color: var(--text); font-size: 12px; font-weight: 650; line-height: 1.45; }
+.presence-popover-foot { padding: 8px 14px; border-top: 1px solid var(--border); color: var(--text2); background: rgba(127,127,127,.035); font-size: 10px; text-align: center; }
+
 /* ========================= 保存状态 ========================= */
 .save-status {
   display: inline-flex;
@@ -691,6 +841,14 @@ body {
 .hd-change-box.new { border-left: 3px solid #3b82f6; color: var(--text); }
 
 @media (max-width: 760px) {
+  .topbar { justify-content: flex-start; gap: 8px; padding: 0 8px; overflow-x: auto; scrollbar-width: none; }
+  .topbar::-webkit-scrollbar { display: none; }
+  .topbar-l, .topbar-r { flex: 0 0 auto; gap: 6px; }
+  .topbar .logo { display: none; }
+  .presence-summary { padding: 5px 7px; }
+  .presence-avatars { display: none; }
+  .presence-chevron { display: none; }
+  .presence-popover { position: fixed; top: 58px; left: 8px; right: 8px; width: auto; max-height: calc(100vh - 70px); transform-origin: top center; }
   .save-status { min-width: auto; padding: 5px 8px; }
   .save-status-text { max-width: 82px; overflow: hidden; text-overflow: ellipsis; }
   .manage-list { grid-template-columns: 1fr; }

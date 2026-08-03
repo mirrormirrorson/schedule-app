@@ -1283,6 +1283,9 @@ function startEditDOM(cellEl, personId, dateStr, idx) {
   if (editing) commitEdit();
 
   editing = { personId, dateStr, idx, el: cellEl };
+  if (typeof presenceStartEditing === 'function') {
+    presenceStartEditing({ mode: 'group', personId, dateStr, groupId: activeGroupId, taskIndex: idx });
+  }
   renderEditTable();
 
   const ta = document.getElementById('editInput');
@@ -1330,10 +1333,10 @@ function commitEdit() {
 
   let next;
   if (idx < 0) {
-    if (!newVal) { editing = null; renderEditTable(); return; }
+    if (!newVal) { editing = null; presenceStopEditing(); renderEditTable(); return; }
     next = entries.concat([{ note: newVal }]);
   } else {
-    if (oldVal === newVal) { editing = null; renderEditTable(); return; }
+    if (oldVal === newVal) { editing = null; presenceStopEditing(); renderEditTable(); return; }
     next = entries.slice();
     if (newVal) next[idx] = { note: newVal };
     else next.splice(idx, 1);
@@ -1343,11 +1346,13 @@ function commitEdit() {
   saveData();
 
   editing = null;
+  presenceStopEditing();
   renderEditTable();
 }
 
 function cancelEdit() {
   editing = null;
+  presenceStopEditing();
   renderEditTable();
 }
 
@@ -1676,6 +1681,9 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   const isNew = !(idx >= 0 && entries[idx]);
 
   editing = { mode:'overview', personId, dateStr, groupId, idx, isNew, el:cellEl, oldVal };
+  if (typeof presenceStartEditing === 'function') {
+    presenceStartEditing({ mode: 'overview', personId, dateStr, groupId, taskIndex: idx });
+  }
   cellEl.classList.add('editing');
   cellEl.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:none;overflow:hidden;word-break:break-word;white-space:pre-wrap;" placeholder="输入任务"></textarea>`;
   const ta = cellEl.querySelector('textarea');
@@ -1692,10 +1700,10 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
     const curEntries = getEntries(cur.groupId, cur.personId, cur.dateStr);
     let next;
     if (cur.isNew) {
-      if (!newVal) { editing = null; requestAnimationFrame(() => renderOverview()); return; }
+      if (!newVal) { editing = null; presenceStopEditing(); requestAnimationFrame(() => renderOverview()); return; }
       next = curEntries.concat([{ note: newVal }]);
     } else {
-      if (cur.oldVal === newVal) { editing = null; requestAnimationFrame(() => renderOverview()); return; }
+      if (cur.oldVal === newVal) { editing = null; presenceStopEditing(); requestAnimationFrame(() => renderOverview()); return; }
       next = curEntries.slice();
       if (newVal) next[cur.idx] = { note: newVal };
       else next.splice(cur.idx, 1);
@@ -1704,6 +1712,7 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
     pushUndo([{ personId: cur.personId, dateStr: cur.dateStr, groupId: cur.groupId, oldVal: curEntries, newVal: next }]);
     saveData();
     editing = null;
+    presenceStopEditing();
     requestAnimationFrame(() => renderOverview());
   }
 
@@ -1712,7 +1721,7 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   });
   ta.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); editing = null; requestAnimationFrame(() => renderOverview()); }
+    if (e.key === 'Escape') { e.preventDefault(); editing = null; presenceStopEditing(); requestAnimationFrame(() => renderOverview()); }
   });
 }
 
