@@ -62,14 +62,16 @@ function normalizePresencePayload(source) {
   const userName = cleanPresenceText(body.userName, 100);
   if (active && !userName) throw new Error('presence user required');
 
-  const context = body.context && typeof body.context === 'object' ? body.context : {};
+  const hasContext = !!body.context && typeof body.context === 'object';
+  const context = hasContext ? body.context : {};
   const taskIndexValue = Number.parseInt(context.taskIndex, 10);
   return {
     sessionId,
     active,
     userName,
-    context: {
+    context: hasContext ? {
       mode: context.mode === 'overview' ? 'overview' : 'group',
+      status: context.status === 'editing' ? 'editing' : 'selected',
       action: context.action === 'add' ? 'add' : 'edit',
       weekStart: cleanPresenceText(context.weekStart, 10),
       weekLabel: cleanPresenceText(context.weekLabel, 40),
@@ -82,7 +84,7 @@ function normalizePresencePayload(source) {
       taskIndex: Number.isInteger(taskIndexValue) && taskIndexValue >= -1 && taskIndexValue <= 999
         ? taskIndexValue
         : -1,
-    },
+    } : null,
   };
 }
 

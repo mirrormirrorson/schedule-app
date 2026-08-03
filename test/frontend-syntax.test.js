@@ -30,7 +30,7 @@ test('all browser scripts parse as JavaScript', () => {
 
 test('frontend entrypoint references extracted stylesheet and contains no large inline code blocks', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
-  assert.match(html, /<link rel="stylesheet" href="\/css\/app\.css\?v=presence-20260803">/);
+  assert.match(html, /<link rel="stylesheet" href="\/css\/app\.css\?v=presence-cursors-v2-20260803">/);
   assert.match(html, /<link rel="stylesheet" href="\/css\/enhancements\.css">/);
   assert.doesNotMatch(html, /<style>/i);
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>[\s\S]{200,}<\/script>/i);

@@ -81,7 +81,7 @@ test('background renderer remains on the pre-redesign implementation', () => {
   assert.doesNotMatch(css, /整页风格主题|--shell-surface|body \.table-card::before/);
 });
 
-test('live presence appears in the top bar and follows cell edit lifecycle', () => {
+test('live presence lists online people and renders same-group cell cursors', () => {
   const html = read('public/index.html');
   const presence = read('public/js/presence.js');
   const schedule = read('public/js/schedule-core.js');
@@ -89,15 +89,24 @@ test('live presence appears in the top bar and follows cell edit lifecycle', () 
 
   assert.match(html, /id="presenceHub"/);
   assert.match(html, /id="presencePopover"/);
+  assert.match(html, /0 人在线/);
+  assert.match(html, /操作位置会直接显示在排班表格中/);
   assert.match(html, /\/js\/presence\.js/);
   assert.match(presence, /PRESENCE_HEARTBEAT_MS = 4_000/);
   assert.match(presence, /groupPresenceByPerson/);
-  assert.match(presence, /presenceCellLabel/);
+  assert.match(presence, /renderRemoteCellPresence/);
+  assert.match(presence, /remote-presence-tag/);
+  assert.match(presence, /editor\.sessionId === presenceSessionId/);
+  assert.match(presence, /context\.weekStart !== wsKey\(\)/);
+  assert.match(presence, /context\.groupId !== activeGroupId/);
+  assert.doesNotMatch(presence, /presenceCellLabel/);
   assert.match(presence, /navigator\.sendBeacon/);
   assert.doesNotMatch(presence, /\.note\b|textarea\.value|editInput/);
+  assert.match(schedule, /presenceSelectCell/);
   assert.match(schedule, /presenceStartEditing\(\{ mode: 'group'/);
-  assert.match(schedule, /presenceStartEditing\(\{ mode: 'overview'/);
   assert.match(schedule, /presenceStopEditing\(\)/);
   assert.match(css, /\.presence-hub:hover \.presence-popover/);
   assert.match(css, /\.presence-person/);
+  assert.match(css, /\.cell\.remote-presence-cell/);
+  assert.match(css, /\.remote-presence-tag/);
 });

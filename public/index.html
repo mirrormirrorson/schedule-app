@@ -6,7 +6,7 @@
 <title>【内部】运营一部视频制作排期表</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<link rel="stylesheet" href="/css/app.css?v=presence-20260803">
+<link rel="stylesheet" href="/css/app.css?v=presence-cursors-v2-20260803">
 <link rel="stylesheet" href="/css/enhancements.css">
 </head>
 <body>
@@ -27,21 +27,21 @@
   </div>
   <div class="topbar-r">
     <div id="presenceHub" class="presence-hub">
-      <button id="presenceSummary" class="presence-summary" type="button" aria-haspopup="true" aria-expanded="false" title="查看谁正在编辑">
+      <button id="presenceSummary" class="presence-summary" type="button" aria-haspopup="true" aria-expanded="false" title="查看谁在线">
         <span class="presence-summary-dot" aria-hidden="true"></span>
         <span id="presenceAvatars" class="presence-avatars" aria-hidden="true"></span>
-        <span id="presenceLabel">0 人编辑</span>
+        <span id="presenceLabel">0 人在线</span>
         <span class="presence-chevron" aria-hidden="true">⌄</span>
       </button>
       <div id="presencePopover" class="presence-popover" role="dialog" aria-label="实时协作状态">
         <div class="presence-popover-head">
-          <div><strong>实时协作</strong><span>显示当前正在修改单元格的同事</span></div>
+          <div><strong>当前在线</strong><span>显示正在使用排班网页的同事</span></div>
           <span id="presenceConnection" class="presence-connection">连接中</span>
         </div>
         <div id="presenceList" class="presence-list">
-          <div class="presence-empty">暂时没有人正在编辑</div>
+          <div class="presence-empty">暂时没有人在线</div>
         </div>
-        <div class="presence-popover-foot">状态会在停止编辑或离开页面后自动消失</div>
+        <div class="presence-popover-foot">同组同事的操作位置会直接显示在排班表格中</div>
       </div>
     </div>
     <div id="saveStatus" class="save-status loading" role="status" aria-live="polite">

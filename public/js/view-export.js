@@ -40,6 +40,7 @@ function renderAll() {
   document.getElementById('editPanel').style.display = isOv ? 'none' : '';
   document.getElementById('overviewPanel').style.display = isOv ? '' : 'none';
   if (isOv) renderOverview(); else renderEditTable();
+  if (typeof presenceViewChanged === 'function') presenceViewChanged();
 }
 
 function renderGroupTabs() {

@@ -35,8 +35,14 @@ test('presence payload keeps location metadata but never arbitrary fields', () =
 
   assert.equal(payload.userName, '张雅镜');
   assert.equal(payload.context.groupName, '臣妾组');
+  assert.equal(payload.context.status, 'selected');
   assert.equal(payload.context.taskIndex, 1);
   assert.equal(Object.hasOwn(payload.context, 'note'), false);
+
+  const onlineOnly = normalizePresencePayload({
+    sessionId: 'p_online_123456', active: true, userName: '在线用户',
+  });
+  assert.equal(onlineOnly.context, null);
 });
 
 test('expired presence sessions are pruned from the snapshot', () => {

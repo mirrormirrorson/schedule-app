@@ -282,6 +282,33 @@ body {
 }
 .cell.editing textarea::placeholder { color: #e8c8d4; font-weight: 400; }
 
+/* 同一小组中的远程协作光标：只覆盖边框和姓名标签，不改变单元格内容布局。 */
+#editTable .cell.remote-presence-cell {
+  outline: 2px solid var(--remote-presence-color) !important;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--remote-presence-color) 24%, transparent) !important;
+  z-index: 6;
+}
+.remote-presence-tag {
+  position: absolute;
+  top: -10px;
+  left: 5px;
+  max-width: calc(100% - 10px);
+  padding: 2px 6px;
+  border-radius: 6px 6px 6px 2px;
+  color: #fff;
+  background: var(--remote-presence-color);
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--remote-presence-color) 30%, transparent);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 8;
+}
+
 .cell-tooltip {
   position: fixed;
   display: none;
@@ -843,8 +870,14 @@ body {
 @media (max-width: 760px) {
   .topbar { justify-content: flex-start; gap: 8px; padding: 0 8px; overflow-x: auto; scrollbar-width: none; }
   .topbar::-webkit-scrollbar { display: none; }
-  .topbar-l, .topbar-r { flex: 0 0 auto; gap: 6px; }
+  .topbar-l, .topbar-r { flex: 0 0 auto; gap: 5px; }
   .topbar .logo { display: none; }
+  .topbar-l .btn-w { padding: 4px 7px !important; font-size: 0 !important; }
+  .topbar-l .btn-w::after { content: '排班'; font-size: 11px; }
+  .topbar .week-nav { gap: 1px; padding: 2px 3px; }
+  .topbar .week-nav .btn { padding: 1px 4px !important; }
+  .topbar .week-nav #weekLabel { min-width: 72px !important; font-size: 11px !important; }
+  .topbar #weekBadge { display: none !important; }
   .presence-summary { padding: 5px 7px; }
   .presence-avatars { display: none; }
   .presence-chevron { display: none; }

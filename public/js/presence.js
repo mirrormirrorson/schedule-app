@@ -1,5 +1,5 @@
 // ========================= 实时协作状态 =========================
-// 这里只同步“谁正在编辑哪个单元格”，不发送输入内容，也不写入排班数据库或历史记录。
+// 这里只同步“谁在线、谁选中了哪个单元格”，不发送输入内容，也不写入排班数据库或历史记录。
 const PRESENCE_HEARTBEAT_MS = 4_000;
 const PRESENCE_STALE_MS = 16_000;
 const presenceSessionId = (() => {
@@ -24,9 +24,10 @@ function presenceWeekLabel() {
   return `${fmtDate(currentWeek)}～${fmtDate(end)}`;
 }
 
-function buildPresenceContext({ mode = 'group', personId, dateStr, groupId, taskIndex = -1 }) {
+function buildPresenceContext({ mode = 'group', status = 'selected', personId, dateStr, groupId, taskIndex = -1 }) {
   return {
     mode,
+    status: status === 'editing' ? 'editing' : 'selected',
     action: taskIndex < 0 ? 'add' : 'edit',
     weekStart: wsKey(),
     weekLabel: presenceWeekLabel(),
@@ -41,13 +42,47 @@ function buildPresenceContext({ mode = 'group', personId, dateStr, groupId, task
 }
 
 function presenceStartEditing(context) {
-  presenceActivity = buildPresenceContext(context || {});
+  presenceActivity = buildPresenceContext({ ...(context || {}), status: 'editing' });
   requestPresencePulse();
 }
 
+function presenceSelectCell(context) {
+  if (activeGroupId === '__overview__') return presenceClearCell();
+  presenceActivity = buildPresenceContext({ ...(context || {}), status: 'selected' });
+  requestPresencePulse();
+}
+
+function currentSelectionPresence() {
+  if (!activeCell || activeGroupId === '__overview__') return null;
+  const people = weekPeople();
+  const dates = weekDates(currentWeek);
+  const person = people[activeCell.r];
+  const date = dates[activeCell.c];
+  if (!person || !date) return null;
+  return buildPresenceContext({
+    mode: 'group', status: 'selected', personId: person.id,
+    dateStr: fmtFull(date), groupId: activeGroupId, taskIndex: -1,
+  });
+}
+
 function presenceStopEditing() {
+  presenceActivity = currentSelectionPresence();
+  requestPresencePulse();
+}
+
+function presenceClearCell() {
   if (!presenceActivity) return;
   presenceActivity = null;
+  requestPresencePulse();
+}
+
+function presenceViewChanged() {
+  if (presenceActivity && (
+    activeGroupId === '__overview__'
+    || presenceActivity.weekStart !== wsKey()
+    || presenceActivity.groupId !== activeGroupId
+  )) presenceActivity = null;
+  renderRemoteCellPresence();
   requestPresencePulse();
 }
 
@@ -74,7 +109,7 @@ async function pulsePresence(options = {}) {
   if (!presenceInitialized || presenceRequestRunning) return;
   presenceRequestRunning = true;
   const forceInactive = options.forceInactive === true;
-  const active = !forceInactive && !!currentUser && !!presenceActivity;
+  const active = !forceInactive && !!currentUser;
   try {
     updatePresenceConnection('connecting');
     const response = await fetch(`${API_BASE}/api/presence`, {
@@ -122,20 +157,48 @@ function presenceAvatarColor(name) {
 function groupPresenceByPerson() {
   const groups = new Map();
   presenceEditors.forEach(editor => {
-    if (!editor || !editor.userName || !editor.context) return;
+    if (!editor || !editor.userName) return;
     if (!groups.has(editor.userName)) groups.set(editor.userName, []);
     groups.get(editor.userName).push(editor);
   });
   return [...groups.entries()].map(([name, sessions]) => ({ name, sessions }));
 }
 
-function presenceCellLabel(context) {
-  const dateLabel = context.dateStr ? context.dateStr.slice(5).replace('-', '/') : '';
-  const dayLabel = [context.weekday, dateLabel].filter(Boolean).join(' ');
-  const taskLabel = context.action === 'add'
-    ? '新增任务'
-    : `编辑任务 ${Number(context.taskIndex) + 1}`;
-  return [context.personName || '未知人员', dayLabel, taskLabel].filter(Boolean).join(' · ');
+function renderRemoteCellPresence() {
+  const cells = [...document.querySelectorAll('#editTable [data-pid][data-date]')];
+  cells.forEach(cell => {
+    cell.classList.remove('remote-presence-cell');
+    cell.style.removeProperty('--remote-presence-color');
+    cell.querySelectorAll(':scope > .remote-presence-tag').forEach(tag => tag.remove());
+  });
+  if (!cells.length || activeGroupId === '__overview__') return;
+
+  const locations = new Map();
+  presenceEditors.forEach(editor => {
+    const context = editor && editor.context;
+    if (!context || editor.sessionId === presenceSessionId) return;
+    if (context.mode !== 'group' || context.weekStart !== wsKey() || context.groupId !== activeGroupId) return;
+    if (!context.personId || !context.dateStr) return;
+    const key = `${context.personId}\u0000${context.dateStr}`;
+    if (!locations.has(key)) locations.set(key, []);
+    const names = locations.get(key);
+    if (!names.includes(editor.userName)) names.push(editor.userName);
+  });
+
+  locations.forEach((names, key) => {
+    const [personId, dateStr] = key.split('\u0000');
+    const cell = cells.find(item => item.dataset.pid === personId && item.dataset.date === dateStr);
+    if (!cell || !names.length) return;
+    const color = presenceAvatarColor(names[0]);
+    cell.classList.add('remote-presence-cell');
+    cell.style.setProperty('--remote-presence-color', color);
+    const tag = document.createElement('span');
+    tag.className = 'remote-presence-tag';
+    tag.style.setProperty('--remote-presence-color', color);
+    tag.textContent = `${names.join('、')}正在编辑`;
+    tag.title = tag.textContent;
+    cell.appendChild(tag);
+  });
 }
 
 function renderPresence() {
@@ -145,37 +208,28 @@ function renderPresence() {
   if (!label || !avatars || !list) return;
 
   const people = groupPresenceByPerson();
-  label.textContent = `${people.length} 人编辑`;
+  label.textContent = `${people.length} 人在线`;
   avatars.innerHTML = people.slice(0, 3).map(person => {
     const initial = esc(String(person.name).slice(0, 1) || '?');
     return `<span class="presence-avatar-mini" style="--avatar-color:${presenceAvatarColor(person.name)}">${initial}</span>`;
   }).join('');
 
   if (!people.length) {
-    list.innerHTML = '<div class="presence-empty"><span>✓</span><strong>暂时没有人正在编辑</strong><small>有人双击单元格后会显示在这里</small></div>';
+    list.innerHTML = '<div class="presence-empty"><span>○</span><strong>暂时没有人在线</strong><small>同事打开排班网页后会显示在这里</small></div>';
+    renderRemoteCellPresence();
     return;
   }
 
   list.innerHTML = people.map(person => {
     const isMe = currentUser && person.name === currentUser.name;
-    const locations = person.sessions.map(editor => {
-      const context = editor.context || {};
-      return `<div class="presence-location">
-        <div class="presence-location-top">
-          <span>${esc(context.weekLabel || context.weekStart || '当前周')}</span>
-          <b>${esc(context.groupName || '未知小组')}</b>
-        </div>
-        <div class="presence-cell-label">${esc(presenceCellLabel(context))}</div>
-      </div>`;
-    }).join('');
     return `<article class="presence-person">
       <div class="presence-person-head">
         <span class="presence-avatar" style="--avatar-color:${presenceAvatarColor(person.name)}">${esc(String(person.name).slice(0, 1) || '?')}</span>
-        <div><strong>${esc(person.name)}${isMe ? '（我）' : ''}</strong><span><i></i> 正在修改</span></div>
+        <div><strong>${esc(person.name)}${isMe ? '（我）' : ''}</strong><span><i></i> 在线</span></div>
       </div>
-      <div class="presence-locations">${locations}</div>
     </article>`;
   }).join('');
+  renderRemoteCellPresence();
 }
 
 function updatePresenceConnection(state) {

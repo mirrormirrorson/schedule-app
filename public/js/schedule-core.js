@@ -290,12 +290,27 @@ function updateUndoHint() {
 function clearSelection() {
   sel = null; selAnchor = null; activeCell = null; selExtra = new Set();
   updateFillHandle();
+  if (typeof presenceClearCell === 'function') presenceClearCell();
+}
+
+function syncPresenceActiveCell() {
+  if (typeof presenceSelectCell !== 'function' || !activeCell || activeGroupId === '__overview__') return;
+  const people = weekPeople();
+  const dates = weekDates(currentWeek);
+  const person = people[activeCell.r];
+  const date = dates[activeCell.c];
+  if (!person || !date) return;
+  presenceSelectCell({
+    mode: 'group', personId: person.id, dateStr: fmtFull(date),
+    groupId: activeGroupId, taskIndex: -1,
+  });
 }
 
 function selectCell(r, c) {
   sel = { r1: r, c1: c, r2: r, c2: c };
   selAnchor = { r, c };
   activeCell = { r, c };
+  syncPresenceActiveCell();
 }
 
 function selectRange(r, c) {
@@ -822,6 +837,7 @@ function renderEditTable() {
   const handle = document.getElementById('fillHandle');
   handle.onmousedown = startFillDrag;
   handle.onmouseup = endFillDrag;
+  if (typeof renderRemoteCellPresence === 'function') renderRemoteCellPresence();
 }
 
 // ========================= 鼠标交互 =========================
@@ -1204,6 +1220,7 @@ document.addEventListener('click', function(e) {
     selExtra = new Set();
     selectRange(r, c);
     activeCell = { r, c };
+    syncPresenceActiveCell();
     renderEditTable();
     return;
   }
@@ -1220,6 +1237,7 @@ document.addEventListener('click', function(e) {
     }
     activeCell = { r, c };
     if (!sel) selectCell(r, c);
+    else syncPresenceActiveCell();
     renderEditTable();
     return;
   }
@@ -1368,6 +1386,7 @@ function moveActiveCell(dr, dc) {
   activeCell.c = Math.max(0, Math.min(6, activeCell.c + dc));
   sel = { r1: activeCell.r, c1: activeCell.c, r2: activeCell.r, c2: activeCell.c };
   selAnchor = { r: activeCell.r, c: activeCell.c };
+  syncPresenceActiveCell();
 
   setTimeout(() => {
     renderEditTable();
@@ -1536,6 +1555,7 @@ document.addEventListener('keydown', function(e) {
     sel = { r1: 0, c1: 0, r2: total - 1, c2: 6 };
     selAnchor = { r: 0, c: 0 };
     activeCell = { r: 0, c: 0 };
+    syncPresenceActiveCell();
     renderEditTable();
     return;
   }
@@ -1681,9 +1701,7 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   const isNew = !(idx >= 0 && entries[idx]);
 
   editing = { mode:'overview', personId, dateStr, groupId, idx, isNew, el:cellEl, oldVal };
-  if (typeof presenceStartEditing === 'function') {
-    presenceStartEditing({ mode: 'overview', personId, dateStr, groupId, taskIndex: idx });
-  }
+  if (typeof presenceClearCell === 'function') presenceClearCell();
   cellEl.classList.add('editing');
   cellEl.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:none;overflow:hidden;word-break:break-word;white-space:pre-wrap;" placeholder="输入任务"></textarea>`;
   const ta = cellEl.querySelector('textarea');
