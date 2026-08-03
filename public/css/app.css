@@ -238,24 +238,25 @@ body {
 .row-del:hover { color: var(--danger); }
 .schedule-table tr.row-external td:first-child { background: var(--external-name-col-bg); }
 .person-name { white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
-.person-name.has-intro {
+.person-name.has-radar {
   cursor: help;
   text-decoration: underline dotted color-mix(in srgb, var(--primary) 52%, transparent) 1px;
   text-underline-offset: 4px;
 }
-.person-name.has-intro:focus-visible {
+.person-name.has-radar:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 4px;
   border-radius: 3px;
 }
-.person-intro-tooltip {
+.person-radar-tooltip {
   position: fixed;
   z-index: 850;
-  width: max-content;
-  max-width: min(320px, calc(100vw - 20px));
-  padding: 11px 13px;
+  width: min(372px, calc(100vw - 20px));
+  max-height: calc(100vh - 20px);
+  overflow: hidden auto;
+  padding: 14px 15px 12px;
   border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
-  border-radius: 11px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--card) 96%, var(--primary));
   box-shadow: 0 12px 30px rgba(15,23,42,.18);
   color: var(--text);
@@ -264,9 +265,24 @@ body {
   transform: translateY(3px);
   transition: opacity .12s ease, transform .12s ease;
 }
-.person-intro-tooltip.visible { opacity: 1; transform: translateY(0); }
-.person-intro-tooltip-name { display: block; margin-bottom: 5px; color: var(--primary); font-size: 13px; }
-.person-intro-tooltip-text { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.65; }
+.person-radar-tooltip.visible { opacity: 1; transform: translateY(0); }
+.person-radar-tooltip-name { display: block; color: var(--primary); font-size: 14px; text-align: center; }
+.person-radar-tooltip-chart { display: grid; place-items: center; min-height: 240px; margin: -2px 0 -8px; }
+.person-radar-tooltip > small { display: block; margin-top: 9px; color: var(--text2); font-size: 10px; text-align: center; }
+.person-radar-tooltip-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 8px; }
+.person-radar-tooltip-legend span {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  min-width: 0; padding: 5px 8px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+.person-radar-tooltip-legend b { overflow: hidden; color: var(--text2); font-size: 10px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.person-radar-tooltip-legend em { color: var(--primary); font-size: 12px; font-style: normal; font-weight: 750; }
+.person-radar-svg { display: block; max-width: 100%; height: auto; overflow: visible; color: var(--border); }
+.radar-grid { fill: color-mix(in srgb, var(--primary) 3%, transparent); stroke: color-mix(in srgb, var(--text2) 24%, transparent); stroke-width: 1; }
+.radar-axis { stroke: color-mix(in srgb, var(--text2) 22%, transparent); stroke-width: 1; }
+.radar-value { fill: color-mix(in srgb, var(--primary) 24%, transparent); stroke: var(--primary); stroke-width: 2.2; }
+.radar-marker { fill: var(--card); stroke: var(--primary); stroke-width: 2; }
+.radar-label { fill: var(--text); font-family: var(--font); font-size: 11px; font-weight: 650; }
+.person-radar-empty { color: var(--text2); font-size: 12px; text-align: center; }
 .schedule-table tr.row-external td { background: var(--external-row-bg); }
 
 .cell {
@@ -812,7 +828,7 @@ body {
 .manage-item-color { width: 4px; align-self: stretch; border-radius: 4px; background: var(--primary); }
 .manage-item-name { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); font-size: 13px; font-weight: 650; }
 .manage-person-main { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
-.manage-person-intro {
+.manage-person-radar-summary {
   display: -webkit-box;
   overflow: hidden;
   color: var(--text2);
@@ -822,7 +838,7 @@ body {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-.manage-person-intro.empty { opacity: .68; font-style: italic; }
+.manage-person-radar-summary.empty { opacity: .68; }
 .manage-item-actions { display: flex; gap: 5px; }
 .manage-icon-btn {
   width: 30px;
@@ -844,6 +860,63 @@ body {
   color: var(--text2);
   text-align: center;
   font-size: 12px;
+}
+.radar-field-section {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cell-select-bg) 36%, var(--card));
+}
+.radar-field-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+.radar-field-item { display: grid; grid-template-columns: 24px minmax(0,1fr) 30px; align-items: center; gap: 7px; }
+.radar-field-index {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  color: var(--primary); background: var(--card); font-size: 10px; font-weight: 750;
+}
+.radar-field-item input {
+  min-width: 0; height: 34px; border: 1px solid var(--border); border-radius: 8px;
+  padding: 0 9px; background: var(--card); color: var(--text); font: inherit; font-size: 12px;
+}
+.radar-field-item input:focus { border-color: var(--primary); outline: 2px solid color-mix(in srgb, var(--primary) 16%, transparent); }
+.radar-field-empty { padding: 12px; }
+.radar-field-note { margin: 9px 0 0; color: var(--text2); font-size: 10px; line-height: 1.5; }
+.person-radar-overlay { display: flex; z-index: 700; }
+.person-radar-modal { width: 720px; max-width: 94vw; max-height: 90vh; padding: 0; overflow: hidden; }
+.person-radar-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+}
+.person-radar-modal-head h3 { margin: 0 0 4px; color: var(--text); font-size: 17px; }
+.person-radar-modal-head p { margin: 0; color: var(--text2); font-size: 11px; }
+.person-radar-editor { display: grid; grid-template-columns: minmax(300px, 1.1fr) minmax(230px, .9fr); gap: 18px; padding: 18px 20px; overflow-y: auto; }
+.person-radar-preview {
+  display: grid; place-items: center; min-height: 290px; border: 1px solid var(--border); border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 60%, var(--card));
+}
+.person-radar-score-list { display: flex; flex-direction: column; gap: 8px; align-self: center; }
+.person-radar-score-row {
+  display: grid; grid-template-columns: minmax(0,1fr) 70px 34px; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--card);
+}
+.person-radar-score-row > span { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.person-radar-score-row input {
+  width: 70px; height: 34px; box-sizing: border-box; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 0 8px; background: var(--bg); color: var(--primary); font: inherit; font-weight: 750; text-align: center;
+}
+.person-radar-score-row input:focus { border-color: var(--primary); outline: 2px solid color-mix(in srgb, var(--primary) 16%, transparent); }
+.person-radar-score-row small { color: var(--text2); font-size: 10px; }
+.person-radar-modal-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 20px 16px; border-top: 1px solid var(--border);
+}
+.person-radar-modal-foot > div { display: flex; gap: 8px; }
+.danger-text { color: var(--danger); }
+@media (max-width: 680px) {
+  .radar-field-list { grid-template-columns: 1fr; }
+  .person-radar-editor { grid-template-columns: 1fr; }
+  .person-radar-preview { min-height: 250px; }
+  .person-radar-modal-foot { align-items: stretch; flex-direction: column-reverse; }
+  .person-radar-modal-foot > div { justify-content: flex-end; }
 }
 .manage-footer {
   display: flex;

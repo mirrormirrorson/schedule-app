@@ -309,6 +309,7 @@ function saveLocal() {
 
 const EDITABLE_ROOTS = [
   'internalPeople', 'externalPeople', 'groups', 'conditionRules',
+  'personRadarFields', 'personRadarScores',
   'weekPeople', 'weekPeopleLocked', 'weekGroups', 'weekGroupLocked',
   'groupColors', 'schedules', 'resolutions'
 ];

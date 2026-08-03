@@ -6,7 +6,7 @@
   if (weekGroups().length > 0) activeGroupId = weekGroups()[0].id;
   renderAll();
   initCellTooltip();
-  initPersonIntroTooltip();
+  initPersonRadarTooltip();
   updateUndoHint();
   await initIdentity();
   initPresence();

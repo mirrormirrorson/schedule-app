@@ -17,7 +17,7 @@ function switchManageTab(tab) {
   document.querySelector(`.mtab[onclick="switchManageTab('${tab}')"]`).classList.add('active');
   document.querySelectorAll('.manage-panel').forEach(p => p.style.display = 'none');
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = '';
-  const hint = tab === 'people' ? '默认人员模板，新周自动沿用；点击 ⓘ 编辑人物介绍，排班表姓名悬停即可查看。' :
+  const hint = tab === 'people' ? '先设置所有人员共用的雷达字段，再为每个人单独评分；排班表姓名悬停即可查看。' :
     tab === 'groups' ? '编辑排班小组。' :
     tab === 'conditions' ? '用关键词和颜色快速标记重要排班内容。' : '选择配色主题与字体样式。';
   const hintEl = document.getElementById('manageHint');
@@ -103,15 +103,23 @@ function renderThemeTab() {
 }
 
 function managePersonHTML(person, color) {
-  const intro = String(person.intro || '').trim();
+  const fields = getRadarFields();
+  const scores = getPersonRadarScores(person.id);
+  const scored = fields.filter(field => Object.prototype.hasOwnProperty.call(scores, field.id)).length;
+  const average = scored
+    ? (fields.reduce((sum, field) => sum + normalizeRadarScore(scores[field.id]), 0) / fields.length).toFixed(1)
+    : '';
+  const summary = fields.length < 3
+    ? '请先设置至少 3 个雷达字段'
+    : scored ? `已评分 ${scored}/${fields.length} 项 · 平均 ${average} 分` : '待设置个人分数';
   return `<div class="manage-item">
     <span class="manage-item-color" style="background:${color}"></span>
     <span class="manage-person-main">
       <span class="manage-item-name">${esc(person.name)}</span>
-      <span class="manage-person-intro${intro ? '' : ' empty'}">${intro ? esc(intro) : '未填写人物介绍'}</span>
+      <span class="manage-person-radar-summary${scored ? '' : ' empty'}">${summary}</span>
     </span>
     <span class="manage-item-actions">
-      <button class="manage-icon-btn" onclick="editPersonIntro('${person.id}')" title="编辑人物介绍" aria-label="编辑 ${esc(person.name)} 的人物介绍">ⓘ</button>
+      <button class="manage-icon-btn" onclick="editPersonRadar('${person.id}')" title="设置雷达分数" aria-label="设置 ${esc(person.name)} 的雷达分数">◈</button>
       <button class="manage-icon-btn" onclick="renamePerson('${person.id}')" title="修改姓名" aria-label="修改 ${esc(person.name)}">✎</button>
       <button class="manage-icon-btn danger" onclick="removePerson('${person.id}')" title="删除人员" aria-label="删除 ${esc(person.name)}">×</button>
     </span>
@@ -132,6 +140,7 @@ function manageGroupHTML(group, index) {
 
 function renderManageTab() {
   if (manageActiveTab === 'people') {
+    renderRadarFieldSettings();
     document.getElementById('internalPeopleCount').textContent = `${data.internalPeople.length} 人`;
     document.getElementById('externalPeopleCount').textContent = `${data.externalPeople.length} 人`;
     document.getElementById('manageInternalTags').innerHTML = data.internalPeople
@@ -154,6 +163,138 @@ function renderManageTab() {
   } else if (manageActiveTab === 'theme') {
     renderThemeTab();
   }
+}
+
+function renderRadarFieldSettings() {
+  const fields = getRadarFields();
+  document.getElementById('radarFieldCount').textContent = `${fields.length} 项`;
+  document.getElementById('radarFieldList').innerHTML = fields.length
+    ? fields.map((field, index) => `<div class="radar-field-item">
+        <span class="radar-field-index">${index + 1}</span>
+        <input type="text" maxlength="12" value="${esc(field.name)}" aria-label="雷达字段 ${index + 1}" onchange="updateRadarField('${field.id}',this.value)">
+        <button class="manage-icon-btn danger" onclick="removeRadarField('${field.id}')" title="删除字段" aria-label="删除 ${esc(field.name)}">×</button>
+      </div>`).join('')
+    : '<div class="manage-empty radar-field-empty">暂无字段，请至少添加 3 个字段</div>';
+}
+
+function addRadarField() {
+  const input = document.getElementById('newRadarFieldInput');
+  const name = String(input.value || '').trim();
+  const fields = getRadarFields();
+  if (!name) return;
+  if (fields.length >= 8) { alert('雷达图最多设置 8 个字段'); return; }
+  if (fields.some(field => field.name === name)) { alert('字段名称已存在'); return; }
+  if (!Array.isArray(data.personRadarFields)) data.personRadarFields = [];
+  data.personRadarFields.push({ id: `rf${Date.now()}${Math.random().toString(36).slice(2, 6)}`, name: name.slice(0, 12) });
+  input.value = '';
+  saveData();
+  renderManageTab();
+  renderAll();
+}
+
+function updateRadarField(id, value) {
+  const fields = getRadarFields();
+  const field = fields.find(item => item.id === id);
+  const name = String(value || '').trim().slice(0, 12);
+  if (!field) return;
+  if (!name) { alert('字段名称不能为空'); renderManageTab(); return; }
+  if (fields.some(item => item.id !== id && item.name === name)) {
+    alert('字段名称已存在'); renderManageTab(); return;
+  }
+  if (field.name === name) return;
+  field.name = name;
+  saveData();
+  renderManageTab();
+  renderAll();
+}
+
+function removeRadarField(id) {
+  const fields = getRadarFields();
+  const field = fields.find(item => item.id === id);
+  if (!field || !confirm(`确定删除雷达字段「${field.name}」？\n所有人员在该字段上的分数会一并移除。`)) return;
+  data.personRadarFields = fields.filter(item => item.id !== id);
+  if (data.personRadarScores && typeof data.personRadarScores === 'object') {
+    Object.values(data.personRadarScores).forEach(scores => {
+      if (scores && typeof scores === 'object') delete scores[id];
+    });
+  }
+  saveData();
+  renderManageTab();
+  renderAll();
+}
+
+function editPersonRadar(id) {
+  const person = data.internalPeople.find(item => item.id === id)
+    || data.externalPeople.find(item => item.id === id);
+  const fields = getRadarFields();
+  if (!person) return;
+  if (fields.length < 3) { alert('请先设置至少 3 个雷达字段'); return; }
+
+  const old = document.getElementById('personRadarModal');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'personRadarModal';
+  overlay.className = 'modal-overlay person-radar-overlay';
+  const current = getPersonRadarScores(id);
+  overlay.innerHTML = `<div class="modal person-radar-modal">
+    <div class="person-radar-modal-head">
+      <div><h3>${esc(person.name)} · 任务雷达评分</h3><p>所有字段满分 10 分，本次只修改该人员的分数</p></div>
+      <button class="btn manage-close" id="personRadarClose" aria-label="关闭雷达评分">✕</button>
+    </div>
+    <div class="person-radar-editor">
+      <div class="person-radar-preview" id="personRadarPreview"></div>
+      <div class="person-radar-score-list">
+        ${fields.map(field => `<label class="person-radar-score-row">
+          <span>${esc(field.name)}</span>
+          <input type="number" min="0" max="10" step="1" inputmode="numeric" data-radar-field="${field.id}" value="${normalizeRadarScore(current[field.id])}">
+          <small>/ 10</small>
+        </label>`).join('')}
+      </div>
+    </div>
+    <div class="person-radar-modal-foot">
+      <button class="btn danger-text" id="personRadarClear">清空该人员评分</button>
+      <div><button class="btn" id="personRadarCancel">取消</button><button class="btn btn-p" id="personRadarSave">保存评分</button></div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  const inputs = [...overlay.querySelectorAll('[data-radar-field]')];
+  const collect = () => Object.fromEntries(inputs.map(input => [input.dataset.radarField, normalizeRadarScore(input.value)]));
+  const updatePreview = () => {
+    overlay.querySelector('#personRadarPreview').innerHTML = buildPersonRadarSVG(fields, collect(), { width: 320, height: 260 });
+  };
+  inputs.forEach(input => input.addEventListener('input', () => {
+    const score = normalizeRadarScore(input.value);
+    if (String(score) !== input.value && input.value !== '') input.value = score;
+    updatePreview();
+  }));
+  const close = () => overlay.remove();
+  overlay.querySelector('#personRadarClose').addEventListener('click', close);
+  overlay.querySelector('#personRadarCancel').addEventListener('click', close);
+  overlay.querySelector('#personRadarSave').addEventListener('click', () => {
+    if (!data.personRadarScores || typeof data.personRadarScores !== 'object') data.personRadarScores = {};
+    data.personRadarScores[id] = collect();
+    close();
+    saveData();
+    renderManageTab();
+    renderAll();
+    toast('雷达评分已保存');
+  });
+  overlay.querySelector('#personRadarClear').addEventListener('click', () => {
+    if (!confirm(`确定清空「${person.name}」的全部雷达分数？`)) return;
+    if (data.personRadarScores) delete data.personRadarScores[id];
+    close();
+    saveData();
+    renderManageTab();
+    renderAll();
+    toast('雷达评分已清空');
+  });
+  overlay.addEventListener('mousedown', event => { if (event.target === overlay) close(); });
+  overlay.addEventListener('keydown', event => {
+    event.stopPropagation();
+    if (event.key === 'Escape') { event.preventDefault(); close(); }
+  });
+  updatePreview();
 }
 
 function addPerson(cat, name) {
@@ -216,6 +357,7 @@ function removePerson(id) {
   if (!list) return;
   const personName = (list[idx] && list[idx].name) || '未知';
   list.splice(idx, 1);
+  if (data.personRadarScores) delete data.personRadarScores[id];
   removePersonFromAllWeeks(id);
   logPersonAction('removePerson', personName, 'template', {
     category: list === data.internalPeople ? 'internal' : 'external'
@@ -270,26 +412,6 @@ function ensureGroupColors(persist = true) {
   });
   if (changed && persist) saveData();
   return changed;
-}
-
-function editPersonIntro(id) {
-  const p = data.internalPeople.find(x => x.id === id)
-    || data.externalPeople.find(x => x.id === id);
-  if (!p) return;
-  showNameInputModal('编辑人物介绍（最多 500 字）', p.intro || '', val => {
-    const intro = String(val || '').trim();
-    if (intro.length > 500) {
-      alert('人物介绍最多 500 字');
-      return;
-    }
-    if (intro === String(p.intro || '').trim()) return;
-    if (intro) p.intro = intro;
-    else delete p.intro;
-    saveData();
-    renderManageTab();
-    renderAll();
-    toast(intro ? '人物介绍已保存' : '人物介绍已清空');
-  });
 }
 
 function addGroup() {

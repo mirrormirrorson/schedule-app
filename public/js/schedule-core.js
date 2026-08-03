@@ -293,35 +293,85 @@ function clearSelection() {
   if (typeof presenceClearCell === 'function') presenceClearCell();
 }
 
-function resolvePersonIntro(personId) {
-  if (!personId) return '';
-  const templatePerson = (data.internalPeople || []).find(p => p.id === personId)
-    || (data.externalPeople || []).find(p => p.id === personId);
-  if (templatePerson && templatePerson.intro) return String(templatePerson.intro).trim();
-  for (const people of Object.values(data.weekPeople || {})) {
-    const weekPerson = people.find(p => p.id === personId);
-    if (weekPerson && weekPerson.intro) return String(weekPerson.intro).trim();
-  }
-  return '';
+function getRadarFields() {
+  if (!Array.isArray(data.personRadarFields)) return [];
+  return data.personRadarFields
+    .filter(field => field && field.id && String(field.name || '').trim())
+    .slice(0, 8);
+}
+
+function getPersonRadarScores(personId) {
+  const scores = data.personRadarScores && data.personRadarScores[personId];
+  return scores && typeof scores === 'object' && !Array.isArray(scores) ? scores : {};
+}
+
+function normalizeRadarScore(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(10, Math.round(number)));
+}
+
+function resolvePersonRadar(personId) {
+  const fields = getRadarFields();
+  const scores = getPersonRadarScores(personId);
+  if (fields.length < 3 || !fields.some(field => Object.prototype.hasOwnProperty.call(scores, field.id))) return null;
+  return { fields, scores };
+}
+
+function buildPersonRadarSVG(fields, scores, options = {}) {
+  const width = Number(options.width) || 340;
+  const height = Number(options.height) || 270;
+  const safeFields = (fields || []).slice(0, 8);
+  if (safeFields.length < 3) return '<div class="person-radar-empty">至少需要 3 个字段</div>';
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width * 0.255, height * 0.29);
+  const labelRadius = radius + 27;
+  const point = (index, distance) => {
+    const angle = -Math.PI / 2 + index * Math.PI * 2 / safeFields.length;
+    return [cx + Math.cos(angle) * distance, cy + Math.sin(angle) * distance];
+  };
+  const pointsText = points => points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const grid = [2, 4, 6, 8, 10].map(level => {
+    const points = safeFields.map((_, index) => point(index, radius * level / 10));
+    return `<polygon class="radar-grid" points="${pointsText(points)}"></polygon>`;
+  }).join('');
+  const axes = safeFields.map((_, index) => {
+    const [x, y] = point(index, radius);
+    return `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"></line>`;
+  }).join('');
+  const values = safeFields.map((field, index) => point(index, radius * normalizeRadarScore(scores[field.id]) / 10));
+  const markers = values.map(([x, y]) => `<circle class="radar-marker" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2"></circle>`).join('');
+  const labels = safeFields.map((field, index) => {
+    const [x, y] = point(index, labelRadius);
+    const anchor = x > cx + 5 ? 'start' : x < cx - 5 ? 'end' : 'middle';
+    const dy = y > cy + 5 ? 7 : y < cy - 5 ? -2 : 4;
+    return `<text class="radar-label" x="${x.toFixed(1)}" y="${(y + dy).toFixed(1)}" text-anchor="${anchor}">${esc(String(field.name).slice(0, 12))}</text>`;
+  }).join('');
+  return `<svg class="person-radar-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
+    ${grid}${axes}<polygon class="radar-value" points="${pointsText(values)}"></polygon>${markers}${labels}
+  </svg>`;
+}
+
+function buildRadarScoreLegend(fields, scores) {
+  return fields.map(field => `<span><b>${esc(field.name)}</b><em>${normalizeRadarScore(scores[field.id])}</em></span>`).join('');
 }
 
 function personNameHTML(person) {
-  const intro = resolvePersonIntro(person.id);
-  const introClass = intro ? ' has-intro' : '';
-  const introAttrs = intro
-    ? ' tabindex="0" aria-describedby="personIntroTooltip"'
-    : '';
-  return `<span class="person-name${introClass}"${introAttrs} data-person-id="${esc(person.id)}">${esc(person.name)}</span>`;
+  const radar = resolvePersonRadar(person.id);
+  const radarClass = radar ? ' has-radar' : '';
+  const radarAttrs = radar ? ' tabindex="0" aria-describedby="personRadarTooltip"' : '';
+  return `<span class="person-name${radarClass}"${radarAttrs} data-person-id="${esc(person.id)}">${esc(person.name)}</span>`;
 }
 
-function initPersonIntroTooltip() {
-  if (document.getElementById('personIntroTooltip')) return;
+function initPersonRadarTooltip() {
+  if (document.getElementById('personRadarTooltip')) return;
   const tooltip = document.createElement('div');
-  tooltip.id = 'personIntroTooltip';
-  tooltip.className = 'person-intro-tooltip';
+  tooltip.id = 'personRadarTooltip';
+  tooltip.className = 'person-radar-tooltip';
   tooltip.setAttribute('role', 'tooltip');
   tooltip.setAttribute('aria-hidden', 'true');
-  tooltip.innerHTML = '<strong class="person-intro-tooltip-name"></strong><div class="person-intro-tooltip-text"></div>';
+  tooltip.innerHTML = '<strong class="person-radar-tooltip-name"></strong><div class="person-radar-tooltip-chart"></div><div class="person-radar-tooltip-legend"></div><small>任务雷达 · 满分 10 分</small>';
   document.body.appendChild(tooltip);
 
   let activeTarget = null;
@@ -331,11 +381,12 @@ function initPersonIntroTooltip() {
     tooltip.setAttribute('aria-hidden', 'true');
   };
   const show = target => {
-    const intro = resolvePersonIntro(target.dataset.personId);
-    if (!intro) { hide(); return; }
+    const radar = resolvePersonRadar(target.dataset.personId);
+    if (!radar) { hide(); return; }
     activeTarget = target;
-    tooltip.querySelector('.person-intro-tooltip-name').textContent = target.textContent.trim();
-    tooltip.querySelector('.person-intro-tooltip-text').textContent = intro;
+    tooltip.querySelector('.person-radar-tooltip-name').textContent = target.textContent.trim();
+    tooltip.querySelector('.person-radar-tooltip-chart').innerHTML = buildPersonRadarSVG(radar.fields, radar.scores, { width: 340, height: 260 });
+    tooltip.querySelector('.person-radar-tooltip-legend').innerHTML = buildRadarScoreLegend(radar.fields, radar.scores);
     tooltip.classList.add('visible');
     tooltip.setAttribute('aria-hidden', 'false');
     const anchor = target.getBoundingClientRect();

@@ -20,6 +20,8 @@ const EDITABLE_ROOTS = new Set([
   'externalPeople',
   'groups',
   'conditionRules',
+  'personRadarFields',
+  'personRadarScores',
   'weekPeople',
   'weekPeopleLocked',
   'weekGroups',
@@ -114,6 +116,8 @@ function defaultState() {
     externalPeople: [],
     groups: [],
     conditionRules: [],
+    personRadarFields: [],
+    personRadarScores: {},
     weekPeople: {},
     schedules: {},
   };

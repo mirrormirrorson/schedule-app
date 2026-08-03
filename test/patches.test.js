@@ -87,6 +87,26 @@ test('retrying an already-applied patch is idempotent', () => {
   assert.deepEqual(retry.nextData.groups, [{ id: 'g1', name: '甲组' }]);
 });
 
+test('radar fields and one person scores patch without changing schedules', () => {
+  const schedules = { '2026-08-10': { g1: { p1_2026_08_10: [{ note: '保留排班' }] } } };
+  const base = { personRadarFields: [], personRadarScores: {}, schedules };
+  const fields = [
+    { id: 'rf1', name: '执行力' },
+    { id: 'rf2', name: '沟通' },
+    { id: 'rf3', name: '创意' },
+  ];
+  const changes = normalizeChanges([
+    patch(['personRadarFields'], [], fields),
+    patch(['personRadarScores', 'p1'], undefined, { rf1: 8, rf2: 7, rf3: 9 }),
+  ]);
+
+  const result = applyChanges(base, changes);
+  assert.equal(result.conflicts.length, 0);
+  assert.deepEqual(result.nextData.personRadarFields, fields);
+  assert.deepEqual(result.nextData.personRadarScores.p1, { rf1: 8, rf2: 7, rf3: 9 });
+  assert.deepEqual(result.nextData.schedules, schedules);
+});
+
 test('prototype-polluting paths are rejected', () => {
   assert.throws(
     () => normalizeChanges([patch(['schedules', '__proto__', 'x'], undefined, 'bad')]),

@@ -115,21 +115,32 @@ test('live presence lists online people and renders same-group cell cursors', ()
   assert.match(css, /\.remote-presence-tag/);
 });
 
-test('person introductions are editable in management and visible from every schedule row head', () => {
+test('shared radar fields and per-person scores render from every schedule row head', () => {
+  const html = read('public/index.html');
   const management = read('public/js/management.js');
   const schedule = read('public/js/schedule-core.js');
   const bootstrap = read('public/js/bootstrap.js');
   const css = read('public/css/app.css');
+  const sync = read('public/js/state-sync.js');
+  const server = read('server.js');
 
-  assert.match(management, /function editPersonIntro\(id\)/);
-  assert.match(management, /if \(intro\) p\.intro = intro/);
-  assert.match(management, /delete p\.intro/);
-  assert.match(management, /编辑人物介绍/);
-  assert.match(schedule, /function resolvePersonIntro\(personId\)/);
+  assert.match(html, /id="radarFieldList"/);
+  assert.match(html, /所有人员共用同一套字段/);
+  assert.match(management, /function addRadarField\(\)/);
+  assert.match(management, /function updateRadarField\(id, value\)/);
+  assert.match(management, /function editPersonRadar\(id\)/);
+  assert.match(management, /data\.personRadarScores\[id\] = collect\(\)/);
+  assert.doesNotMatch(management, /function editPersonIntro/);
+  assert.match(schedule, /function resolvePersonRadar\(personId\)/);
+  assert.match(schedule, /function buildPersonRadarSVG\(fields, scores/);
   assert.match(schedule, /function personNameHTML\(person\)/);
-  assert.match(schedule, /function initPersonIntroTooltip\(\)/);
+  assert.match(schedule, /function initPersonRadarTooltip\(\)/);
   assert.equal((schedule.match(/\$\{personNameHTML\(/g) || []).length, 2);
-  assert.match(bootstrap, /initPersonIntroTooltip\(\)/);
-  assert.match(css, /\.person-name\.has-intro/);
-  assert.match(css, /\.person-intro-tooltip\.visible/);
+  assert.match(bootstrap, /initPersonRadarTooltip\(\)/);
+  assert.match(css, /\.person-name\.has-radar/);
+  assert.match(css, /\.person-radar-tooltip\.visible/);
+  assert.match(css, /\.person-radar-modal/);
+  assert.match(sync, /'personRadarFields', 'personRadarScores'/);
+  assert.match(server, /'personRadarFields'/);
+  assert.match(server, /'personRadarScores'/);
 });
