@@ -252,8 +252,8 @@ function openHistoryDrawer() {
   loadAllHistory(true);
   if (historyRefreshTimer) clearInterval(historyRefreshTimer);
   historyRefreshTimer = setInterval(() => {
-    if (document.getElementById('historyDrawer').classList.contains('open')) loadAllHistory();
-  }, 4000);
+    if (!document.hidden && document.getElementById('historyDrawer').classList.contains('open')) loadAllHistory();
+  }, 60000);
 }
 
 function closeHistoryDrawer() {
@@ -278,6 +278,8 @@ function weekLabelOf(wk) {
 
 let allHistory = [];
 let historyRefreshTimer = null;
+let historyResponseTag = '';
+let historyRequestInFlight = false;
 
 function buildHistoryGroupFilter() {
   const sel = document.getElementById('historyGroupFilter');
@@ -299,11 +301,33 @@ async function loadAllHistory(applyOpenContext = false) {
   const list = document.getElementById('historyList');
   const summary = document.getElementById('historySummary');
   if (!list) return;
+  if (historyRequestInFlight) return;
+  historyRequestInFlight = true;
   const prevScroll = list.scrollTop;
   if (!list.innerHTML.includes('hd-item')) list.innerHTML = '<div class="hd-empty">加载中…</div>';
   try {
-    const res = await fetch(`${API_BASE}/api/history?limit=8000`);
+    const headers = historyResponseTag ? { 'If-None-Match': historyResponseTag } : {};
+    const res = await fetch(`${API_BASE}/api/history?limit=8000`, { headers });
+    if (res.status === 304) {
+      buildHistoryGroupFilter();
+      buildWeekFilter();
+      if (applyOpenContext && historyOpenContext) {
+        const groupFilter = document.getElementById('historyGroupFilter');
+        const weekFilter = document.getElementById('historyWeekFilter');
+        groupFilter.value = [...groupFilter.options].some(option => option.value === historyOpenContext.group)
+          ? historyOpenContext.group
+          : '';
+        weekFilter.value = [...weekFilter.options].some(option => option.value === historyOpenContext.week)
+          ? historyOpenContext.week
+          : '';
+        historyOpenContext = null;
+      }
+      renderHistoryList();
+      list.scrollTop = prevScroll;
+      return;
+    }
     if (!res.ok) throw new Error('fail');
+    historyResponseTag = res.headers.get('ETag') || '';
     const r = await res.json();
     allHistory = r.history || [];
     buildHistoryGroupFilter();
@@ -324,6 +348,8 @@ async function loadAllHistory(applyOpenContext = false) {
   } catch (e) {
     if (summary) summary.textContent = '读取失败，请检查网络后重试';
     if (!list.innerHTML.includes('hd-item')) list.innerHTML = '<div class="hd-empty">加载失败</div>';
+  } finally {
+    historyRequestInFlight = false;
   }
 }
 

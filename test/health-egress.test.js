@@ -36,4 +36,15 @@ test('health and ping use metadata without reading the full state', async t => {
   const pingPayload = await ping.json();
   assert.equal(ping.status, 200);
   assert.equal(Number.isFinite(pingPayload._revision), true);
+
+  const history = await fetch(`http://127.0.0.1:${port}/api/history?limit=8000`);
+  const historyTag = history.headers.get('etag');
+  assert.equal(history.status, 200);
+  assert.match(historyTag, /^W\/"history-[a-f0-9]{20}"$/);
+
+  const unchangedHistory = await fetch(`http://127.0.0.1:${port}/api/history?limit=8000`, {
+    headers: { 'If-None-Match': historyTag },
+  });
+  assert.equal(unchangedHistory.status, 304);
+  assert.equal(await unchangedHistory.text(), '');
 });

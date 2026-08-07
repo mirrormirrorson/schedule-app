@@ -8,7 +8,11 @@
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node --test test/*.test.js",
-    "import:snapshot": "node scripts/import-snapshot.js"
+    "import:snapshot": "node scripts/import-snapshot.js",
+    "backup:keygen": "node scripts/backup-keygen.js",
+    "backup:export": "node scripts/backup-export.js",
+    "backup:inspect": "node scripts/backup-inspect.js",
+    "backup:restore": "node scripts/backup-restore.js"
   },
   "dependencies": {
     "express": "^4.21.2",

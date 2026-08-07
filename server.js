@@ -13,6 +13,10 @@ const DB_PATH = process.env.DB_PATH
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const MAX_HISTORY = 8000;
 const MAX_PATCHES = 3000;
+const USER_LAST_SEEN_WRITE_INTERVAL_MS = Math.max(
+  5 * 60 * 1000,
+  Number(process.env.USER_LAST_SEEN_WRITE_INTERVAL_MS || 24 * 60 * 60 * 1000),
+);
 const PRESENCE_TTL_MS = 15_000;
 const MAX_PRESENCE_SESSIONS = 200;
 const PERMISSION_ADMIN_NAMES = new Set(['张雅镜', '林俊凯', '简慧仪']);
@@ -50,6 +54,19 @@ function nowIso() {
 
 function cloneJson(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function historyVersionOf(entries) {
+  const hash = crypto.createHash('sha256');
+  for (const entry of entries || []) {
+    hash.update(String(entry && entry.id || ''));
+    hash.update('\0');
+    hash.update(String(entry && entry.opId || ''));
+    hash.update('\0');
+    hash.update(String(entry && entry.ts || ''));
+    hash.update('\n');
+  }
+  return hash.digest('hex').slice(0, 20);
 }
 
 function isPermissionAdminName(name) {
@@ -255,6 +272,34 @@ function normalizeHistoryEntries(rawEntries) {
   });
 }
 
+async function insertHistoryEntries(client, entries) {
+  if (!entries.length) return;
+  const rows = entries.map(entry => ({
+    id: entry.id,
+    op_id: entry.opId || null,
+    ts: entry.ts,
+    user_name: entry.user || null,
+    week: entry.week || null,
+    group_name: entry.group || null,
+    person: entry.person || null,
+    action: entry.action || null,
+    content: entry.content || null,
+    data: entry,
+  }));
+  await client.query(
+    `INSERT INTO history_entries
+       (id, op_id, ts, user_name, week, group_name, person, action, content, data)
+     SELECT item.id, item.op_id, item.ts::timestamptz, item.user_name, item.week,
+            item.group_name, item.person, item.action, item.content, item.data
+     FROM jsonb_to_recordset($1::jsonb) AS item(
+       id text, op_id text, ts text, user_name text, week text,
+       group_name text, person text, action text, content text, data jsonb
+     )
+     ON CONFLICT (id) DO NOTHING`,
+    [JSON.stringify(rows)],
+  );
+}
+
 function applyChanges(currentData, changes) {
   const nextData = cloneJson(currentData);
   const conflicts = [];
@@ -282,6 +327,7 @@ class FileStore {
     this.revision = Number(seed._revision || 1);
     this.updatedAt = new Date(seed._updated || Date.now()).toISOString();
     this.mutations = new Map();
+    this.historyVersion = historyVersionOf(this.history);
     this.queue = Promise.resolve();
   }
 
@@ -328,6 +374,7 @@ class FileStore {
       this.document = result.nextData;
       this.history.push(...historyEntries);
       if (this.history.length > MAX_HISTORY) this.history = this.history.slice(-MAX_HISTORY);
+      if (historyEntries.length) this.historyVersion = historyVersionOf(this.history);
       this.revision += 1;
       this.updatedAt = nowIso();
       this.mutations.set(mutationId, this.revision);
@@ -424,6 +471,7 @@ class FileStore {
       const seen = new Set(this.history.map(entry => entry.id));
       this.history.push(...entries.filter(entry => !seen.has(entry.id)));
       if (this.history.length > MAX_HISTORY) this.history = this.history.slice(-MAX_HISTORY);
+      if (entries.length) this.historyVersion = historyVersionOf(this.history);
       await this.persist();
       return entries.length;
     });
@@ -434,22 +482,35 @@ class FileStore {
       const wanted = new Set(opIds);
       const removed = this.history.filter(item => item.opId && wanted.has(item.opId));
       this.history = this.history.filter(item => !(item.opId && wanted.has(item.opId)));
+      if (removed.length) this.historyVersion = historyVersionOf(this.history);
       await this.persist();
       return cloneJson(removed);
     });
+  }
+
+  getHistoryVersion() {
+    return this.historyVersion;
   }
 
   async close() {}
 }
 
 class PostgresStore {
-  constructor(connectionString, seed) {
+  constructor(connectionString, seed, options = {}) {
     this.seed = seed;
     this.meta = null;
-    this.pool = new Pool({
+    this.stateCache = null;
+    this.usersById = new Map();
+    this.usersByName = new Map();
+    this.persistedLastSeenByName = new Map();
+    this.historyCache = [];
+    this.historyVersion = historyVersionOf([]);
+    this.writeQueue = Promise.resolve();
+    this.lastMutationCleanupAt = 0;
+    this.pool = options.pool || new Pool({
       connectionString,
       ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
-      max: 5,
+      max: 3,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000,
     });
@@ -465,98 +526,154 @@ class PostgresStore {
        ON CONFLICT (id) DO NOTHING`,
       [JSON.stringify(seedData)],
     );
-    const state = await this.getState();
+    await this.refreshCachesFromDb();
+  }
+
+  setStateCache(state) {
+    this.stateCache = cloneJson(state);
     this.meta = { _revision: state._revision, _updated: state._updated };
   }
 
-  async getState(client = this.pool) {
+  setUsersCache(rows) {
+    this.usersById.clear();
+    this.usersByName.clear();
+    this.persistedLastSeenByName.clear();
+    for (const row of rows || []) this.cacheUser(row, true);
+  }
+
+  cacheUser(source, markPersisted = false) {
+    const user = accountUserResponse(source);
+    if (!user) return null;
+    const cached = cloneJson(user);
+    this.usersById.set(cached.id, cached);
+    this.usersByName.set(cached.name, cached);
+    if (markPersisted) {
+      this.persistedLastSeenByName.set(cached.name, Date.parse(cached.lastSeenAt) || Date.now());
+    }
+    return cloneJson(cached);
+  }
+
+  setHistoryCache(entries) {
+    this.historyCache = cloneJson(entries || [])
+      .sort((a, b) => new Date(b.ts) - new Date(a.ts))
+      .slice(0, MAX_HISTORY);
+    this.historyVersion = historyVersionOf(this.historyCache);
+  }
+
+  mergeHistoryCache(entries) {
+    if (!entries || !entries.length) return;
+    const byId = new Map(this.historyCache.map(entry => [entry.id, entry]));
+    for (const entry of entries) {
+      if (!byId.has(entry.id)) byId.set(entry.id, cloneJson(entry));
+    }
+    this.historyCache = [...byId.values()]
+      .sort((a, b) => new Date(b.ts) - new Date(a.ts))
+      .slice(0, MAX_HISTORY);
+    this.historyVersion = historyVersionOf(this.historyCache);
+  }
+
+  async readStateFromDb(client = this.pool) {
     const result = await client.query('SELECT data, revision, updated_at FROM app_state WHERE id = 1');
     const row = result.rows[0];
-    const state = makeStateResponse(row.data, row.revision, row.updated_at);
-    this.meta = { _revision: state._revision, _updated: state._updated };
-    return state;
+    return makeStateResponse(row.data, row.revision, row.updated_at);
+  }
+
+  async refreshCachesFromDb(client = this.pool) {
+    const [state, users, history] = await Promise.all([
+      this.readStateFromDb(client),
+      client.query(
+        `SELECT id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields
+         FROM app_users ORDER BY last_seen_at DESC, name ASC`,
+      ),
+      client.query(
+        `SELECT data FROM history_entries
+         ORDER BY ts DESC, id DESC LIMIT $1`,
+        [MAX_HISTORY],
+      ),
+    ]);
+    this.setStateCache(state);
+    this.setUsersCache(users.rows);
+    this.setHistoryCache(history.rows.map(row => row.data));
+  }
+
+  withWriteLock(fn) {
+    const run = this.writeQueue.then(fn, fn);
+    this.writeQueue = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  async getState() {
+    if (!this.stateCache) this.setStateCache(await this.readStateFromDb());
+    return cloneJson(this.stateCache);
   }
 
   async getMeta() {
     if (!this.meta) {
-      const state = await this.getState();
+      const state = await this.readStateFromDb();
+      this.setStateCache(state);
       return { _revision: state._revision, _updated: state._updated };
     }
     return { ...this.meta };
   }
 
   async applyPatch({ mutationId, changes, historyEntries }) {
+    return this.withWriteLock(() => this.applyPatchLocked({ mutationId, changes, historyEntries }));
+  }
+
+  async applyPatchLocked({ mutationId, changes, historyEntries }) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const existing = await client.query('SELECT revision FROM mutations WHERE id = $1', [mutationId]);
-      if (existing.rowCount) {
-        const state = await this.getState(client);
-        await client.query('COMMIT');
-        return { duplicate: true, state, conflicts: [] };
-      }
-
-      const locked = await client.query('SELECT data, revision, updated_at FROM app_state WHERE id = 1 FOR UPDATE');
+      const locked = await client.query('SELECT revision, updated_at FROM app_state WHERE id = 1 FOR UPDATE');
       const row = locked.rows[0];
+      let currentState = this.stateCache;
+      if (!currentState || Number(currentState._revision) !== Number(row.revision)) {
+        currentState = await this.readStateFromDb(client);
+        this.setStateCache(currentState);
+      }
       const existingAfterLock = await client.query('SELECT revision FROM mutations WHERE id = $1', [mutationId]);
       if (existingAfterLock.rowCount) {
-        const state = makeStateResponse(row.data, row.revision, row.updated_at);
-        this.meta = { _revision: state._revision, _updated: state._updated };
         await client.query('COMMIT');
-        return { duplicate: true, state, conflicts: [] };
+        return { duplicate: true, state: cloneJson(currentState), conflicts: [] };
       }
-      const result = applyChanges(row.data, changes);
+      const result = applyChanges(editableState(currentState), changes);
       if (result.conflicts.length) {
-        const state = makeStateResponse(row.data, row.revision, row.updated_at);
         await client.query('ROLLBACK');
-        return { duplicate: false, state, conflicts: result.conflicts };
+        return { duplicate: false, state: cloneJson(currentState), conflicts: result.conflicts };
       }
 
       const updated = await client.query(
         `UPDATE app_state
          SET data = $1::jsonb, revision = revision + 1, updated_at = NOW()
          WHERE id = 1
-         RETURNING data, revision, updated_at`,
+         RETURNING revision, updated_at`,
         [JSON.stringify(result.nextData)],
       );
       const revision = Number(updated.rows[0].revision);
 
-      for (const entry of historyEntries) {
+      await insertHistoryEntries(client, historyEntries);
+      if (historyEntries.length) {
         await client.query(
-          `INSERT INTO history_entries
-             (id, op_id, ts, user_name, week, group_name, person, action, content, data)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
-           ON CONFLICT (id) DO NOTHING`,
-          [
-            entry.id,
-            entry.opId || null,
-            entry.ts,
-            entry.user || null,
-            entry.week || null,
-            entry.group || null,
-            entry.person || null,
-            entry.action || null,
-            entry.content || null,
-            JSON.stringify(entry),
-          ],
+          `DELETE FROM history_entries
+           WHERE id IN (
+             SELECT id FROM history_entries
+             ORDER BY ts DESC, id DESC
+             OFFSET $1
+           )`,
+          [MAX_HISTORY],
         );
       }
-
-      await client.query(
-        `DELETE FROM history_entries
-         WHERE id IN (
-           SELECT id FROM history_entries
-           ORDER BY ts DESC, id DESC
-           OFFSET $1
-         )`,
-        [MAX_HISTORY],
-      );
       await client.query('INSERT INTO mutations (id, revision) VALUES ($1, $2)', [mutationId, revision]);
-      await client.query(`DELETE FROM mutations WHERE created_at < NOW() - INTERVAL '30 days'`);
+      const shouldCleanupMutations = Date.now() - this.lastMutationCleanupAt >= 24 * 60 * 60 * 1000;
+      if (shouldCleanupMutations) {
+        await client.query(`DELETE FROM mutations WHERE created_at < NOW() - INTERVAL '30 days'`);
+      }
       await client.query('COMMIT');
+      if (shouldCleanupMutations) this.lastMutationCleanupAt = Date.now();
 
-      const state = makeStateResponse(updated.rows[0].data, revision, updated.rows[0].updated_at);
-      this.meta = { _revision: state._revision, _updated: state._updated };
+      const state = makeStateResponse(result.nextData, revision, updated.rows[0].updated_at);
+      this.setStateCache(state);
+      this.mergeHistoryCache(historyEntries);
       return {
         duplicate: false,
         state,
@@ -571,21 +688,37 @@ class PostgresStore {
   }
 
   async replaceState(next, expectedRevision) {
+    return this.withWriteLock(() => this.replaceStateLocked(next, expectedRevision));
+  }
+
+  async replaceStateLocked(next, expectedRevision) {
     const updated = await this.pool.query(
       `UPDATE app_state
        SET data = $1::jsonb, revision = revision + 1, updated_at = NOW()
        WHERE id = 1 AND revision = $2
-       RETURNING data, revision, updated_at`,
+       RETURNING revision, updated_at`,
       [JSON.stringify(editableState(next)), Number(expectedRevision)],
     );
-    if (!updated.rowCount) return { conflict: true, state: await this.getState() };
+    if (!updated.rowCount) {
+      const state = await this.readStateFromDb();
+      this.setStateCache(state);
+      return { conflict: true, state };
+    }
     const row = updated.rows[0];
-    const state = makeStateResponse(row.data, row.revision, row.updated_at);
-    this.meta = { _revision: state._revision, _updated: state._updated };
+    const state = makeStateResponse(editableState(next), row.revision, row.updated_at);
+    this.setStateCache(state);
     return { conflict: false, state };
   }
 
   async identify(name) {
+    const cached = this.usersByName.get(name);
+    const timestamp = Date.now();
+    if (cached) {
+      cached.lastSeenAt = new Date(timestamp).toISOString();
+      this.usersById.set(cached.id, cached);
+      const persistedAt = this.persistedLastSeenByName.get(name) || 0;
+      if (timestamp - persistedAt < USER_LAST_SEEN_WRITE_INTERVAL_MS) return cloneJson(cached);
+    }
     const admin = isPermissionAdminName(name);
     const result = await this.pool.query(
       `INSERT INTO app_users
@@ -599,24 +732,17 @@ class PostgresStore {
        RETURNING id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields`,
       [name, `u_${crypto.randomUUID()}`, admin],
     );
-    return accountUserResponse(result.rows[0]);
+    return this.cacheUser(result.rows[0], true);
   }
 
   async getUserById(id) {
-    const result = await this.pool.query(
-      `SELECT id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields
-       FROM app_users WHERE id = $1`,
-      [id],
-    );
-    return accountUserResponse(result.rows[0]);
+    return cloneJson(this.usersById.get(id) || null);
   }
 
   async listUsers() {
-    const result = await this.pool.query(
-      `SELECT id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields
-       FROM app_users ORDER BY last_seen_at DESC, name ASC`,
-    );
-    return result.rows.map(accountUserResponse);
+    return [...this.usersById.values()]
+      .map(cloneJson)
+      .sort((a, b) => new Date(b.lastSeenAt) - new Date(a.lastSeenAt) || a.name.localeCompare(b.name, 'zh-CN'));
   }
 
   async updateUserPermissions(id, permissions) {
@@ -630,7 +756,7 @@ class PostgresStore {
        RETURNING id, name, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields`,
       [id, normalized.canScoreRadar, normalized.canManageRadarFields],
     );
-    return accountUserResponse(result.rows[0]);
+    return this.cacheUser(result.rows[0], true);
   }
 
   async deleteUser(id) {
@@ -638,70 +764,46 @@ class PostgresStore {
     if (!user) return null;
     if (isPermissionAdminName(user.name)) return { protected: true, user };
     await this.pool.query('DELETE FROM app_users WHERE id = $1', [id]);
+    this.usersById.delete(id);
+    this.usersByName.delete(user.name);
+    this.persistedLastSeenByName.delete(user.name);
     return { protected: false, user };
   }
 
   async listHistory({ group, user, query, limit }) {
-    const clauses = [];
-    const values = [];
-    const add = value => {
-      values.push(value);
-      return `$${values.length}`;
-    };
-    if (group) {
-      if (group === '总览') clauses.push(`(group_name = ${add(group)} OR group_name IS NULL OR group_name = '')`);
-      else clauses.push(`group_name = ${add(group)}`);
-    }
-    if (user) clauses.push(`user_name = ${add(user)}`);
+    let rows = this.historyCache.slice();
+    if (group) rows = rows.filter(item => item.group === group || (group === '总览' && (!item.group || item.group === '总览')));
+    if (user) rows = rows.filter(item => item.user === user);
     if (query) {
-      const token = `%${query}%`;
-      const placeholder = add(token);
-      clauses.push(`(
-        COALESCE(content, '') ILIKE ${placeholder}
-        OR COALESCE(user_name, '') ILIKE ${placeholder}
-        OR COALESCE(person, '') ILIKE ${placeholder}
-        OR COALESCE(group_name, '') ILIKE ${placeholder}
-      )`);
+      const needle = query.toLowerCase();
+      rows = rows.filter(item => [item.content, item.user, item.person, item.group]
+        .some(value => String(value || '').toLowerCase().includes(needle)));
     }
-    values.push(limit);
-    const result = await this.pool.query(
-      `SELECT data
-       FROM history_entries
-       ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
-       ORDER BY ts DESC, id DESC
-       LIMIT $${values.length}`,
-      values,
-    );
-    return result.rows.map(row => row.data);
+    return cloneJson(rows.slice(0, limit));
   }
 
   async appendHistory(entries) {
+    return this.withWriteLock(() => this.appendHistoryLocked(entries));
+  }
+
+  async appendHistoryLocked(entries) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      for (const entry of entries) {
+      await insertHistoryEntries(client, entries);
+      if (entries.length) {
         await client.query(
-          `INSERT INTO history_entries
-             (id, op_id, ts, user_name, week, group_name, person, action, content, data)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
-           ON CONFLICT (id) DO NOTHING`,
-          [
-            entry.id,
-            entry.opId || null,
-            entry.ts,
-            entry.user || null,
-            entry.week || null,
-            entry.group || null,
-            entry.person || null,
-            entry.action || null,
-            entry.content || null,
-            JSON.stringify(entry),
-          ],
+          `DELETE FROM history_entries
+           WHERE id IN (
+             SELECT id FROM history_entries
+             ORDER BY ts DESC, id DESC
+             OFFSET $1
+           )`,
+          [MAX_HISTORY],
         );
       }
       await client.query('COMMIT');
-      const state = await this.getState();
-      this.meta = { _revision: state._revision, _updated: state._updated };
+      this.mergeHistoryCache(entries);
       return entries.length;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
@@ -712,15 +814,29 @@ class PostgresStore {
   }
 
   async removeHistory(opIds) {
+    return this.withWriteLock(() => this.removeHistoryLocked(opIds));
+  }
+
+  async removeHistoryLocked(opIds) {
     if (!opIds.length) return [];
     const result = await this.pool.query(
       'DELETE FROM history_entries WHERE op_id = ANY($1::text[]) RETURNING data',
       [opIds],
     );
-    return result.rows.map(row => row.data);
+    const removed = result.rows.map(row => row.data);
+    if (removed.length) {
+      const removedIds = new Set(removed.map(entry => entry.id));
+      this.historyCache = this.historyCache.filter(entry => !removedIds.has(entry.id));
+      this.historyVersion = historyVersionOf(this.historyCache);
+    }
+    return removed;
   }
 
   async importSnapshot(snapshot) {
+    return this.withWriteLock(() => this.importSnapshotLocked(snapshot));
+  }
+
+  async importSnapshotLocked(snapshot) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -733,38 +849,25 @@ class PostgresStore {
       );
       await client.query('DELETE FROM history_entries');
       await client.query('DELETE FROM app_users');
-      for (const entry of normalizeHistoryEntries(snapshot.history || [])) {
-        await client.query(
-          `INSERT INTO history_entries
-             (id, op_id, ts, user_name, week, group_name, person, action, content, data)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
-           ON CONFLICT (id) DO NOTHING`,
-          [
-            entry.id,
-            entry.opId || null,
-            entry.ts,
-            entry.user || null,
-            entry.week || null,
-            entry.group || null,
-            entry.person || null,
-            entry.action || null,
-            entry.content || null,
-            JSON.stringify(entry),
-          ],
-        );
-      }
+      await insertHistoryEntries(client, normalizeHistoryEntries(snapshot.history || []));
       for (const [name, rawUser] of Object.entries(snapshot.users || {})) {
         const firstSeen = rawUser.firstSeenAt && !Number.isNaN(Date.parse(rawUser.firstSeenAt)) ? rawUser.firstSeenAt : nowIso();
         const lastSeen = rawUser.lastSeenAt && !Number.isNaN(Date.parse(rawUser.lastSeenAt)) ? rawUser.lastSeenAt : firstSeen;
+        const permissions = normalizeAccountPermissions(rawUser.permissions || rawUser, name);
         await client.query(
-          `INSERT INTO app_users (name, id, first_seen_at, last_seen_at)
-           VALUES ($1, $2, $3, $4)
+          `INSERT INTO app_users
+             (name, id, first_seen_at, last_seen_at, can_score_radar, can_manage_radar_fields)
+           VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (name) DO UPDATE
-           SET last_seen_at = EXCLUDED.last_seen_at`,
-          [name, rawUser.id || `u_${crypto.randomUUID()}`, firstSeen, lastSeen],
+           SET last_seen_at = EXCLUDED.last_seen_at,
+               can_score_radar = EXCLUDED.can_score_radar,
+               can_manage_radar_fields = EXCLUDED.can_manage_radar_fields`,
+          [name, rawUser.id || `u_${crypto.randomUUID()}`, firstSeen, lastSeen,
+            permissions.canScoreRadar, permissions.canManageRadarFields],
         );
       }
       await client.query('COMMIT');
+      await this.refreshCachesFromDb(client);
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -775,6 +878,10 @@ class PostgresStore {
 
   async close() {
     await this.pool.end();
+  }
+
+  getHistoryVersion() {
+    return this.historyVersion;
   }
 }
 
@@ -950,6 +1057,10 @@ app.post('/api/history/append', async (req, res, next) => {
 
 app.get('/api/history', async (req, res, next) => {
   try {
+    const historyTag = `W/"history-${store.getHistoryVersion()}"`;
+    res.setHeader('Cache-Control', 'private, no-cache');
+    res.setHeader('ETag', historyTag);
+    if (req.headers['if-none-match'] === historyTag) return res.status(304).end();
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 500, 1), MAX_HISTORY);
     const history = await store.listHistory({
       group: String(req.query.group || '').trim(),
@@ -1059,4 +1170,7 @@ module.exports = {
   presenceSessions,
   isPermissionAdminName,
   normalizeAccountPermissions,
+  FileStore,
+  PostgresStore,
+  USER_LAST_SEEN_WRITE_INTERVAL_MS,
 };

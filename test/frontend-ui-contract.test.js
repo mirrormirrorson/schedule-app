@@ -28,6 +28,14 @@ test('history opens with the current week and current group context', () => {
   assert.match(source, /全部小组/);
 });
 
+test('history refresh is conditional and no longer downloads every four seconds', () => {
+  const source = read('public/js/identity-history.js');
+  assert.match(source, /'If-None-Match': historyResponseTag/);
+  assert.match(source, /res\.status === 304/);
+  assert.match(source, /}, 60000\);/);
+  assert.doesNotMatch(source, /}, 4000\);/);
+});
+
 test('condition colors are redesigned while themes remain unchanged', () => {
   const source = read('public/js/management.js');
   const html = read('public/index.html');
