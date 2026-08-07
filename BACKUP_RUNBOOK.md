@@ -25,11 +25,12 @@ GitHub 当作网页每次编辑时来回同步的数据源。
 
 2. 新建私有仓库 `mirrormirrorson/schedule-app-backups`，不要把备份 Release 放在当前公开的
    源码仓库里。
-3. 把输出中的 `BACKUP_PUBLIC_KEY_B64` 填入源码仓库的 Actions Variable。它是公钥，
+3. 在私有备份仓库创建 `.github/workflows/encrypted-database-backup.yml`。工作流只读检出公开
+   源码仓库，并把加密快照发布为当前私有仓库的 Release。
+4. 把输出中的 `BACKUP_PUBLIC_KEY_B64` 填入私有备份仓库的 Actions Variable。它是公钥，
    可以公开，但不能拿它解密。
-4. 把私有备份仓库全名填入源码仓库的 Actions Variable `BACKUP_REPOSITORY`。
-5. 把当前生产数据库连接串填入 Actions Secret `BACKUP_DATABASE_URL`；再创建一个仅能向
-   私有备份仓库写 Release 的 fine-grained token，填入 Secret `BACKUP_REPO_TOKEN`。
+5. 把当前生产数据库连接串填入私有备份仓库的 Actions Secret `BACKUP_DATABASE_URL`。
+   工作流使用该仓库自身的 `github.token` 写 Release，不需要额外保存 GitHub 访问令牌。
 6. 在 GitHub Actions 手动运行一次 `Encrypted database backup`，确认私有仓库产生
    `db-backup-*` Release。
 7. 把 `production-backups/keys/schedule-backup-private.pem` 额外复制到一个离线 U 盘或公司
