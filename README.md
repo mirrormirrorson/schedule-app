@@ -89,8 +89,9 @@ DATABASE_URL='postgresql://...' pnpm import:snapshot -- path/to/state.json
 
 ## 独立备份
 
-项目包含每天两次的加密 GitHub 备份、本地镜像、完整性检查和新库恢复工具。备份只读数据库，
-不会修改 revision 或真实数据；私钥只留本机。详细配置和恢复步骤见
+项目包含每天两次的私有 GitHub JSON 备份、本地镜像、完整性检查和新库恢复工具。JSON
+可以直接查看；备份过程只读数据库，不会修改 revision 或真实数据。旧 `.sab` 加密备份仍
+可继续检查和恢复。详细配置和恢复步骤见
 [`BACKUP_RUNBOOK.md`](BACKUP_RUNBOOK.md)。
 
 ## 生产核验

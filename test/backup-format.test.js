@@ -1,7 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
-const { encryptBackup, decryptBackup } = require('../lib/backup-format');
+const {
+  encryptBackup,
+  decryptBackup,
+  loadBackup,
+  serializePlainBackup,
+} = require('../lib/backup-format');
 
 test('encrypted backup round-trips and detects tampering', () => {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
@@ -28,4 +33,23 @@ test('encrypted backup round-trips and detects tampering', () => {
   tampered[0] ^= 1;
   envelope.ciphertext = tampered.toString('base64');
   assert.throws(() => decryptBackup(Buffer.from(JSON.stringify(envelope)), privateKey));
+});
+
+test('plain JSON backup is readable without a private key', () => {
+  const payload = {
+    format: 'schedule-app-logical-backup-v1',
+    createdAt: new Date().toISOString(),
+    counts: { appState: 1, appUsers: 1, historyEntries: 0, mutations: 0 },
+    tables: {
+      appState: { revision: 12, data: { groups: [{ id: 'g1', name: '测试组' }] } },
+      appUsers: [{ id: 'u1', name: '测试人员' }],
+      historyEntries: [],
+      mutations: [],
+    },
+  };
+  const plain = serializePlainBackup(payload);
+  const loaded = loadBackup(plain);
+  assert.equal(loaded.encrypted, false);
+  assert.deepEqual(loaded.payload, payload);
+  assert.match(plain.toString('utf8'), /测试组/);
 });

@@ -27,7 +27,7 @@ $target = Join-Path $resolvedDestination $release.tag_name
 New-Item -ItemType Directory -Path $target -Force | Out-Null
 $downloadHeaders = $headers.Clone()
 $downloadHeaders['Accept'] = 'application/octet-stream'
-foreach ($asset in $release.assets | Where-Object { $_.name -like '*.sab' -or $_.name -eq 'manifest.json' }) {
+foreach ($asset in $release.assets | Where-Object { $_.name -like '*.json' -or $_.name -like '*.sab' }) {
   $output = Join-Path $target $asset.name
   if (-not (Test-Path -LiteralPath $output)) {
     Invoke-WebRequest -Uri $asset.url -Headers $downloadHeaders -OutFile $output

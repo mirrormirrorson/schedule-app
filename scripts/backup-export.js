@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { Pool } = require('pg');
-const { encryptBackup, sha256 } = require('../lib/backup-format');
+const { encryptBackup, serializePlainBackup, sha256 } = require('../lib/backup-format');
 
 function argValue(name) {
   const index = process.argv.indexOf(name);
@@ -79,9 +79,15 @@ async function readConsistentBackup(pool, databaseUrl) {
 async function main() {
   const databaseUrl = process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('BACKUP_DATABASE_URL or DATABASE_URL is required');
+  const encryptedMode = process.argv.includes('--encrypted');
   const outputPath = path.resolve(
     argValue('--output')
-      || path.join(__dirname, '..', 'production-backups', `schedule-backup-${timestampName()}.sab`),
+      || path.join(
+        __dirname,
+        '..',
+        'production-backups',
+        `schedule-backup-${timestampName()}.${encryptedMode ? 'sab' : 'json'}`,
+      ),
   );
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -92,14 +98,17 @@ async function main() {
   });
   try {
     const payload = await readConsistentBackup(pool, databaseUrl);
-    const encrypted = encryptBackup(payload, loadPublicKey());
+    const output = encryptedMode
+      ? encryptBackup(payload, loadPublicKey())
+      : serializePlainBackup(payload);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, encrypted, { flag: 'wx' });
+    fs.writeFileSync(outputPath, output, { flag: 'wx' });
     console.log(JSON.stringify({
       ok: true,
       output: outputPath,
-      encryptedBytes: encrypted.length,
-      sha256: sha256(encrypted),
+      format: encryptedMode ? 'encrypted' : 'plain-json',
+      bytes: output.length,
+      sha256: sha256(output),
       createdAt: payload.createdAt,
       revision: Number(payload.tables.appState && payload.tables.appState.revision || 0),
       counts: payload.counts,

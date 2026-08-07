@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-const { decryptBackup } = require('../lib/backup-format');
+const { BACKUP_FORMAT, loadBackup } = require('../lib/backup-format');
 
 function argValue(name) {
   const index = process.argv.indexOf(name);
@@ -14,19 +14,23 @@ async function main() {
   const expectedDatabase = argValue('--confirm-database');
   const apply = process.argv.includes('--apply');
   if (!backupPath) throw new Error('Backup path is required');
-  const privatePath = path.resolve(
-    argValue('--private-key')
-      || process.env.BACKUP_PRIVATE_KEY_PATH
-      || path.join(__dirname, '..', 'production-backups', 'keys', 'schedule-backup-private.pem'),
-  );
-  const { payload } = decryptBackup(
-    fs.readFileSync(backupPath),
-    fs.readFileSync(privatePath, 'utf8'),
-  );
+  const raw = fs.readFileSync(backupPath);
+  const parsed = JSON.parse(raw.toString('utf8'));
+  let privateKey = '';
+  if (parsed.format === BACKUP_FORMAT) {
+    const privatePath = path.resolve(
+      argValue('--private-key')
+        || process.env.BACKUP_PRIVATE_KEY_PATH
+        || path.join(__dirname, '..', 'production-backups', 'keys', 'schedule-backup-private.pem'),
+    );
+    privateKey = fs.readFileSync(privatePath, 'utf8');
+  }
+  const { encrypted, payload } = loadBackup(raw, privateKey);
   if (!apply) {
     console.log(JSON.stringify({
       ok: true,
       mode: 'verify-only',
+      format: encrypted ? 'encrypted' : 'plain-json',
       createdAt: payload.createdAt,
       revision: Number(payload.tables.appState && payload.tables.appState.revision || 0),
       counts: payload.counts,
