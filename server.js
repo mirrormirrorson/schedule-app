@@ -312,6 +312,10 @@ class FileStore {
     return makeStateResponse(this.document, this.revision, this.updatedAt);
   }
 
+  async getMeta() {
+    return { _revision: this.revision, _updated: this.updatedAt };
+  }
+
   async applyPatch({ mutationId, changes, historyEntries }) {
     return this.withLock(async () => {
       if (this.mutations.has(mutationId)) {
@@ -792,7 +796,9 @@ async function permissionAdminAccount(actor) {
 
 app.get('/api/health', async (req, res, next) => {
   try {
-    const state = await store.getState();
+    // Render probes this endpoint every few seconds. Keep it metadata-only so
+    // health checks never transfer the full schedule document from Postgres.
+    const state = await store.getMeta();
     res.json({
       ok: true,
       storage: DATABASE_URL ? 'postgres' : 'file',
@@ -806,7 +812,7 @@ app.get('/api/health', async (req, res, next) => {
 
 app.get('/api/ping', async (req, res, next) => {
   try {
-    const state = typeof store.getMeta === 'function' ? await store.getMeta() : await store.getState();
+    const state = await store.getMeta();
     res.json({ _revision: state._revision, _updated: state._updated });
   } catch (error) {
     next(error);
