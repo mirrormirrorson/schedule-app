@@ -311,6 +311,21 @@ function normalizeRadarScore(value) {
   return Math.max(0, Math.min(10, Math.round(number)));
 }
 
+function splitRadarLabel(value, maxChars = 6) {
+  const remaining = Array.from(String(value || '').trim());
+  if (remaining.length === 0) return [''];
+  const lines = [];
+  while (remaining.length > maxChars) {
+    let cut = maxChars;
+    for (let index = maxChars; index >= 3; index--) {
+      if (/[、，,\/｜·＆&\s]/.test(remaining[index - 1])) { cut = index; break; }
+    }
+    lines.push(remaining.splice(0, cut).join('').trim());
+  }
+  if (remaining.length) lines.push(remaining.join('').trim());
+  return lines.filter(Boolean);
+}
+
 function resolvePersonRadar(personId) {
   const fields = getRadarFields();
   const scores = getPersonRadarScores(personId);
@@ -346,7 +361,11 @@ function buildPersonRadarSVG(fields, scores, options = {}) {
     const [x, y] = point(index, labelRadius);
     const anchor = x > cx + 5 ? 'start' : x < cx - 5 ? 'end' : 'middle';
     const dy = y > cy + 5 ? 7 : y < cy - 5 ? -2 : 4;
-    return `<text class="radar-label" x="${x.toFixed(1)}" y="${(y + dy).toFixed(1)}" text-anchor="${anchor}">${esc(String(field.name).slice(0, 12))}</text>`;
+    const lines = splitRadarLabel(field.name);
+    const lineHeight = 13;
+    const firstY = y + dy - (lines.length - 1) * lineHeight / 2;
+    const tspans = lines.map((line, lineIndex) => `<tspan x="${x.toFixed(1)}" y="${(firstY + lineIndex * lineHeight).toFixed(1)}">${esc(line)}</tspan>`).join('');
+    return `<text class="radar-label" x="${x.toFixed(1)}" text-anchor="${anchor}">${tspans}</text>`;
   }).join('');
   return `<svg class="person-radar-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
     ${grid}${axes}<polygon class="radar-value" points="${pointsText(values)}"></polygon>${markers}${labels}
@@ -360,7 +379,7 @@ function buildRadarScoreLegend(fields, scores) {
 function personNameHTML(person) {
   const radar = resolvePersonRadar(person.id);
   const radarClass = radar ? ' has-radar' : '';
-  const radarAttrs = radar ? ' tabindex="0" aria-describedby="personRadarTooltip"' : '';
+  const radarAttrs = radar ? ' tabindex="0" aria-describedby="personRadarTooltip" title="悬停预览，单击固定雷达图"' : '';
   return `<span class="person-name${radarClass}"${radarAttrs} data-person-id="${esc(person.id)}">${esc(person.name)}</span>`;
 }
 
@@ -371,23 +390,29 @@ function initPersonRadarTooltip() {
   tooltip.className = 'person-radar-tooltip';
   tooltip.setAttribute('role', 'tooltip');
   tooltip.setAttribute('aria-hidden', 'true');
-  tooltip.innerHTML = '<strong class="person-radar-tooltip-name"></strong><div class="person-radar-tooltip-chart"></div><div class="person-radar-tooltip-legend"></div><small>任务雷达 · 满分 10 分</small>';
+  tooltip.innerHTML = '<strong class="person-radar-tooltip-name"></strong><div class="person-radar-tooltip-chart"></div><div class="person-radar-tooltip-legend"></div><small class="person-radar-tooltip-hint">任务雷达 · 满分 10 分</small>';
   document.body.appendChild(tooltip);
 
   let activeTarget = null;
+  let pinnedTarget = null;
   const hide = () => {
     activeTarget = null;
     tooltip.classList.remove('visible');
+    tooltip.classList.remove('pinned');
     tooltip.setAttribute('aria-hidden', 'true');
   };
-  const show = target => {
+  const show = (target, pinned = false) => {
     const radar = resolvePersonRadar(target.dataset.personId);
     if (!radar) { hide(); return; }
     activeTarget = target;
     tooltip.querySelector('.person-radar-tooltip-name').textContent = target.textContent.trim();
-    tooltip.querySelector('.person-radar-tooltip-chart').innerHTML = buildPersonRadarSVG(radar.fields, radar.scores, { width: 340, height: 260 });
+    tooltip.querySelector('.person-radar-tooltip-chart').innerHTML = buildPersonRadarSVG(radar.fields, radar.scores, { width: 520, height: 350 });
     tooltip.querySelector('.person-radar-tooltip-legend').innerHTML = buildRadarScoreLegend(radar.fields, radar.scores);
+    tooltip.querySelector('.person-radar-tooltip-hint').textContent = pinned
+      ? '已固定 · 点击空白处关闭'
+      : '任务雷达 · 满分 10 分 · 单击姓名可固定';
     tooltip.classList.add('visible');
+    tooltip.classList.toggle('pinned', pinned);
     tooltip.setAttribute('aria-hidden', 'false');
     const anchor = target.getBoundingClientRect();
     const box = tooltip.getBoundingClientRect();
@@ -400,22 +425,51 @@ function initPersonRadarTooltip() {
   };
 
   document.addEventListener('mouseover', event => {
+    if (pinnedTarget) return;
     const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
     if (target && target !== activeTarget) show(target);
   });
   document.addEventListener('mouseout', event => {
+    if (pinnedTarget) return;
     const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
     if (target && !target.contains(event.relatedTarget)) hide();
   });
   document.addEventListener('focusin', event => {
+    if (pinnedTarget) return;
     const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
     if (target) show(target);
   });
   document.addEventListener('focusout', event => {
-    if (event.target.closest && event.target.closest('.person-name[data-person-id]')) hide();
+    if (!pinnedTarget && event.target.closest && event.target.closest('.person-name[data-person-id]')) hide();
   });
-  window.addEventListener('scroll', hide, true);
-  window.addEventListener('resize', hide);
+  document.addEventListener('click', event => {
+    const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
+    if (target && resolvePersonRadar(target.dataset.personId)) {
+      pinnedTarget = target;
+      show(target, true);
+      return;
+    }
+    if (pinnedTarget && !tooltip.contains(event.target)) {
+      pinnedTarget = null;
+      hide();
+    }
+  }, true);
+  document.addEventListener('keydown', event => {
+    const target = event.target.closest && event.target.closest('.person-name[data-person-id]');
+    if (target && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      pinnedTarget = target;
+      show(target, true);
+    } else if (event.key === 'Escape' && pinnedTarget) {
+      pinnedTarget = null;
+      hide();
+    }
+  });
+  window.addEventListener('scroll', () => { if (!pinnedTarget) hide(); }, true);
+  window.addEventListener('resize', () => {
+    if (pinnedTarget && pinnedTarget.isConnected) show(pinnedTarget, true);
+    else { pinnedTarget = null; hide(); }
+  });
 }
 
 function syncPresenceActiveCell() {
