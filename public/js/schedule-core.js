@@ -536,7 +536,8 @@ function getOverviewSelectedCells() {
 
 // ========================= 剪贴板 =========================
 // 统一剪贴板格式：系统剪贴板用 TSV（\t 列、\n 行），单元格内换行用 \u2424 占位；
-// 内部 clipData = { rows, cols, data:[[note,...],...] }，data 内换行用真实 \n。
+// 内部 clipData = { rows, cols, data, blockData, mask }，data 内换行用真实 \n；
+// mask 保留 Ctrl+点击形成的非连续选区，使跨表粘贴不会把空隙当成待覆盖单元格。
 // 总览表与小组表共用该格式，因此复制粘贴无需进入编辑态即可选区操作，且跨表一致。
 function parseGridText(text) {
   // 不含制表符时视为单个单元格，保留内部换行，避免多行文本被拆成多格
@@ -576,7 +577,7 @@ async function readClipboardGrid() {
           ? (clipData.data[0][0] || '').trim()
           : clipData.data.map(row => row.map(c => (c || '').replace(/\n/g, '\u2424')).join('\t')).join('\n');
         if (text.trim() === internalText.trim()) {
-          return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData };
+          return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData, mask: clipData.mask };
         }
       }
       const d = parseGridText(text);
@@ -584,7 +585,7 @@ async function readClipboardGrid() {
     }
   } catch (e) {}
   if (clipData && clipData.data && clipData.data.length) {
-    return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData };
+    return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData, mask: clipData.mask };
   }
   return null;
 }
@@ -606,7 +607,8 @@ function copySelection() {
     data[r - minR][c - minC] = joinNotes(entries.map(e => e.note));
     if (entries.length > 0) blockData[r - minR][c - minC] = entries.map(e => ({ note: e.note }));
   });
-  clipData = { rows, cols, data, blockData };
+  const mask = ScheduleGridClipboard.buildMask(rows, cols, cells, minR, minC);
+  clipData = { rows, cols, data, blockData, mask };
   writeClipboardGrid(clipData);
   toast(`已复制 ${cells.length} 个单元格`);
 }
@@ -624,7 +626,8 @@ function copyOverviewSelection() {
     data[r - minR][c - minC] = joinNotes(blocks.map(b => b.note || ''));
     if (blocks.length > 0) blockData[r - minR][c - minC] = blocks.map(b => ({ note: b.note }));
   });
-  clipData = { rows, cols, data, blockData };
+  const mask = ScheduleGridClipboard.buildMask(rows, cols, cells, minR, minC);
+  clipData = { rows, cols, data, blockData, mask };
   writeClipboardGrid(clipData);
   toast(`已复制 ${cells.length} 个单元格`);
 }
@@ -652,15 +655,25 @@ async function pasteToSelection() {
   }
   if (cells.length === 0) { toast('请先选中目标单元格'); return; }
 
-  const minR = Math.min(...cells.map(c => c.r)), maxR = Math.max(...cells.map(c => c.r));
-  const minC = Math.min(...cells.map(c => c.c)), maxC = Math.max(...cells.map(c => c.c));
+  const dates = weekDates(currentWeek);
+  const people = weekPeople();
+  const resolveCell = (r, c) => {
+    const person = people[r];
+    if (!person || c < 0 || c >= 7) return null;
+    const cell = { r, c, person, dateStr: fmtFull(dates[c]) };
+    if (isOv) {
+      const el = document.querySelector(`#overviewTable [data-r="${r}"][data-c="${c}"]`);
+      cell.gid = el ? (el.dataset.gid || '') : '';
+    }
+    return cell;
+  };
+  const pastePlan = ScheduleGridClipboard.buildPastePlan(cells, clip, resolveCell);
+  const expandedFromSingleAnchor = cells.length === 1 && pastePlan.length > 1;
 
   const changes = [];
-  const useBlocks = clip.blockData && clipData && clipData.blockData;
-  cells.forEach(({ r, c, person, dateStr, gid }) => {
-    const sr = (r - minR) % clip.rows;
-    const sc = (c - minC) % clip.cols;
-    const srcBlocks = useBlocks ? clipData.blockData[sr][sc] : null;
+  const useBlocks = Boolean(clip.blockData);
+  pastePlan.forEach(({ cell: { person, dateStr, gid }, sr, sc }) => {
+    const srcBlocks = useBlocks ? clip.blockData[sr][sc] : null;
     if (isOv) {
       const groupId = gid || (weekGroups()[0] ? weekGroups()[0].id : '');
       const oldEntries = getEntries(groupId, person.id, dateStr);
@@ -702,6 +715,13 @@ async function pasteToSelection() {
   if (changes.length > 0) {
     pushUndo(changes);
     saveData();
+  }
+  if (expandedFromSingleAnchor) {
+    const anchor = pastePlan[0].cell;
+    sel = { r1: anchor.r, c1: anchor.c, r2: anchor.r, c2: anchor.c };
+    selAnchor = { r: anchor.r, c: anchor.c };
+    activeCell = { r: anchor.r, c: anchor.c };
+    selExtra = new Set(pastePlan.slice(1).map(({ cell }) => `${cell.r},${cell.c}`));
   }
   if (isOv) { renderAll(); highlightOverviewSelection(); }
   else renderEditTable();

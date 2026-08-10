@@ -33,7 +33,7 @@ let selExtra = new Set();  // Ctrl+点击追加的单元格 "r,c"
 let editing = null;    // { personId, dateStr, el }
 
 // 内部剪贴板
-let clipData = null;   // { rows, cols, data: [[val,...],...] }
+let clipData = null;   // { rows, cols, data, blockData, mask }；mask 保留 Ctrl 非连续选区
 
 // 撤销/重做
 let undoStack = [];
