@@ -4,6 +4,8 @@ const {
   buildMask,
   buildPastePlan,
   selectedSourceCount,
+  serializeClipboardText,
+  clipboardTextMatches,
 } = require('../public/js/grid-clipboard');
 
 function resolveWithin(rows, cols) {
@@ -33,6 +35,17 @@ test('pasting a multi-cell copy on one destination expands from that anchor', ()
     { cell: { r: 1, c: 2 }, sr: 0, sc: 0 },
     { cell: { r: 2, c: 4 }, sr: 1, sc: 2 },
   ]);
+});
+
+test('a vertical internal copy still matches after Windows converts LF to CRLF', () => {
+  const clip = {
+    rows: 2,
+    cols: 1,
+    data: [['1'], ['2']],
+    mask: [[true], [true]],
+  };
+  assert.equal(serializeClipboardText(clip), '1\n2');
+  assert.equal(clipboardTextMatches(clip, '1\r\n2'), true);
 });
 
 test('a rectangular clipboard from outside the app expands every source cell', () => {

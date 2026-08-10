@@ -3,6 +3,24 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.ScheduleGridClipboard = api;
 })(typeof window !== 'undefined' ? window : globalThis, function createGridClipboard() {
+  function normalizeClipboardText(text) {
+    return String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+  }
+
+  function serializeClipboardText(clip) {
+    if (clip.rows === 1 && clip.cols === 1) {
+      return normalizeClipboardText((clip.data[0] && clip.data[0][0]) || '').trim();
+    }
+    return clip.data
+      .map(row => row.map(cell => normalizeClipboardText(cell || '').replace(/\n/g, '\u2424')).join('\t'))
+      .join('\n');
+  }
+
+  function clipboardTextMatches(clip, text) {
+    if (!clip || !clip.data || !clip.data.length) return false;
+    return normalizeClipboardText(text).trim() === normalizeClipboardText(serializeClipboardText(clip)).trim();
+  }
+
   function buildMask(rows, cols, cells, minR, minC) {
     const mask = Array.from({ length: rows }, () => Array(cols).fill(false));
     cells.forEach(({ r, c }) => {
@@ -51,5 +69,12 @@
     }).filter(({ sr, sc }) => isSourceCellSelected(clip, sr, sc));
   }
 
-  return { buildMask, buildPastePlan, selectedSourceCount };
+  return {
+    buildMask,
+    buildPastePlan,
+    selectedSourceCount,
+    normalizeClipboardText,
+    serializeClipboardText,
+    clipboardTextMatches,
+  };
 });

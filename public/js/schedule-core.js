@@ -540,6 +540,7 @@ function getOverviewSelectedCells() {
 // mask 保留 Ctrl+点击形成的非连续选区，使跨表粘贴不会把空隙当成待覆盖单元格。
 // 总览表与小组表共用该格式，因此复制粘贴无需进入编辑态即可选区操作，且跨表一致。
 function parseGridText(text) {
+  text = ScheduleGridClipboard.normalizeClipboardText(text);
   // 不含制表符时视为单个单元格，保留内部换行，避免多行文本被拆成多格
   if (!text.includes('\t')) {
     return { rows: 1, cols: 1, data: [[(text || '').trim()]] };
@@ -552,14 +553,7 @@ function parseGridText(text) {
 }
 function writeClipboardGrid(clip) {
   try {
-    let text;
-    if (clip.rows === 1 && clip.cols === 1) {
-      // 单格复制：直接保留真实换行，便于粘贴到编辑框或外部应用；trim 掉末尾空行
-      text = (clip.data[0][0] || '').trim();
-    } else {
-      // 多格复制：用 TSV + 占位符保证网格结构
-      text = clip.data.map(row => row.map(c => (c || '').replace(/\n/g, '\u2424')).join('\t')).join('\n');
-    }
+    const text = ScheduleGridClipboard.serializeClipboardText(clip);
     navigator.clipboard.writeText(text);
   } catch (e) {}
 }
@@ -573,10 +567,7 @@ async function readClipboardGrid() {
     if (text && text.trim() !== '') {
       // 如果系统剪贴板内容与当前内部 clipData 的拼接结果一致，优先使用内部 blockData 以保留独立块结构
       if (clipData && clipData.data && clipData.data.length) {
-        const internalText = clipData.rows === 1 && clipData.cols === 1
-          ? (clipData.data[0][0] || '').trim()
-          : clipData.data.map(row => row.map(c => (c || '').replace(/\n/g, '\u2424')).join('\t')).join('\n');
-        if (text.trim() === internalText.trim()) {
+        if (ScheduleGridClipboard.clipboardTextMatches(clipData, text)) {
           return { rows: clipData.rows, cols: clipData.cols, data: clipData.data, blockData: clipData.blockData, mask: clipData.mask };
         }
       }
