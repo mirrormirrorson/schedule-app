@@ -16,6 +16,17 @@ function weekDates(monday) {
 function wsKey() { return fmtFull(currentWeek); }
 function skey(personId, dateStr) { return `${personId}_${dateStr}`; }
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function scheduleWeekKey() { return fmtFull(getMonday(new Date(Date.now() + 7*86400000))); }
+function isFutureScheduleWeek(weekKey = wsKey()) { return String(weekKey || '') > scheduleWeekKey(); }
+function canEditScheduleWeek(weekKey = wsKey()) {
+  if (!isFutureScheduleWeek(weekKey)) return true;
+  return typeof isPermissionAdmin === 'function' && isPermissionAdmin();
+}
+function requireScheduleWeekEdit(weekKey = wsKey(), notify = true) {
+  const allowed = canEditScheduleWeek(weekKey);
+  if (!allowed && notify) toast('还未进入排班时间');
+  return allowed;
+}
 function autoResizeTextarea(ta) {
   ta.style.height = 'auto';
   ta.style.height = ta.scrollHeight + 'px';
@@ -208,6 +219,7 @@ function pushUndo(changes, opMeta) {
 async function undo() {
   if (editing) commitEdit();
   if (undoStack.length === 0) { toast('没有可撤销的操作'); return; }
+  if (!requireScheduleWeekEdit(undoStack[undoStack.length - 1].week)) return;
   const action = undoStack.pop();
   redoStack.push(action);
 
@@ -250,6 +262,7 @@ async function undo() {
 async function redo() {
   if (editing) commitEdit();
   if (redoStack.length === 0) { toast('没有可重做的操作'); return; }
+  if (!requireScheduleWeekEdit(redoStack[redoStack.length - 1].week)) return;
   const action = redoStack.pop();
   undoStack.push(action);
 
@@ -678,6 +691,7 @@ function copyOverviewSelection() {
 }
 
 async function pasteToSelection() {
+  if (!requireScheduleWeekEdit()) return;
   const isOv = activeGroupId === '__overview__';
   const clip = await readClipboardGrid();
   if (!clip) return;
@@ -775,6 +789,7 @@ async function pasteToSelection() {
 
 // ========================= 填充 =========================
 function fillDown() {
+  if (!requireScheduleWeekEdit()) return;
   if (!sel || (sel.r2 - sel.r1 === 0 && sel.c2 - sel.c1 === 0)) return;
 
   const dates = weekDates(currentWeek);
@@ -809,6 +824,7 @@ function fillDown() {
 // 填充柄拖拽填充
 function startFillDrag(e) {
   if (!sel) return;
+  if (!requireScheduleWeekEdit()) return;
   fillDragging = true;
   fillStart = { r: sel.r2, c: sel.c2 };
   fillEnd = null;
@@ -845,6 +861,11 @@ function updateFillDrag(e) {
 }
 
 function endFillDrag() {
+  if (!requireScheduleWeekEdit()) {
+    fillDragging = false; fillStart = null; fillEnd = null;
+    renderEditTable();
+    return;
+  }
   if (!fillDragging || !fillEnd) {
     fillDragging = false; fillStart = null; fillEnd = null;
     renderEditTable();
@@ -1334,6 +1355,12 @@ document.addEventListener('mouseup', function(e) {
 
   // 拖拽移动释放（小组表）：源移除被拖块，目标追加该块（即使同组也作为独立块，不覆盖）
   if (cellDrag && dragStarted) {
+    if (!requireScheduleWeekEdit()) {
+      cleanupDrag();
+      mouseDownCell = null;
+      renderEditTable();
+      return;
+    }
     const sourceSnapshot = { r: cellDrag.r, c: cellDrag.c, personId: cellDrag.personId, dateStr: cellDrag.dateStr };
     const targetEl = findCellAtPoint(e.clientX, e.clientY);
     let selectedAfterDrop = sourceSnapshot;
@@ -1473,6 +1500,7 @@ document.addEventListener('dblclick', function(e) {
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
 
   if (!lastClickCell) return;
+  if (!requireScheduleWeekEdit()) return;
   const { personId, dateStr, r, c } = lastClickCell;
 
   // 总览表双击编辑
@@ -1512,6 +1540,7 @@ document.addEventListener('dblclick', function(e) {
 
 // ========================= 编辑 =========================
 function startEditDOM(cellEl, personId, dateStr, idx) {
+  if (!requireScheduleWeekEdit()) return;
   if (editing) commitEdit();
 
   editing = { personId, dateStr, idx, el: cellEl };
@@ -1555,6 +1584,7 @@ function startEditDOM(cellEl, personId, dateStr, idx) {
 
 function commitEdit() {
   if (!editing) return;
+  if (!requireScheduleWeekEdit()) { cancelEdit(); return; }
 
   const { personId, dateStr, idx } = editing;
   const ta = document.getElementById('editInput');
@@ -1667,6 +1697,7 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (!sel) return;
     e.preventDefault();
+    if (!requireScheduleWeekEdit()) return;
     if (activeGroupId === '__overview__') {
       // 汇总表：清除选中格中「所有小组」的全部块
       const cells = getOverviewSelectedCells();
@@ -1909,6 +1940,7 @@ function renderOverview() {
 
 // 总览表编辑入口 —— 编辑某一小组的具体块（idx）；idx<0 表示新增块
 function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
+  if (!requireScheduleWeekEdit()) return;
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
   const entries = getEntries(groupId, personId, dateStr);
   const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
@@ -1988,6 +2020,7 @@ function cleanupOvDrag() {
 // 拖动一个小组块到别处：源位置移除该块，目标位置叠加该块（空/非空都直接加，不再弹窗、无交换/加入概念）
 // 即使目标已存在同一小组的块，也作为「另一个独立块」追加，不会覆盖。
 function moveBlock(groupId, srcPid, srcDate, srcIdx, tPid, tDate) {
+  if (!requireScheduleWeekEdit()) return;
   if (srcPid === tPid && srcDate === tDate) return; // 同一格不处理
   const srcEntries = getEntries(groupId, srcPid, srcDate);
   if (srcIdx < 0 || srcIdx >= srcEntries.length) return;

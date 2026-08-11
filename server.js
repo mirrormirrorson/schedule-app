@@ -73,6 +73,34 @@ function isPermissionAdminName(name) {
   return PERMISSION_ADMIN_NAMES.has(String(name || '').trim());
 }
 
+function scheduleWeekKeyForShanghai(now = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]),
+  );
+  const localDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  const day = localDate.getUTCDay();
+  localDate.setUTCDate(localDate.getUTCDate() + (day === 0 ? -6 : 1 - day) + 7);
+  return `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
+}
+
+function futureScheduleWeeksFromChanges(changes, boundary = scheduleWeekKeyForShanghai()) {
+  const weeks = new Set();
+  for (const change of changes || []) {
+    if (!change || !Array.isArray(change.path) || change.path[0] !== 'schedules') continue;
+    const week = String(change.path[1] || '');
+    if (week) {
+      if (week > boundary) weeks.add(week);
+      continue;
+    }
+    if (change.after && change.after.exists && change.after.value && typeof change.after.value === 'object') {
+      Object.keys(change.after.value).forEach(key => { if (key > boundary) weeks.add(key); });
+    }
+  }
+  return [...weeks].sort();
+}
+
 function normalizeAccountPermissions(source, name = '') {
   const isAdmin = isPermissionAdminName(name);
   return {
@@ -942,10 +970,24 @@ app.post('/api/state/patch', async (req, res, next) => {
     }
     const changes = normalizeChanges(req.body.changes || []);
     const historyEntries = normalizeHistoryEntries(req.body.historyEntries || []);
+    const futureScheduleWeeks = futureScheduleWeeksFromChanges(changes);
+    let actor = null;
+    if (futureScheduleWeeks.length) {
+      actor = await authorizedAccount(req.body && req.body.actor);
+      if (!actor || !actor.isPermissionAdmin) {
+        return res.status(403).json({
+          ok: false,
+          error: 'future schedule permission denied',
+          deniedWeeks: futureScheduleWeeks,
+          user: actor,
+          state: await store.getState(),
+        });
+      }
+    }
     const radarFieldChange = changes.some(change => change.path[0] === 'personRadarFields');
     const radarScoreChange = changes.some(change => change.path[0] === 'personRadarScores');
     if (radarFieldChange || radarScoreChange) {
-      const actor = await authorizedAccount(req.body && req.body.actor);
+      actor = actor || await authorizedAccount(req.body && req.body.actor);
       const deniedRoots = [];
       if (!actor || (radarFieldChange && !actor.permissions.canManageRadarFields)) {
         if (radarFieldChange) deniedRoots.push('personRadarFields');
@@ -1169,6 +1211,8 @@ module.exports = {
   getPresenceSnapshot,
   presenceSessions,
   isPermissionAdminName,
+  scheduleWeekKeyForShanghai,
+  futureScheduleWeeksFromChanges,
   normalizeAccountPermissions,
   FileStore,
   PostgresStore,

@@ -14,6 +14,7 @@ function switchGroup(id) {
 
 function clearGroup() {
   if (!activeGroupId || activeGroupId === '__overview__') return;
+  if (!requireScheduleWeekEdit()) return;
   if (!confirm('确定清空当前小组本周所有排班？')) return;
   const ws = wsKey();
   const changes = [];
@@ -46,7 +47,7 @@ function renderAll() {
 function renderGroupTabs() {
   const ws = wsKey();
   const sched = data.schedules[ws] || {};
-  const scheduleWeek = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const scheduleWeek = scheduleWeekKey();
   const isReadonly = ws < scheduleWeek; // 只有排班周及之后才可编辑小组
 
   let html = '';
@@ -256,13 +257,13 @@ function updateWeekUI() {
   const end = new Date(currentWeek); end.setDate(end.getDate()+6);
   document.getElementById('weekLabel').textContent = `${fmtDate(currentWeek)} ~ ${fmtDate(end)}`;
   // 下一周期显示「排班周」标签
-  const nextMonday = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const nextMonday = scheduleWeekKey();
   document.getElementById('weekBadge').style.display = (wsKey() === nextMonday) ? 'inline' : 'none';
 }
 
 function goToScheduleWeek() {
   if (editing) commitEdit();
-  const scheduleWeek = getMonday(new Date(Date.now() + 7*86400000));
+  const scheduleWeek = new Date(scheduleWeekKey() + 'T00:00:00');
   if (fmtFull(currentWeek) === fmtFull(scheduleWeek)) {
     toast('已在排班周');
     return;

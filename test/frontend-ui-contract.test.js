@@ -203,3 +203,20 @@ test('permission panel is visible only to protected admins and manages account c
   assert.match(server, /app\.patch\('\/api\/admin\/users\/:id\/permissions'/);
   assert.match(server, /app\.delete\('\/api\/admin\/users\/:id'/);
 });
+
+test('future scheduling cycles are editable only by protected admins', () => {
+  const schedule = read('public/js/schedule-core.js');
+  const sync = read('public/js/state-sync.js');
+  const server = read('server.js');
+  assert.match(schedule, /function scheduleWeekKey\(\)/);
+  assert.match(schedule, /function canEditScheduleWeek\(weekKey = wsKey\(\)\)/);
+  assert.match(schedule, /typeof isPermissionAdmin === 'function' && isPermissionAdmin\(\)/);
+  assert.match(schedule, /toast\('还未进入排班时间'\)/);
+  assert.match(schedule, /document\.addEventListener\('dblclick',[\s\S]*?requireScheduleWeekEdit\(\)/);
+  assert.match(schedule, /async function pasteToSelection\(\) \{\s*if \(!requireScheduleWeekEdit\(\)\) return;/);
+  assert.match(schedule, /function ovEntryEdit\([\s\S]*?if \(!requireScheduleWeekEdit\(\)\) return;/);
+  assert.match(sync, /payload\.error === 'future schedule permission denied'/);
+  assert.match(server, /function scheduleWeekKeyForShanghai\(now = new Date\(\)\)/);
+  assert.match(server, /futureScheduleWeeksFromChanges\(changes\)/);
+  assert.match(server, /error: 'future schedule permission denied'/);
+});

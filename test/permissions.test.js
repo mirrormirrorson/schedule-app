@@ -8,9 +8,20 @@ const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'schedule-permissions-'));
 process.env.DB_PATH = path.join(testDir, 'db.json');
 delete process.env.DATABASE_URL;
 
-const { app, store } = require('../server');
+const { app, store, scheduleWeekKeyForShanghai, futureScheduleWeeksFromChanges } = require('../server');
 
 test.after(() => fs.rmSync(testDir, { recursive: true, force: true }));
+
+test('schedule week boundary follows Shanghai time and flags only later cycles', () => {
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-11T04:00:00Z')), '2026-08-17');
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-16T04:00:00Z')), '2026-08-17');
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-17T04:00:00Z')), '2026-08-24');
+  const changes = [
+    { path: ['schedules', '2026-08-17', 'g1', 'p1_2026-08-17'], after: { exists: true, value: [{ note: '排班周' }] } },
+    { path: ['schedules', '2026-08-24', 'g1', 'p1_2026-08-24'], after: { exists: true, value: [{ note: '未来周' }] } },
+  ];
+  assert.deepEqual(futureScheduleWeeksFromChanges(changes, '2026-08-17'), ['2026-08-24']);
+});
 
 async function jsonRequest(url, options) {
   const response = await fetch(url, options);
@@ -139,4 +150,55 @@ test('server rejects radar patches without the matching account capability', asy
   });
   assert.equal(allowedField.response.status, 200);
   assert.equal(allowedField.payload.state.personRadarFields.at(-1).name, '权限测试');
+});
+
+test('only protected admins can write schedules after the scheduling week', async t => {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const identify = async name => (await jsonRequest(`${base}/api/user/identify`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  })).payload.user;
+  const admin = await identify('林俊凯');
+  const regular = await identify('排班测试用户');
+  const boundary = scheduleWeekKeyForShanghai();
+  const future = new Date(boundary + 'T00:00:00Z');
+  future.setUTCDate(future.getUTCDate() + 7);
+  const futureWeek = future.toISOString().slice(0, 10);
+  const changeFor = (week, note) => [{
+    path: ['schedules', week, 'g_future_permission', `p_future_${week}`],
+    before: { exists: false },
+    after: { exists: true, value: [{ note }] },
+  }];
+
+  const before = await fetch(`${base}/api/state`).then(response => response.json());
+  const allowedBoundary = await jsonRequest(`${base}/api/state/patch`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mutationId: 'm_regular_schedule_boundary', changes: changeFor(boundary, '普通用户排班周'), actor: regular,
+    }),
+  });
+  assert.equal(allowedBoundary.response.status, 200);
+  assert.equal(allowedBoundary.payload.state._revision, before._revision + 1);
+
+  const deniedFuture = await jsonRequest(`${base}/api/state/patch`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mutationId: 'm_regular_schedule_future', changes: changeFor(futureWeek, '普通用户未来周'), actor: regular,
+    }),
+  });
+  assert.equal(deniedFuture.response.status, 403);
+  assert.equal(deniedFuture.payload.error, 'future schedule permission denied');
+  assert.deepEqual(deniedFuture.payload.deniedWeeks, [futureWeek]);
+  assert.equal(deniedFuture.payload.state._revision, allowedBoundary.payload.state._revision);
+
+  const allowedAdmin = await jsonRequest(`${base}/api/state/patch`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mutationId: 'm_admin_schedule_future', changes: changeFor(futureWeek, '管理员未来周'), actor: admin,
+    }),
+  });
+  assert.equal(allowedAdmin.response.status, 200);
+  assert.equal(allowedAdmin.payload.state.schedules[futureWeek].g_future_permission[`p_future_${futureWeek}`][0].note, '管理员未来周');
 });

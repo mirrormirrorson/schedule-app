@@ -490,6 +490,41 @@ async function drainSyncQueue() {
         await handleSyncConflict(payload, sentHistory);
         continue;
       }
+      if (res.status === 403 && payload.error === 'future schedule permission denied') {
+        inFlightHistoryEntries = [];
+        const deniedWeeks = new Set(Array.isArray(payload.deniedWeeks) ? payload.deniedWeeks.map(String) : []);
+        pendingHistoryEntries = sentHistory
+          .filter(entry => !deniedWeeks.has(String(entry && entry.week || '')))
+          .concat(pendingHistoryEntries);
+        const serverState = editableSnapshot(payload.state || lastServerData || {});
+        lastServerData = cloneValue(serverState);
+        serverRevision = Number((payload.state && payload.state._revision) || serverRevision);
+        serverUpdated = Number((payload.state && payload.state._updated) || serverUpdated || Date.now());
+        if (!data.schedules || typeof data.schedules !== 'object') data.schedules = {};
+        deniedWeeks.forEach(week => {
+          if (serverState.schedules && Object.prototype.hasOwnProperty.call(serverState.schedules, week)) {
+            data.schedules[week] = cloneValue(serverState.schedules[week]);
+          } else {
+            delete data.schedules[week];
+          }
+        });
+        if (typeof currentUser !== 'undefined' && currentUser && payload.user) {
+          currentUser = payload.user;
+          if (typeof renderGreeting === 'function') renderGreeting();
+        }
+        saveLocal();
+        if (!editing) renderAll();
+        toast('还未进入排班时间');
+        syncRequested = pendingHistoryEntries.length > 0
+          || (lastServerData && buildPatches(lastServerData, data).length > 0);
+        if (!syncRequested) {
+          clearPersistentOutbox();
+          setSaveStatus('saved', '未到时间的修改已撤回');
+        } else {
+          writePersistentOutbox();
+        }
+        continue;
+      }
       if (res.status === 403 && payload.error === 'radar permission denied') {
         inFlightHistoryEntries = [];
         pendingHistoryEntries = sentHistory.concat(pendingHistoryEntries);
