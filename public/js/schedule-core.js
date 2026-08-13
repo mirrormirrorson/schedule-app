@@ -43,7 +43,7 @@ function allPeople() {
 // 当前周的人员列表 —— 每周独立
 // 锁规则：有排班数据 或 被增删改过 → 锁定，不再从模板同步
 // 如果人员列表与模板完全一致且无排班数据 → 不锁定，每次切过来重新从模板拿最新
-function weekPeople() {
+function rawWeekPeople() {
   const ws = wsKey();
   if (!data.weekPeople) data.weekPeople = {};
   if (!data.weekPeopleLocked) data.weekPeopleLocked = {};
@@ -64,6 +64,23 @@ function weekPeople() {
   // 首次访问
   data.weekPeople[ws] = buildPeopleFromTemplate();
   return data.weekPeople[ws];
+}
+
+// 排班表始终先展示全部内部人员，再展示外协人员；同一分类内保留原有顺序。
+// 返回展示副本，不重排数据库中的周人员数组，避免仅浏览页面就产生数据写入。
+function orderWeekPeopleForDisplay(list) {
+  return (list || [])
+    .map((person, index) => ({ person, index }))
+    .sort((left, right) => {
+      const leftRank = left.person && left.person._cat === 'external' ? 1 : 0;
+      const rightRank = right.person && right.person._cat === 'external' ? 1 : 0;
+      return leftRank - rightRank || left.index - right.index;
+    })
+    .map(item => item.person);
+}
+
+function weekPeople() {
+  return orderWeekPeopleForDisplay(rawWeekPeople());
 }
 
 function buildPeopleFromTemplate() {
@@ -137,7 +154,7 @@ function findPersonInAll(id) {
 
 function findPersonList(id) {
   // 先在当前周找
-  const wp = weekPeople();
+  const wp = rawWeekPeople();
   const wpFound = wp.find(p => p.id === id);
   if (wpFound) return { list: wp, cat: wpFound._cat, weekPeople: true };
 

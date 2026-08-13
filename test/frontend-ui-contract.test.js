@@ -220,3 +220,31 @@ test('future scheduling cycles are editable only by protected admins', () => {
   assert.match(server, /futureScheduleWeeksFromChanges\(changes\)/);
   assert.match(server, /error: 'future schedule permission denied'/);
 });
+
+test('temporary internal people stay in the existing internal section', () => {
+  const schedule = read('public/js/schedule-core.js');
+  const management = read('public/js/management.js');
+  assert.match(schedule, /function rawWeekPeople\(\)/);
+  assert.match(schedule, /function orderWeekPeopleForDisplay\(list\)/);
+  assert.match(schedule, /leftRank - rightRank \|\| left\.index - right\.index/);
+  assert.match(schedule, /return orderWeekPeopleForDisplay\(rawWeekPeople\(\)\)/);
+  assert.match(management, /rawWeekPeople\(\)\.push\(newPerson\)/);
+  assert.match(management, /const wp = rawWeekPeople\(\)/);
+});
+
+test('right-clicking a schedule cell opens its complete cell history', () => {
+  const html = read('public/index.html');
+  const history = read('public/js/identity-history.js');
+  const css = read('public/css/enhancements.css');
+  assert.match(html, /右键查看该格历史/);
+  assert.match(html, /id="historyCellFilter"/);
+  assert.match(history, /document\.addEventListener\('contextmenu'/);
+  assert.match(history, /function openCellHistoryDrawer\(context\)/);
+  assert.match(history, /function historyEntryTouchesCell\(entry, context\)/);
+  assert.match(history, /function historyEntriesForCell\(entries, context\)/);
+  assert.match(history, /moveSourceLocation\(candidate, location\)/);
+  assert.match(history, /entry\.fromPersonId === context\.personId/);
+  assert.match(history, /entry\.toPersonId === context\.personId/);
+  assert.match(history, /该单元格暂无修改记录/);
+  assert.match(css, /\.hd-cell-filter\s*\{/);
+});

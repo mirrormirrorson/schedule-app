@@ -222,6 +222,31 @@
 }
 
 /* Structured history: date sections, context, content, and location */
+.hd-cell-filter {
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  color: var(--text);
+  font-size: 12px;
+}
+.hd-cell-filter strong { color: var(--primary); }
+.hd-cell-filter span { flex: 1; min-width: 0; line-height: 1.5; }
+.hd-cell-filter button {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: var(--card);
+  color: var(--text2);
+  cursor: pointer;
+  font-family: inherit;
+}
+.hd-cell-filter button:hover { color: var(--primary); border-color: var(--primary); }
 .hd-item-person {
   border-left: 4px solid color-mix(in srgb, var(--primary) 62%, #a855f7);
 }

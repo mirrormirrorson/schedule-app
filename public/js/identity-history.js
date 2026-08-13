@@ -67,6 +67,11 @@ function logChanges(changes, opId, opMeta) {
       action: 'move',
       content: opMeta.content || '',
       fromLabel, toLabel,
+      groupId: opMeta.groupId || '',
+      fromPersonId: opMeta.fromPerson || '',
+      fromDate: opMeta.fromDate || '',
+      toPersonId: opMeta.toPerson || '',
+      toDate: opMeta.toDate || '',
       opId
     }];
   } else {
@@ -83,7 +88,9 @@ function logChanges(changes, opId, opMeta) {
         ts: new Date().toISOString(),
         week,
         group: resolveGroupName(gid),
+        groupId: gid,
         person: resolvePersonName(ch.personId),
+        personId: ch.personId,
         date: dateStr,
         weekday: weekdayName(dateStr),
         action,
@@ -207,6 +214,7 @@ async function initIdentity() {
 const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
 const PERSON_ACTIONS = new Set(['addPerson', 'renamePerson', 'removePerson', 'removeFromWeek']);
 let historyOpenContext = null;
+let historyCellContext = null;
 
 function isPersonHistory(entry) {
   return PERSON_ACTIONS.has(entry && entry.action);
@@ -241,11 +249,33 @@ function personCategoryLabel(entry) {
   return '';
 }
 
-function openHistoryDrawer() {
-  const currentGroup = activeGroupId && activeGroupId !== '__overview__'
-    ? resolveGroupName(activeGroupId)
-    : '';
-  historyOpenContext = { week: wsKey(), group: currentGroup };
+function updateHistoryCellFilterUI() {
+  const banner = document.getElementById('historyCellFilter');
+  const groupFilter = document.getElementById('historyGroupFilter');
+  const weekFilter = document.getElementById('historyWeekFilter');
+  if (!banner || !groupFilter || !weekFilter) return;
+  const active = Boolean(historyCellContext);
+  groupFilter.disabled = active;
+  weekFilter.disabled = active;
+  if (!active) {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    return;
+  }
+  const context = historyCellContext;
+  const area = context.overview ? '总览（全部小组）' : context.group;
+  banner.style.display = 'flex';
+  banner.innerHTML = `<span><strong>当前单元格内容</strong> · ${esc(context.person)} · ${esc(context.date)} ${esc(context.weekday)} · ${esc(area)}</span>
+    <button type="button" onclick="clearCellHistoryFilter()">退出单元格筛选</button>`;
+}
+
+function clearCellHistoryFilter() {
+  historyCellContext = null;
+  updateHistoryCellFilterUI();
+  renderHistoryList();
+}
+
+function showHistoryDrawer() {
   buildHistoryGroupFilter();
   document.getElementById('historyOverlay').classList.add('open');
   document.getElementById('historyDrawer').classList.add('open');
@@ -254,6 +284,30 @@ function openHistoryDrawer() {
   historyRefreshTimer = setInterval(() => {
     if (!document.hidden && document.getElementById('historyDrawer').classList.contains('open')) loadAllHistory();
   }, 60000);
+}
+
+function openHistoryDrawer() {
+  const currentGroup = activeGroupId && activeGroupId !== '__overview__'
+    ? resolveGroupName(activeGroupId)
+    : '';
+  historyCellContext = null;
+  updateHistoryCellFilterUI();
+  historyOpenContext = { week: wsKey(), group: currentGroup };
+  showHistoryDrawer();
+}
+
+function openCellHistoryDrawer(context) {
+  historyCellContext = context;
+  historyOpenContext = { week: context.week, group: context.group || '' };
+  const search = document.getElementById('historySearch');
+  const groupFilter = document.getElementById('historyGroupFilter');
+  const weekFilter = document.getElementById('historyWeekFilter');
+  if (search) search.value = '';
+  // 单元格自身已经包含精确周/组/人员/日期，先清掉旧的手动筛选，避免叠加后误判为无记录。
+  if (groupFilter) groupFilter.value = '';
+  if (weekFilter) weekFilter.value = '';
+  updateHistoryCellFilterUI();
+  showHistoryDrawer();
 }
 
 function closeHistoryDrawer() {
@@ -297,6 +351,20 @@ function buildHistoryGroupFilter() {
   if ([...sel.options].some(option => option.value === selected)) sel.value = selected;
 }
 
+function applyHistoryOpenContext() {
+  if (!historyOpenContext) return;
+  const groupFilter = document.getElementById('historyGroupFilter');
+  const weekFilter = document.getElementById('historyWeekFilter');
+  groupFilter.value = [...groupFilter.options].some(option => option.value === historyOpenContext.group)
+    ? historyOpenContext.group
+    : '';
+  weekFilter.value = [...weekFilter.options].some(option => option.value === historyOpenContext.week)
+    ? historyOpenContext.week
+    : '';
+  historyOpenContext = null;
+  updateHistoryCellFilterUI();
+}
+
 async function loadAllHistory(applyOpenContext = false) {
   const list = document.getElementById('historyList');
   const summary = document.getElementById('historySummary');
@@ -312,15 +380,7 @@ async function loadAllHistory(applyOpenContext = false) {
       buildHistoryGroupFilter();
       buildWeekFilter();
       if (applyOpenContext && historyOpenContext) {
-        const groupFilter = document.getElementById('historyGroupFilter');
-        const weekFilter = document.getElementById('historyWeekFilter');
-        groupFilter.value = [...groupFilter.options].some(option => option.value === historyOpenContext.group)
-          ? historyOpenContext.group
-          : '';
-        weekFilter.value = [...weekFilter.options].some(option => option.value === historyOpenContext.week)
-          ? historyOpenContext.week
-          : '';
-        historyOpenContext = null;
+        applyHistoryOpenContext();
       }
       renderHistoryList();
       list.scrollTop = prevScroll;
@@ -333,15 +393,7 @@ async function loadAllHistory(applyOpenContext = false) {
     buildHistoryGroupFilter();
     buildWeekFilter();
     if (applyOpenContext && historyOpenContext) {
-      const groupFilter = document.getElementById('historyGroupFilter');
-      const weekFilter = document.getElementById('historyWeekFilter');
-      groupFilter.value = [...groupFilter.options].some(option => option.value === historyOpenContext.group)
-        ? historyOpenContext.group
-        : '';
-      weekFilter.value = [...weekFilter.options].some(option => option.value === historyOpenContext.week)
-        ? historyOpenContext.week
-        : '';
-      historyOpenContext = null;
+      applyHistoryOpenContext();
     }
     renderHistoryList();
     list.scrollTop = prevScroll;
@@ -371,6 +423,153 @@ function buildWeekFilter() {
   if ([...sel.options].some(option => option.value === selected)) sel.value = selected;
 }
 
+function historyEntryTouchesCell(entry, context) {
+  if (!entry || !context || isPersonHistory(entry)) return false;
+  if ((entry.week || '') !== context.week) return false;
+  if (!context.overview) {
+    const sameGroup = entry.groupId && context.groupId
+      ? entry.groupId === context.groupId
+      : historyAreaKey(entry) === context.group;
+    if (!sameGroup) return false;
+  }
+  if (entry.action === 'move') {
+    const exactSource = entry.fromPersonId === context.personId && entry.fromDate === context.date;
+    const exactTarget = entry.toPersonId === context.personId && entry.toDate === context.date;
+    if (exactSource || exactTarget) return true;
+    const legacyLabel = `${context.person}·${context.weekday}`;
+    return entry.fromLabel === legacyLabel || entry.toLabel === legacyLabel;
+  }
+  const samePerson = entry.personId ? entry.personId === context.personId : entry.person === context.person;
+  return samePerson && (entry.date || '') === context.date;
+}
+
+function normalizeHistoryText(value) {
+  return String(value || '').replace(/\r\n?/g, '\n').trim();
+}
+
+function historyEntryMatchesGroup(entry, location) {
+  if (entry.groupId && location.groupId) return entry.groupId === location.groupId;
+  return historyAreaKey(entry) === location.group;
+}
+
+function historyEntryMatchesLocation(entry, location) {
+  if (!historyEntryMatchesGroup(entry, location)) return false;
+  const samePerson = entry.personId && location.personId
+    ? entry.personId === location.personId
+    : entry.person === location.person;
+  return samePerson && (entry.date || '') === location.date;
+}
+
+function moveLabelLocation(label, week) {
+  const text = String(label || '');
+  const splitAt = text.lastIndexOf('·');
+  if (splitAt < 0) return null;
+  const person = text.slice(0, splitAt);
+  const weekday = text.slice(splitAt + 1);
+  const dayIndex = ['周一','周二','周三','周四','周五','周六','周日'].indexOf(weekday);
+  if (dayIndex < 0) return null;
+  const date = new Date(week + 'T00:00:00');
+  if (Number.isNaN(date.getTime())) return null;
+  date.setDate(date.getDate() + dayIndex);
+  return { person, weekday, date: fmtFull(date) };
+}
+
+function moveTargetsLocation(entry, location) {
+  if (!historyEntryMatchesGroup(entry, location)) return false;
+  if (entry.toPersonId && entry.toDate && location.personId) {
+    return entry.toPersonId === location.personId && entry.toDate === location.date;
+  }
+  return entry.toLabel === `${location.person}·${location.weekday}`;
+}
+
+function moveSourceLocation(entry, currentLocation) {
+  const legacy = moveLabelLocation(entry.fromLabel, entry.week);
+  return {
+    groupId: entry.groupId || currentLocation.groupId,
+    group: entry.group || currentLocation.group,
+    personId: entry.fromPersonId || '',
+    person: legacy ? legacy.person : '',
+    date: entry.fromDate || (legacy ? legacy.date : ''),
+    weekday: legacy ? legacy.weekday : weekdayName(entry.fromDate || ''),
+  };
+}
+
+function historyEntriesForCell(entries, context) {
+  const source = Array.isArray(entries) ? entries : [];
+  const blocks = Array.isArray(context && context.blocks) ? context.blocks : [];
+  if (!blocks.length) return source.filter(entry => historyEntryTouchesCell(entry, context));
+  const matched = new Set();
+  blocks.forEach(block => {
+    let note = normalizeHistoryText(block.note);
+    let location = {
+      groupId: block.groupId || context.groupId || '',
+      group: block.group || context.group || '',
+      personId: context.personId,
+      person: context.person,
+      date: context.date,
+      weekday: context.weekday,
+    };
+    let before = Number.POSITIVE_INFINITY;
+    for (let depth = 0; depth < 200 && note; depth += 1) {
+      const candidate = source
+        .filter(entry => (entry.week || '') === context.week)
+        .filter(entry => {
+          const time = Date.parse(entry.ts || '');
+          if (!Number.isNaN(time) && time >= before) return false;
+          if (entry.action === 'move') {
+            return moveTargetsLocation(entry, location)
+              && normalizeHistoryText(entry.content) === note;
+          }
+          if (!historyEntryMatchesLocation(entry, location)) return false;
+          const newValue = entry.detail && entry.detail.new !== undefined
+            ? normalizeHistoryText(entry.detail.new)
+            : normalizeHistoryText(entry.content);
+          return newValue === note;
+        })
+        .sort((left, right) => Date.parse(right.ts || '') - Date.parse(left.ts || ''))[0];
+      if (!candidate) break;
+      matched.add(candidate.id || candidate);
+      const time = Date.parse(candidate.ts || '');
+      before = Number.isNaN(time) ? before - 1 : time;
+      if (candidate.action === 'move') {
+        location = moveSourceLocation(candidate, location);
+      } else if (candidate.action === 'modify') {
+        note = normalizeHistoryText(candidate.detail && candidate.detail.old);
+      } else if (candidate.action === 'add') {
+        break;
+      } else {
+        break;
+      }
+    }
+  });
+  return source.filter(entry => matched.has(entry.id || entry));
+}
+
+document.addEventListener('contextmenu', event => {
+  if (event.target.closest('textarea, input, select')) return;
+  const cell = event.target.closest('#editTable .cell, #overviewTable .ov-cell');
+  if (!cell) return;
+  const person = weekPeople().find(item => item.id === cell.dataset.pid);
+  const date = cell.dataset.date || '';
+  if (!person || !date) return;
+  event.preventDefault();
+  const overview = Boolean(cell.closest('#overviewTable'));
+  const blocks = overview
+    ? getScheduleInfo(person.id, date).map(block => ({ groupId: block.groupId, group: block.groupName, note: block.note }))
+    : getEntries(activeGroupId, person.id, date).map(entry => ({ groupId: activeGroupId, group: resolveGroupName(activeGroupId), note: entry.note }));
+  openCellHistoryDrawer({
+    week: wsKey(),
+    groupId: overview ? '' : activeGroupId,
+    group: overview ? '' : resolveGroupName(activeGroupId),
+    overview,
+    personId: person.id,
+    person: person.name,
+    date,
+    weekday: weekdayName(date),
+    blocks,
+  });
+});
+
 function renderHistoryList() {
   const list = document.getElementById('historyList');
   const summary = document.getElementById('historySummary');
@@ -379,6 +578,7 @@ function renderHistoryList() {
   const wk = document.getElementById('historyWeekFilter').value;
   const q = document.getElementById('historySearch').value.trim().toLowerCase();
   let h = allHistory || [];
+  if (historyCellContext) h = historyEntriesForCell(h, historyCellContext);
   if (g) h = h.filter(x => historyAreaKey(x) === g);
   if (wk) h = h.filter(x => (x.week || '') === wk);
   if (q) h = h.filter(x => (
@@ -395,10 +595,14 @@ function renderHistoryList() {
     const weekLabel = wk && weekSelect.selectedIndex >= 0
       ? weekSelect.options[weekSelect.selectedIndex].textContent
       : '全部周';
-    summary.textContent = `${weekLabel} · ${groupLabel} · 显示 ${h.length} 条（全部 ${allHistory.length} 条）`;
+    summary.textContent = historyCellContext
+      ? `该单元格内容自新增起共 ${h.length} 条修改记录（全部 ${allHistory.length} 条）`
+      : `${weekLabel} · ${groupLabel} · 显示 ${h.length} 条（全部 ${allHistory.length} 条）`;
   }
   if (!h.length) {
-    list.innerHTML = '<div class="hd-empty">没有符合筛选条件的修改记录</div>';
+    list.innerHTML = historyCellContext
+      ? '<div class="hd-empty">该单元格暂无修改记录</div>'
+      : '<div class="hd-empty">没有符合筛选条件的修改记录</div>';
     return;
   }
 

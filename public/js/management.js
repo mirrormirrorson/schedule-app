@@ -483,7 +483,7 @@ function quickAddPerson(cat) {
     if (weekPeople().find(p => p.name === val.trim())) { alert('本周已存在'); return; }
     const prefix = cat === 'internal' ? 'p' : 'e';
     const newPerson = { id: prefix + Date.now(), name: val.trim(), _cat: cat };
-    weekPeople().push(newPerson);
+    rawWeekPeople().push(newPerson);
     lockWeekPeople();
     logPersonAction('addPerson', val.trim(), 'week', { category: cat });
     saveData();
@@ -491,7 +491,7 @@ function quickAddPerson(cat) {
   });
 }
 function removePersonFromWeek(personId) {
-  const wp = weekPeople();
+  const wp = rawWeekPeople();
   const idx = wp.findIndex(p => p.id === personId);
   if (idx < 0) return;
   const person = wp[idx];

@@ -61,7 +61,7 @@
 
   <div id="editPanel">
     <div class="hint-bar">
-      <span>点击选中 · 双击编辑 · 摁住单元格拖拽 · 摁住右下角选区填充 · Ctrl+点击多选</span>
+      <span>点击选中 · 双击编辑 · 右键查看该格历史 · 摁住单元格拖拽 · 摁住右下角选区填充 · Ctrl+点击多选</span>
       <span style="margin:0 12px;color:var(--border);">|</span>
       <kbd>Ctrl+C</kbd> 复制
       <span style="margin:0 6px;"></span>
@@ -246,6 +246,7 @@
     <select id="historyWeekFilter" onchange="renderHistoryList()"><option value="">全部周</option></select>
     <input id="historySearch" placeholder="搜索姓名/内容" oninput="renderHistoryList()">
   </div>
+  <div id="historyCellFilter" class="hd-cell-filter" style="display:none"></div>
   <div id="historySummary" class="hd-summary">正在读取记录…</div>
   <div id="historyList" class="hd-list"></div>
 </aside>
