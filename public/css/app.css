@@ -221,6 +221,17 @@ body {
 }
 .schedule-table thead th small { font-size: 13px; font-weight: 600; }
 .schedule-table thead th:first-child { width: 150px; text-align: left; padding-left: 16px; z-index: 4; }
+.schedule-table thead th.calendar-day-work { background: #edf6ff; }
+.schedule-table thead th.calendar-day-rest { background: #fff0f3; }
+.schedule-table thead th.calendar-day-adjusted { background: #fff5d9; }
+.calendar-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; margin-left: 4px; padding: 0 4px;
+  border-radius: 6px; color: #fff; background: #4f8ecf;
+  font-size: 10px; font-weight: 800; line-height: 1;
+}
+.calendar-day-rest .calendar-mark, .calendar-mark.rest { background: #e46b86; }
+.calendar-day-adjusted .calendar-mark { background: #d38a22; }
 .schedule-table tbody td {
   border: 1px solid var(--cell-border); padding: 1px; text-align: center;
   vertical-align: top; overflow: visible; height: 1px;
@@ -418,6 +429,36 @@ body {
 
 /* 汇总表独立小组块：只显示内容文字，按小组配色区分 */
 .ov-cell { height: 100%; padding: 3px; display: flex; flex-direction: column; gap: 3px; box-sizing: border-box; }
+.timeoff-chip {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  min-height: 26px; padding: 4px 7px; border-radius: 7px;
+  color: #9b3651; background: #ffe5ec; border: 1px solid #f4afc0;
+  font-size: 12px; font-weight: 800; line-height: 1.35; word-break: break-word;
+}
+.timeoff-chip.compact { min-height: 22px; font-size: 11px; }
+.timeoff-conflict-cell { box-shadow: inset 0 0 0 2px #f59e0b; }
+.timeoff-conflict-cell .timeoff-chip::after { content: ' · 有排班冲突'; color: #b45309; font-size: 10px; }
+.timeoff-action {
+  position: absolute; top: 3px; right: 3px; z-index: 9;
+  width: 24px; height: 22px; padding: 0; border: 1px solid #efafbf; border-radius: 7px;
+  color: #9b3651; background: #fff; font: 800 11px/1 var(--font); cursor: pointer;
+  opacity: 0; transform: translateY(-2px); transition: opacity .12s, transform .12s;
+}
+.ov-cell:hover .timeoff-action, .timeoff-action.active { opacity: 1; transform: translateY(0); }
+.timeoff-action.active { color: #fff; background: #e46b86; border-color: #e46b86; }
+
+.timeoff-modal { max-width: 520px; }
+.timeoff-modal-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.timeoff-modal-head h3 { margin: 0 0 5px; }
+.timeoff-modal-head p { margin: 0; color: var(--text2); font-size: 13px; }
+.timeoff-calendar-summary { display: flex; align-items: center; gap: 8px; margin: 20px 0 14px; padding: 10px 12px; border-radius: 9px; background: var(--section-bg); }
+.timeoff-calendar-summary small { margin-left: auto; color: var(--text2); }
+.timeoff-note-label { display: block; margin-bottom: 7px; color: var(--text2); font-size: 12px; font-weight: 700; }
+.timeoff-note { box-sizing: border-box; width: 100%; min-height: 78px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 9px; background: var(--card); color: var(--text); font: 13px/1.5 var(--font); resize: vertical; outline: none; }
+.timeoff-note:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.timeoff-conflict { margin-top: 12px; padding: 9px 11px; border-radius: 8px; color: #92400e; background: #fff7d6; border: 1px solid #f5d373; font-size: 12px; line-height: 1.5; }
+.timeoff-modal-actions { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; margin-top: 18px; }
+.timeoff-remove { color: #b42346; }
 /* 单块时占满单元格，多块时上下均分；min-height:auto 保证内容不被截断 */
 .ov-block {
   flex: 1 1 0;
@@ -559,6 +600,8 @@ body {
 .hd-tag.removePerson{background:rgba(239,68,68,.16);color:#dc2626;}
 .hd-tag.removeFromWeek{background:rgba(239,68,68,.14);color:#dc2626;}
 .hd-tag.move{background:rgba(139,92,246,.16);color:#7c3aed;}
+.hd-tag.leaveSet{background:rgba(236,72,153,.16);color:#be185d;}
+.hd-tag.leaveClear{background:rgba(100,116,139,.16);color:#475569;}
 .hd-empty{color:var(--text2);font-size:13px;text-align:center;padding:30px 0;}
 /* ===== 身份弹窗 (3.0) ===== */
 #identityModal .id-card{background:var(--card);border-radius:16px;padding:24px 26px;width:380px;max-width:92vw;box-shadow:0 16px 50px rgba(0,0,0,.22);border:1.5px solid var(--border);}

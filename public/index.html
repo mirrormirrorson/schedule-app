@@ -223,7 +223,31 @@
   </div>
 </div>
 
+<!-- 总览表全局休假设置 -->
+<div class="modal-overlay" id="timeOffModal" style="display:none" onclick="if(event.target===this)closeTimeOffModal()">
+  <div class="modal timeoff-modal" role="dialog" aria-modal="true" aria-labelledby="timeOffModalTitle">
+    <div class="timeoff-modal-head">
+      <div>
+        <h3 id="timeOffModalTitle">设置全局休假</h3>
+        <p id="timeOffModalMeta"></p>
+      </div>
+      <button class="btn" onclick="closeTimeOffModal()" aria-label="关闭休假设置">✕</button>
+    </div>
+    <div class="timeoff-calendar-summary" id="timeOffCalendarSummary"></div>
+    <label class="timeoff-note-label" for="timeOffNote">备注（可不填）</label>
+    <textarea id="timeOffNote" class="timeoff-note" maxlength="100" placeholder="例如：年假、调休、外出"></textarea>
+    <div class="timeoff-conflict" id="timeOffConflict" style="display:none"></div>
+    <div class="timeoff-modal-actions">
+      <button class="btn timeoff-remove" id="timeOffRemoveBtn" onclick="removeTimeOff()" style="display:none">取消这天休假</button>
+      <span></span>
+      <button class="btn" onclick="closeTimeOffModal()">返回</button>
+      <button class="btn btn-p" onclick="saveTimeOff()">保存休假</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/state-sync.js" defer></script>
+<script src="/js/work-calendar.js" defer></script>
 <script src="/js/grid-clipboard.js" defer></script>
 <script src="/js/schedule-core.js" defer></script>
 <script src="/js/management.js" defer></script>

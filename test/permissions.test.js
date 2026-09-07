@@ -202,3 +202,36 @@ test('only protected admins can write schedules after the scheduling week', asyn
   assert.equal(allowedAdmin.response.status, 200);
   assert.equal(allowedAdmin.payload.state.schedules[futureWeek].g_future_permission[`p_future_${futureWeek}`][0].note, '管理员未来周');
 });
+
+test('only protected admins can write global time off', async t => {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const identify = async name => (await jsonRequest(`${base}/api/user/identify`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  })).payload.user;
+  const admin = await identify('简慧仪');
+  const regular = await identify('休假测试用户');
+  const week = scheduleWeekKeyForShanghai();
+  const cellKey = `person_time_off_${week}`;
+  const change = [{
+    path: ['timeOff', week, cellKey],
+    before: { exists: false },
+    after: { exists: true, value: { note: '年假' } },
+  }];
+
+  const denied = await jsonRequest(`${base}/api/state/patch`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mutationId: 'm_denied_time_off', changes: change, actor: regular }),
+  });
+  assert.equal(denied.response.status, 403);
+  assert.equal(denied.payload.error, 'time off permission denied');
+
+  const allowed = await jsonRequest(`${base}/api/state/patch`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mutationId: 'm_allowed_time_off', changes: change, actor: admin }),
+  });
+  assert.equal(allowed.response.status, 200);
+  assert.equal(allowed.payload.state.timeOff[week][cellKey].note, '年假');
+});

@@ -11,6 +11,7 @@ test('all browser scripts parse as JavaScript', () => {
     .filter(source => source.startsWith('/js/'));
   assert.deepEqual(scriptPaths, [
     '/js/state-sync.js',
+    '/js/work-calendar.js',
     '/js/grid-clipboard.js',
     '/js/schedule-core.js',
     '/js/management.js',
