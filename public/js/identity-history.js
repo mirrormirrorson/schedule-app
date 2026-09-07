@@ -211,7 +211,7 @@ async function initIdentity() {
 }
 
 // ---- 修改记录抽屉 ----
-const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', leaveSet: '设置休假', leaveClear: '取消休假', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
+const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
 const PERSON_ACTIONS = new Set(['addPerson', 'renamePerson', 'removePerson', 'removeFromWeek']);
 let historyOpenContext = null;
 let historyCellContext = null;
@@ -426,10 +426,6 @@ function buildWeekFilter() {
 function historyEntryTouchesCell(entry, context) {
   if (!entry || !context || isPersonHistory(entry)) return false;
   if ((entry.week || '') !== context.week) return false;
-  if (entry.action === 'leaveSet' || entry.action === 'leaveClear') {
-    const samePerson = entry.personId ? entry.personId === context.personId : entry.person === context.person;
-    return samePerson && (entry.date || '') === context.date;
-  }
   if (!context.overview) {
     const sameGroup = entry.groupId && context.groupId
       ? entry.groupId === context.groupId
@@ -503,9 +499,6 @@ function historyEntriesForCell(entries, context) {
   const blocks = Array.isArray(context && context.blocks) ? context.blocks : [];
   if (!blocks.length) return source.filter(entry => historyEntryTouchesCell(entry, context));
   const matched = new Set();
-  source.filter(entry => historyEntryTouchesCell(entry, context)
-    && (entry.action === 'leaveSet' || entry.action === 'leaveClear'))
-    .forEach(entry => matched.add(entry.id || entry));
   blocks.forEach(block => {
     let note = normalizeHistoryText(block.note);
     let location = {

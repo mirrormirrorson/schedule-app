@@ -27,7 +27,6 @@ const EDITABLE_ROOTS = new Set([
   'conditionRules',
   'personRadarFields',
   'personRadarScores',
-  'timeOff',
   'weekPeople',
   'weekPeopleLocked',
   'weekGroups',
@@ -192,7 +191,6 @@ function defaultState() {
     conditionRules: [],
     personRadarFields: [],
     personRadarScores: {},
-    timeOff: {},
     weekPeople: {},
     schedules: {},
   };
@@ -988,18 +986,6 @@ app.post('/api/state/patch', async (req, res, next) => {
     }
     const radarFieldChange = changes.some(change => change.path[0] === 'personRadarFields');
     const radarScoreChange = changes.some(change => change.path[0] === 'personRadarScores');
-    const timeOffChange = changes.some(change => change.path[0] === 'timeOff');
-    if (timeOffChange) {
-      actor = actor || await authorizedAccount(req.body && req.body.actor);
-      if (!actor || !actor.isPermissionAdmin) {
-        return res.status(403).json({
-          ok: false,
-          error: 'time off permission denied',
-          user: actor,
-          state: await store.getState(),
-        });
-      }
-    }
     if (radarFieldChange || radarScoreChange) {
       actor = actor || await authorizedAccount(req.body && req.body.actor);
       const deniedRoots = [];

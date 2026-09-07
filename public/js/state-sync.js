@@ -54,7 +54,6 @@ function defaultData() {
       { id:'g3', name:'三组' }, { id:'g4', name:'四组' },
     ],
     conditionRules: [],
-    timeOff: {},
     schedules: {},
   };
 }
@@ -311,7 +310,6 @@ function saveLocal() {
 const EDITABLE_ROOTS = [
   'internalPeople', 'externalPeople', 'groups', 'conditionRules',
   'personRadarFields', 'personRadarScores',
-  'timeOff',
   'weekPeople', 'weekPeopleLocked', 'weekGroups', 'weekGroupLocked',
   'groupColors', 'schedules', 'resolutions'
 ];
@@ -547,26 +545,6 @@ async function drainSyncQueue() {
         if (!editing) renderAll();
         if (typeof renderManageTab === 'function') renderManageTab();
         toast('权限已变更，未授权的雷达修改没有保存');
-        syncRequested = pendingHistoryEntries.length > 0
-          || (lastServerData && buildPatches(lastServerData, data).length > 0);
-        if (!syncRequested) {
-          clearPersistentOutbox();
-          setSaveStatus('saved', '未授权修改已撤回');
-        } else {
-          writePersistentOutbox();
-        }
-        continue;
-      }
-      if (res.status === 403 && payload.error === 'time off permission denied') {
-        inFlightHistoryEntries = [];
-        pendingHistoryEntries = sentHistory
-          .filter(entry => entry && entry.action !== 'leaveSet' && entry.action !== 'leaveClear')
-          .concat(pendingHistoryEntries);
-        if (!lastServerData || !Object.prototype.hasOwnProperty.call(lastServerData, 'timeOff')) delete data.timeOff;
-        else data.timeOff = cloneValue(lastServerData.timeOff);
-        saveLocal();
-        if (!editing) renderAll();
-        toast('只有管理员可以设置全局休假，本次修改没有保存');
         syncRequested = pendingHistoryEntries.length > 0
           || (lastServerData && buildPatches(lastServerData, data).length > 0);
         if (!syncRequested) {

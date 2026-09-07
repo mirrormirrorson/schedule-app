@@ -249,21 +249,15 @@ test('right-clicking a schedule cell opens its complete cell history', () => {
   assert.match(css, /\.hd-cell-filter\s*\{/);
 });
 
-test('calendar headers and one-copy global time off are rendered in every schedule view', () => {
+test('calendar headers use official workday and rest-day metadata in every schedule view', () => {
   const html = read('public/index.html');
   const schedule = read('public/js/schedule-core.js');
-  const sync = read('public/js/state-sync.js');
-  const server = read('server.js');
   const css = read('public/css/app.css');
   assert.match(html, /\/js\/work-calendar\.js/);
-  assert.match(html, /id="timeOffModal"/);
   assert.match(schedule, /function calendarHeaderHTML\(date, dayIndex\)/);
   assert.equal((schedule.match(/calendarHeaderHTML\(d, i\)/g) || []).length, 2);
-  assert.match(schedule, /function getTimeOff\(personId, dateStr, weekKey = wsKey\(\)\)/);
-  assert.match(schedule, /data\.timeOff\[wsKey\(\)\]\[skey\(personId, dateStr\)\]/);
-  assert.match(schedule, /跳过 \$\{blockedByTimeOff\} 个休假格/);
-  assert.match(sync, /'timeOff'/);
-  assert.match(server, /error: 'time off permission denied'/);
   assert.match(css, /\.schedule-table thead th\.calendar-day-work/);
-  assert.match(css, /\.timeoff-chip/);
+  assert.match(css, /\.schedule-table thead th\.calendar-day-rest/);
+  assert.doesNotMatch(html, /timeOffModal/);
+  assert.doesNotMatch(schedule, /getTimeOff/);
 });

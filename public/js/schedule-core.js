@@ -352,91 +352,6 @@ function normalizeRadarScore(value) {
   return Math.max(0, Math.min(10, Math.round(number)));
 }
 
-// 全局休假独立于小组排班：一个“人员 × 日期”只存一份，各小组和总览共同读取。
-function getTimeOff(personId, dateStr, weekKey = wsKey()) {
-  const week = data.timeOff && data.timeOff[weekKey];
-  return week && week[skey(personId, dateStr)] ? week[skey(personId, dateStr)] : null;
-}
-
-function timeOffChipHTML(timeOff, compact = false) {
-  if (!timeOff) return '';
-  const note = String(timeOff.note || '').trim();
-  const label = note ? `休假 · ${esc(note)}` : '休假';
-  return `<div class="timeoff-chip${compact ? ' compact' : ''}" title="全局休假：所有小组都能看到">${label}</div>`;
-}
-
-let timeOffDraft = null;
-
-function requireTimeOffPermission() {
-  const allowed = typeof isPermissionAdmin === 'function' && isPermissionAdmin();
-  if (!allowed) toast('只有张雅镜、简慧仪、林俊凯可以设置全局休假');
-  return allowed;
-}
-
-function openTimeOffModal(personId, dateStr) {
-  if (!requireTimeOffPermission()) return;
-  const person = weekPeople().find(item => item.id === personId);
-  if (!person) return;
-  const existing = getTimeOff(personId, dateStr);
-  const blocks = getScheduleInfo(personId, dateStr);
-  const date = new Date(`${dateStr}T00:00:00`);
-  const dayInfo = calendarDayInfo(date);
-  timeOffDraft = { personId, dateStr };
-  document.getElementById('timeOffModalTitle').textContent = existing ? '编辑全局休假' : '设置全局休假';
-  document.getElementById('timeOffModalMeta').textContent = `${person.name} · ${dateStr} ${weekdayName(dateStr)}`;
-  document.getElementById('timeOffCalendarSummary').innerHTML = `<span class="calendar-mark ${dayInfo.kind}">${dayInfo.mark}</span><strong>${dayInfo.kind === 'rest' ? '日历休息日' : '日历工作日'}</strong>${dayInfo.name ? `<small>${esc(dayInfo.name)}</small>` : ''}`;
-  document.getElementById('timeOffNote').value = existing ? String(existing.note || '') : '';
-  const conflict = document.getElementById('timeOffConflict');
-  conflict.style.display = blocks.length ? '' : 'none';
-  conflict.textContent = blocks.length ? `这一天已有 ${blocks.length} 项排班。系统不会自动删除，设置休假后会保留并标记冲突，便于人工调整。` : '';
-  document.getElementById('timeOffRemoveBtn').style.display = existing ? '' : 'none';
-  document.getElementById('timeOffModal').style.display = 'flex';
-  setTimeout(() => document.getElementById('timeOffNote').focus(), 0);
-}
-
-function closeTimeOffModal() {
-  const modal = document.getElementById('timeOffModal');
-  if (modal) modal.style.display = 'none';
-  timeOffDraft = null;
-}
-
-function writeTimeOffHistory(action, personId, dateStr, note) {
-  appendHistory([{
-    user: userName(), ts: new Date().toISOString(), week: wsKey(),
-    group: '全局休假', groupId: '__timeoff__', person: resolvePersonName(personId), personId,
-    date: dateStr, weekday: weekdayName(dateStr), action,
-    content: note || '休假', detail: { new: action === 'leaveSet' ? (note || '休假') : '', old: action === 'leaveClear' ? (note || '休假') : '' },
-  }]);
-}
-
-function saveTimeOff() {
-  if (!timeOffDraft || !requireTimeOffPermission()) return;
-  const { personId, dateStr } = timeOffDraft;
-  const note = document.getElementById('timeOffNote').value.trim().slice(0, 100);
-  if (!data.timeOff || typeof data.timeOff !== 'object') data.timeOff = {};
-  if (!data.timeOff[wsKey()] || typeof data.timeOff[wsKey()] !== 'object') data.timeOff[wsKey()] = {};
-  data.timeOff[wsKey()][skey(personId, dateStr)] = { note, updatedBy: userName(), updatedAt: new Date().toISOString() };
-  writeTimeOffHistory('leaveSet', personId, dateStr, note);
-  saveData();
-  closeTimeOffModal();
-  renderAll();
-  toast('休假已同步到总览和所有小组');
-}
-
-function removeTimeOff() {
-  if (!timeOffDraft || !requireTimeOffPermission()) return;
-  const { personId, dateStr } = timeOffDraft;
-  const existing = getTimeOff(personId, dateStr);
-  if (!existing) return closeTimeOffModal();
-  delete data.timeOff[wsKey()][skey(personId, dateStr)];
-  if (!Object.keys(data.timeOff[wsKey()]).length) delete data.timeOff[wsKey()];
-  writeTimeOffHistory('leaveClear', personId, dateStr, String(existing.note || ''));
-  saveData();
-  closeTimeOffModal();
-  renderAll();
-  toast('该天休假已取消');
-}
-
 function splitRadarLabel(value, maxChars = 6) {
   const remaining = Array.from(String(value || '').trim());
   if (remaining.length === 0) return [''];
@@ -843,15 +758,9 @@ async function pasteToSelection() {
   const expandedFromSingleAnchor = cells.length === 1 && pastePlan.length > 1;
 
   const changes = [];
-  let blockedByTimeOff = 0;
   const useBlocks = Boolean(clip.blockData);
   pastePlan.forEach(({ cell: { person, dateStr, gid }, sr, sc }) => {
     const srcBlocks = useBlocks ? clip.blockData[sr][sc] : null;
-    const incomingText = clip.data[sr][sc] || '';
-    if (getTimeOff(person.id, dateStr) && ((srcBlocks && srcBlocks.length > 0) || incomingText)) {
-      blockedByTimeOff += 1;
-      return;
-    }
     if (isOv) {
       const groupId = gid || (weekGroups()[0] ? weekGroups()[0].id : '');
       const oldEntries = getEntries(groupId, person.id, dateStr);
@@ -903,9 +812,7 @@ async function pasteToSelection() {
   }
   if (isOv) { renderAll(); highlightOverviewSelection(); }
   else renderEditTable();
-  toast(blockedByTimeOff
-    ? `已粘贴 ${changes.length} 个单元格，跳过 ${blockedByTimeOff} 个休假格`
-    : `已粘贴 ${changes.length} 个单元格`);
+  toast(`已粘贴 ${changes.length} 个单元格`);
 }
 
 // ========================= 填充 =========================
@@ -927,7 +834,6 @@ function fillDown() {
       if (r >= people.length) break;
       const personId = people[r].id;
       const oldEntries = getCellEntries(personId, dateStr);
-      if (srcEntries.length && getTimeOff(personId, dateStr)) continue;
       if (JSON.stringify(oldEntries) !== JSON.stringify(srcEntries)) {
         setCellEntries(personId, dateStr, srcEntries);
         changes.push({ personId, dateStr, oldVal: oldEntries, newVal: srcEntries });
@@ -1022,7 +928,6 @@ function endFillDrag() {
       const personId = people[r].id;
       const dateStr = fmtFull(dates[c]);
       const oldEntries = getCellEntries(personId, dateStr);
-      if (srcEntries.length && getTimeOff(personId, dateStr)) continue;
 
       if (JSON.stringify(oldEntries) !== JSON.stringify(srcEntries)) {
         setCellEntries(personId, dateStr, srcEntries);
@@ -1117,22 +1022,19 @@ function renderEditTable() {
       dates.forEach((date, c) => {
         const ds = fmtFull(date);
         const entries = getCellEntries(person.id, ds);
-        const timeOff = getTimeOff(person.id, ds);
         const selClass = isSelected(r, c) ? ' selected' : '';
         const activeClass = (activeCell && activeCell.r === r && activeCell.c === c) ? ' active-cell' : '';
         const isEdit = editing && editing.personId === person.id && editing.dateStr === ds;
         const editClass = isEdit ? ' editing' : '';
-        const conflictClass = (timeOff && entries.length) ? ' timeoff-conflict-cell' : '';
-        const emptyClass = (entries.length === 0 && !timeOff && !isEdit) ? ' cell-empty' : '';
-        html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}${conflictClass}"
+        const emptyClass = (entries.length === 0 && !isEdit) ? ' cell-empty' : '';
+        html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}"
           data-r="${r}" data-c="${c}" data-pid="${person.id}" data-date="${ds}"
           style="position:relative;">`;
         if (isEdit) {
           html += `<textarea placeholder="输入任务" id="editInput"></textarea>`;
-        } else if (entries.length === 0 && !timeOff) {
+        } else if (entries.length === 0) {
           html += '-';
         } else {
-          html += timeOffChipHTML(timeOff, true);
           entries.forEach((e, idx) => {
             const condColor = getConditionColor(e.note);
             const style = condColor
@@ -1493,13 +1395,6 @@ document.addEventListener('mouseup', function(e) {
     if (targetEl && targetEl !== cellDrag.sourceEl) {
       const tPid = targetEl.dataset.pid;
       const tDate = targetEl.dataset.date;
-      if (getTimeOff(tPid, tDate)) {
-        toast('目标人员当天已休假，不能移入排班');
-        cleanupDrag();
-        mouseDownCell = null;
-        renderEditTable();
-        return;
-      }
       const srcEntries = getEntries(cellDrag.gid, cellDrag.personId, cellDrag.dateStr);
       const moved = (srcEntries[cellDrag.idx] && srcEntries[cellDrag.idx].note) || cellDrag.note;
       const tgtEntries = getEntries(cellDrag.gid, tPid, tDate);
@@ -1674,10 +1569,6 @@ document.addEventListener('dblclick', function(e) {
 // ========================= 编辑 =========================
 function startEditDOM(cellEl, personId, dateStr, idx) {
   if (!requireScheduleWeekEdit()) return;
-  if (idx < 0 && getTimeOff(personId, dateStr)) {
-    toast('该人员当天已标记休假，请先在总览取消休假');
-    return;
-  }
   if (editing) commitEdit();
 
   editing = { personId, dateStr, idx, el: cellEl };
@@ -2018,7 +1909,7 @@ function renderOverview() {
   const isScheduleWeek = wsKey() === scheduleWeek;
   document.getElementById('overviewPanel').insertAdjacentHTML('afterbegin',
     `<div class="hint-bar" id="ovHint" style="margin-bottom:12px;">
-      ${isScheduleWeek ? '双击格子编辑内容 · 拖动小组块可移动到其他格 · 管理员点击格子右上角“休”设置全局休假 · 此表为最终导出源' : '双击格子录入/编辑内容 · 拖动小组块可移动到其他格 · 管理员点击格子右上角“休”设置全局休假'}
+      ${isScheduleWeek ? '双击格子编辑内容 · 拖动小组块可移动到其他格 · 此表为最终导出源' : '双击格子录入/编辑内容 · 拖动小组块可移动到其他格'}
       <span class="hint-spacer"></span>
     </div>`);
 
@@ -2037,16 +1928,12 @@ function renderOverview() {
       dates.forEach((d, c) => {
         const ds = fmtFull(d);
         const blocks = getScheduleInfo(p.id, ds);
-        const timeOff = getTimeOff(p.id, ds);
-        const timeOffAction = (typeof isPermissionAdmin === 'function' && isPermissionAdmin())
-          ? `<button class="timeoff-action${timeOff ? ' active' : ''}" title="${timeOff ? '编辑或取消全局休假' : '设置全局休假'}" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();openTimeOffModal('${p.id}','${ds}')">休</button>`
-          : '';
         if (blocks.length === 0) {
           // 空单元格：双击可在第一个小组新增（仅作便捷入口，主入口仍在各小组表）
           const defaultGid = weekGroups().length > 0 ? weekGroups()[0].id : '';
-          html += `<td><div class="cell${timeOff ? ' has-timeoff' : ' cell-empty'} ov-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${defaultGid}">${timeOffAction}${timeOff ? timeOffChipHTML(timeOff) : '-'}</div></td>`;
+          html += `<td><div class="cell cell-empty ov-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${defaultGid}">-</div></td>`;
         } else {
-          html += `<td><div class="cell ov-cell${timeOff ? ' has-timeoff timeoff-conflict-cell' : ''}" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}">${timeOffAction}${timeOff ? timeOffChipHTML(timeOff) : ''}`;
+          html += `<td><div class="cell ov-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}">`;
           blocks.forEach(b => {
             const gi = weekGroups().findIndex(g => g.id === b.groupId);
             const condColor = ovConditionMode ? getConditionColor(b.note) : null;
@@ -2086,10 +1973,6 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   const entries = getEntries(groupId, personId, dateStr);
   const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
   const isNew = !(idx >= 0 && entries[idx]);
-  if (isNew && getTimeOff(personId, dateStr)) {
-    toast('该人员当天已标记休假，请先取消休假再新增排班');
-    return;
-  }
 
   editing = { mode:'overview', personId, dateStr, groupId, idx, isNew, el:cellEl, oldVal };
   if (typeof presenceClearCell === 'function') presenceClearCell();
@@ -2166,7 +2049,6 @@ function cleanupOvDrag() {
 // 即使目标已存在同一小组的块，也作为「另一个独立块」追加，不会覆盖。
 function moveBlock(groupId, srcPid, srcDate, srcIdx, tPid, tDate) {
   if (!requireScheduleWeekEdit()) return;
-  if (getTimeOff(tPid, tDate)) { toast('目标人员当天已休假，不能移入排班'); return; }
   if (srcPid === tPid && srcDate === tDate) return; // 同一格不处理
   const srcEntries = getEntries(groupId, srcPid, srcDate);
   if (srcIdx < 0 || srcIdx >= srcEntries.length) return;
