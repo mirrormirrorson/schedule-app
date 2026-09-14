@@ -328,13 +328,14 @@ function initCellTooltip() {
     const pid = cell.dataset.pid;
     const ds = cell.dataset.date;
     if (!pid || !ds) { tooltip.style.display = 'none'; return; }
+    if (getTimeOff(pid, ds)) { tooltip.style.display = 'none'; return; }
     const conflicts = getCrossGroupBlocks(pid, ds);
     if (conflicts.length === 0) { tooltip.style.display = 'none'; return; }
     const items = conflicts.map(b => {
       const note = esc(b.note || '').replace(/\n/g, '<br>');
       return `<div class="tip-item"><span class="tip-group">${esc(b.groupName)}</span><div class="tip-content">${note}</div></div>`;
     }).join('');
-    tooltip.innerHTML = `<div class="tip-title">⚠ 其它小组已在此处排期</div>${items}<div class="tip-message">已在此处填写排期，请大家先自行协调安排，如解决不了填入后等待排班负责人协调~</div>`;
+    tooltip.innerHTML = `<div class="tip-title">⚠ 其它小组已在此处排期</div>${items}<div class="tip-message">已在此处填写排期，请大家先自行协调安排，<strong>如解决不了，填入后等待排班负责人协调</strong>。</div>`;
     tooltip.style.display = 'block';
     positionTooltip(e);
   });

@@ -33,6 +33,7 @@ const EDITABLE_ROOTS = new Set([
   'weekGroupLocked',
   'groupColors',
   'schedules',
+  'timeOff',
   'resolutions',
 ]);
 const FORBIDDEN_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
@@ -77,18 +78,22 @@ function scheduleWeekKeyForShanghai(now = new Date()) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', hourCycle: 'h23',
     }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]),
   );
   const localDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
   const day = localDate.getUTCDay();
-  localDate.setUTCDate(localDate.getUTCDate() + (day === 0 ? -6 : 1 - day) + 7);
+  // 普通账号的下一排班周在北京时间周一 09:00 开放；周一 09:00 前仍以本周为边界。
+  const beforeMondayOpen = day === 1 && Number(parts.hour) < 9;
+  const daysToBoundary = beforeMondayOpen ? 0 : (day === 0 ? 1 : (day === 1 ? 7 : 8 - day));
+  localDate.setUTCDate(localDate.getUTCDate() + daysToBoundary);
   return `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
 }
 
 function futureScheduleWeeksFromChanges(changes, boundary = scheduleWeekKeyForShanghai()) {
   const weeks = new Set();
   for (const change of changes || []) {
-    if (!change || !Array.isArray(change.path) || change.path[0] !== 'schedules') continue;
+    if (!change || !Array.isArray(change.path) || !['schedules', 'timeOff'].includes(change.path[0])) continue;
     const week = String(change.path[1] || '');
     if (week) {
       if (week > boundary) weeks.add(week);
@@ -193,6 +198,7 @@ function defaultState() {
     personRadarScores: {},
     weekPeople: {},
     schedules: {},
+    timeOff: {},
   };
 }
 

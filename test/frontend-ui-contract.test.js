@@ -12,7 +12,8 @@ test('cell editing remains on the original textarea interaction', () => {
   const css = read('public/css/app.css');
   assert.match(source, /<textarea placeholder="输入任务" id="editInput"><\/textarea>/);
   assert.match(source, /ta\.value = oldVal/);
-  assert.match(source, /cellEl\.innerHTML = `<textarea/);
+  assert.match(source, /isEdit && editing\.idx >= 0/);
+  assert.match(source, /et-block et-new-block/);
   assert.doesNotMatch(source, /contenteditable="true"/);
   assert.doesNotMatch(source, /entry-editor-host/);
   assert.match(css, /\.cell\.editing textarea\s*\{/);
@@ -208,10 +209,10 @@ test('future scheduling cycles are editable only by protected admins', () => {
   const schedule = read('public/js/schedule-core.js');
   const sync = read('public/js/state-sync.js');
   const server = read('server.js');
-  assert.match(schedule, /function scheduleWeekKey\(\)/);
+  assert.match(schedule, /function scheduleWeekKey\(now = new Date\(\)\)/);
   assert.match(schedule, /function canEditScheduleWeek\(weekKey = wsKey\(\)\)/);
   assert.match(schedule, /typeof isPermissionAdmin === 'function' && isPermissionAdmin\(\)/);
-  assert.match(schedule, /toast\('还未进入排班时间'\)/);
+  assert.match(schedule, /还未进入排班时间，请于周一上午 9:00 后再填写/);
   assert.match(schedule, /document\.addEventListener\('dblclick',[\s\S]*?requireScheduleWeekEdit\(\)/);
   assert.match(schedule, /async function pasteToSelection\(\) \{\s*if \(!requireScheduleWeekEdit\(\)\) return;/);
   assert.match(schedule, /function ovEntryEdit\([\s\S]*?if \(!requireScheduleWeekEdit\(\)\) return;/);
@@ -232,13 +233,23 @@ test('temporary internal people stay in the existing internal section', () => {
   assert.match(management, /const wp = rawWeekPeople\(\)/);
 });
 
-test('right-clicking a schedule cell opens its complete cell history', () => {
+test('right-clicking a schedule cell opens add, leave and history actions', () => {
   const html = read('public/index.html');
   const history = read('public/js/identity-history.js');
+  const schedule = read('public/js/schedule-core.js');
   const css = read('public/css/enhancements.css');
-  assert.match(html, /右键查看该格历史/);
+  const menu = html.match(/<div id="cellContextMenu"[\s\S]*?<\/div>/);
+  assert.ok(menu);
+  assert.equal((menu[0].match(/role="menuitem"/g) || []).length, 3);
+  assert.match(menu[0], /新增排班/);
+  assert.match(menu[0], /休假/);
+  assert.match(menu[0], /查看历史记录/);
   assert.match(html, /id="historyCellFilter"/);
   assert.match(history, /document\.addEventListener\('contextmenu'/);
+  assert.match(history, /function openCellContextMenu\(event, context\)/);
+  assert.match(history, /function runCellContextAdd\(\)/);
+  assert.match(history, /function runCellContextTimeOff\(\)/);
+  assert.match(history, /function runCellContextHistory\(\)/);
   assert.match(history, /function openCellHistoryDrawer\(context\)/);
   assert.match(history, /function historyEntryTouchesCell\(entry, context\)/);
   assert.match(history, /function historyEntriesForCell\(entries, context\)/);
@@ -246,6 +257,10 @@ test('right-clicking a schedule cell opens its complete cell history', () => {
   assert.match(history, /entry\.fromPersonId === context\.personId/);
   assert.match(history, /entry\.toPersonId === context\.personId/);
   assert.match(history, /该单元格暂无修改记录/);
+  assert.match(schedule, /function toggleTimeOffFromContext\(context\)/);
+  assert.match(schedule, /function beginNewScheduleFromContext\(context\)/);
+  assert.match(schedule, /原有排班只隐藏、不删除/);
+  assert.match(schedule, /目标人员当天已休假，不能移入排班/);
   assert.match(css, /\.hd-cell-filter\s*\{/);
 });
 
@@ -259,5 +274,22 @@ test('calendar headers use official workday and rest-day metadata in every sched
   assert.match(css, /\.schedule-table thead th\.calendar-day-work/);
   assert.match(css, /\.schedule-table thead th\.calendar-day-rest/);
   assert.doesNotMatch(html, /timeOffModal/);
-  assert.doesNotMatch(schedule, /getTimeOff/);
+  assert.match(schedule, /function getTimeOff\(personId, dateStr, weekKey = wsKey\(\)\)/);
+});
+
+test('leave state is one global person-date value and renders as a protected grey cell', () => {
+  const schedule = read('public/js/schedule-core.js');
+  const sync = read('public/js/state-sync.js');
+  const server = read('server.js');
+  const css = read('public/css/app.css');
+  const tooltip = read('public/js/view-export.js');
+  assert.match(sync, /timeOff: \{\}/);
+  assert.match(server, /'timeOff'/);
+  assert.match(schedule, /data\.timeOff\[week\]\[key\]/);
+  assert.match(schedule, /timeoff-cell/);
+  assert.match(schedule, /timeOffCellHTML\(personId, dateStr\)/);
+  assert.match(schedule, /原排班已保留/);
+  assert.match(css, /\.timeoff-cell\s*\{/);
+  assert.match(css, /background: #e5e7eb !important/);
+  assert.match(tooltip, /<strong>如解决不了，填入后等待排班负责人协调<\/strong>/);
 });

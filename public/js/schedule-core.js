@@ -27,7 +27,15 @@ function calendarHeaderHTML(date, dayIndex) {
   const adjusted = info.adjusted ? ' calendar-day-adjusted' : '';
   return `<th class="calendar-day calendar-day-${info.kind}${adjusted}"${title}>${fmtDate(date)}<br><small>${DAY_NAMES[dayIndex]} <span class="calendar-mark">${info.mark}</span></small></th>`;
 }
-function scheduleWeekKey() { return fmtFull(getMonday(new Date(Date.now() + 7*86400000))); }
+function scheduleWeekKey(now = new Date()) {
+  // 以北京时间计算：周一 09:00 前，下一周仍未开放；09:00 起才切换到下一排班周。
+  const shifted = new Date(new Date(now).getTime() + 8 * 60 * 60 * 1000);
+  const day = shifted.getUTCDay();
+  const beforeMondayOpen = day === 1 && shifted.getUTCHours() < 9;
+  const daysToBoundary = beforeMondayOpen ? 0 : (day === 0 ? 1 : (day === 1 ? 7 : 8 - day));
+  shifted.setUTCDate(shifted.getUTCDate() + daysToBoundary);
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2,'0')}-${String(shifted.getUTCDate()).padStart(2,'0')}`;
+}
 function isFutureScheduleWeek(weekKey = wsKey()) { return String(weekKey || '') > scheduleWeekKey(); }
 function canEditScheduleWeek(weekKey = wsKey()) {
   if (!isFutureScheduleWeek(weekKey)) return true;
@@ -35,7 +43,7 @@ function canEditScheduleWeek(weekKey = wsKey()) {
 }
 function requireScheduleWeekEdit(weekKey = wsKey(), notify = true) {
   const allowed = canEditScheduleWeek(weekKey);
-  if (!allowed && notify) toast('还未进入排班时间');
+  if (!allowed && notify) toast('还未进入排班时间，请于周一上午 9:00 后再填写');
   return allowed;
 }
 function autoResizeTextarea(ta) {
@@ -102,8 +110,10 @@ function buildPeopleFromTemplate() {
 }
 
 function hasWeekData(ws) {
-  if (!data.schedules[ws]) return false;
-  return Object.values(data.schedules[ws]).some(g => Object.keys(g).length > 0);
+  const hasSchedules = Boolean(data.schedules[ws]
+    && Object.values(data.schedules[ws]).some(g => Object.keys(g).length > 0));
+  const hasTimeOff = Boolean(data.timeOff && data.timeOff[ws] && Object.keys(data.timeOff[ws]).length > 0);
+  return hasSchedules || hasTimeOff;
 }
 
 // 标记当前周已锁定（增删改人员时调用）
@@ -118,7 +128,7 @@ function weekGroups() {
   const ws = wsKey();
   if (!data.weekGroups) data.weekGroups = {};
   if (!data.weekGroupLocked) data.weekGroupLocked = {};
-  const scheduleWeek = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const scheduleWeek = scheduleWeekKey();
 
   if (data.weekGroups[ws]) {
     // 历史周 → 永久锁定，不跟模板
@@ -244,10 +254,21 @@ function pushUndo(changes, opMeta) {
   updateUndoHint();
 }
 
+function undoActionWritesIntoTimeOff(action, valueKey) {
+  return Boolean(action && action.changes && action.changes.some(change => {
+    const value = Array.isArray(change[valueKey]) ? change[valueKey] : [];
+    return value.length > 0 && getTimeOff(change.personId, change.dateStr, action.week);
+  }));
+}
+
 async function undo() {
   if (editing) commitEdit();
   if (undoStack.length === 0) { toast('没有可撤销的操作'); return; }
   if (!requireScheduleWeekEdit(undoStack[undoStack.length - 1].week)) return;
+  if (undoActionWritesIntoTimeOff(undoStack[undoStack.length - 1], 'oldVal')) {
+    toast('休假格不能恢复排班，请先右键取消休假');
+    return;
+  }
   const action = undoStack.pop();
   redoStack.push(action);
 
@@ -291,6 +312,10 @@ async function redo() {
   if (editing) commitEdit();
   if (redoStack.length === 0) { toast('没有可重做的操作'); return; }
   if (!requireScheduleWeekEdit(redoStack[redoStack.length - 1].week)) return;
+  if (undoActionWritesIntoTimeOff(redoStack[redoStack.length - 1], 'newVal')) {
+    toast('休假格不能恢复排班，请先右键取消休假');
+    return;
+  }
   const action = redoStack.pop();
   undoStack.push(action);
 
@@ -350,6 +375,75 @@ function normalizeRadarScore(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
   return Math.max(0, Math.min(10, Math.round(number)));
+}
+
+// 休假是“人员 × 日期”的单一状态，各小组与总览共读；原有排班只隐藏、不删除。
+function getTimeOff(personId, dateStr, weekKey = wsKey()) {
+  const week = data.timeOff && data.timeOff[weekKey];
+  return Boolean(week && week[skey(personId, dateStr)]);
+}
+
+function timeOffCellHTML(personId, dateStr) {
+  const hiddenCount = getScheduleInfo(personId, dateStr).length;
+  const suffix = hiddenCount ? `；原有 ${hiddenCount} 项排班已保留，取消休假后恢复` : '';
+  return `<div class="timeoff-chip" title="已标记休假${suffix}"><span>休假</span>${hiddenCount ? `<small>原排班已保留</small>` : ''}</div>`;
+}
+
+function appendTimeOffHistory(action, context) {
+  appendHistory([{
+    user: userName(), ts: new Date().toISOString(), week: context.week || wsKey(),
+    group: '休假', groupId: '__timeoff__',
+    person: context.person || resolvePersonName(context.personId), personId: context.personId,
+    date: context.date, weekday: weekdayName(context.date), action,
+    content: '休假', detail: action === 'leaveSet' ? { old: '', new: '休假' } : { old: '休假', new: '' },
+  }]);
+}
+
+function toggleTimeOffFromContext(context) {
+  if (!context || !context.personId || !context.date) return;
+  const week = context.week || wsKey();
+  if (!requireScheduleWeekEdit(week)) return;
+  if (!data.timeOff || typeof data.timeOff !== 'object') data.timeOff = {};
+  if (!data.timeOff[week] || typeof data.timeOff[week] !== 'object') data.timeOff[week] = {};
+  const key = skey(context.personId, context.date);
+  const isCancel = Boolean(data.timeOff[week][key]);
+  if (isCancel) {
+    delete data.timeOff[week][key];
+    if (!Object.keys(data.timeOff[week]).length) delete data.timeOff[week];
+  } else {
+    data.timeOff[week][key] = { updatedBy: userName(), updatedAt: new Date().toISOString() };
+    if (!data.weekPeopleLocked) data.weekPeopleLocked = {};
+    data.weekPeopleLocked[week] = true;
+  }
+  appendTimeOffHistory(isCancel ? 'leaveClear' : 'leaveSet', { ...context, week });
+  saveData();
+  renderAll();
+  const hiddenCount = getScheduleInfo(context.personId, context.date).length;
+  toast(isCancel
+    ? '已取消休假，原有排班已恢复显示'
+    : (hiddenCount ? `已标记休假，原有 ${hiddenCount} 项排班已安全保留` : '已标记休假，所有小组已同步'));
+}
+
+function beginNewScheduleFromContext(context) {
+  if (!context || !context.personId || !context.date) return;
+  if (!requireScheduleWeekEdit(context.week || wsKey())) return;
+  if (getTimeOff(context.personId, context.date, context.week || wsKey())) {
+    toast('该人员当天已休假，请先右键取消休假');
+    return;
+  }
+  if (context.overview) {
+    const cell = document.querySelector(`#overviewTable .ov-cell[data-pid="${context.personId}"][data-date="${context.date}"]`);
+    if (!cell) return;
+    if (context.groupId) ovEntryEdit(cell, context.personId, context.date, context.groupId, -1);
+    else ovPickGroupForNew(context.personId, context.date, cell);
+    return;
+  }
+  const cell = document.querySelector(`#editTable .cell[data-pid="${context.personId}"][data-date="${context.date}"]`);
+  if (!cell) return;
+  const row = Number(cell.dataset.r);
+  const column = Number(cell.dataset.c);
+  if (Number.isInteger(row) && Number.isInteger(column)) selectCell(row, column);
+  startEditDOM(cell, context.personId, context.date, -1);
 }
 
 function splitRadarLabel(value, maxChars = 6) {
@@ -689,7 +783,9 @@ function copySelection() {
   const data = Array.from({ length: rows }, () => Array(cols).fill(''));
   const blockData = Array.from({ length: rows }, () => Array(cols).fill(null));
   cells.forEach(({ r, c, person }) => {
-    const entries = getCellEntries(person.id, fmtFull(dates[c]));
+    const dateStr = fmtFull(dates[c]);
+    if (getTimeOff(person.id, dateStr)) return;
+    const entries = getCellEntries(person.id, dateStr);
     data[r - minR][c - minC] = joinNotes(entries.map(e => e.note));
     if (entries.length > 0) blockData[r - minR][c - minC] = entries.map(e => ({ note: e.note }));
   });
@@ -708,6 +804,7 @@ function copyOverviewSelection() {
   const data = Array.from({ length: rows }, () => Array(cols).fill(''));
   const blockData = Array.from({ length: rows }, () => Array(cols).fill(null));
   cells.forEach(({ r, c, person, dateStr }) => {
+    if (getTimeOff(person.id, dateStr)) return;
     const blocks = getScheduleInfo(person.id, dateStr);
     data[r - minR][c - minC] = joinNotes(blocks.map(b => b.note || ''));
     if (blocks.length > 0) blockData[r - minR][c - minC] = blocks.map(b => ({ note: b.note }));
@@ -758,9 +855,14 @@ async function pasteToSelection() {
   const expandedFromSingleAnchor = cells.length === 1 && pastePlan.length > 1;
 
   const changes = [];
+  let blockedByTimeOff = 0;
   const useBlocks = Boolean(clip.blockData);
   pastePlan.forEach(({ cell: { person, dateStr, gid }, sr, sc }) => {
     const srcBlocks = useBlocks ? clip.blockData[sr][sc] : null;
+    if (getTimeOff(person.id, dateStr)) {
+      blockedByTimeOff += 1;
+      return;
+    }
     if (isOv) {
       const groupId = gid || (weekGroups()[0] ? weekGroups()[0].id : '');
       const oldEntries = getEntries(groupId, person.id, dateStr);
@@ -812,7 +914,9 @@ async function pasteToSelection() {
   }
   if (isOv) { renderAll(); highlightOverviewSelection(); }
   else renderEditTable();
-  toast(`已粘贴 ${changes.length} 个单元格`);
+  toast(blockedByTimeOff
+    ? `已粘贴 ${changes.length} 个单元格，跳过 ${blockedByTimeOff} 个休假格`
+    : `已粘贴 ${changes.length} 个单元格`);
 }
 
 // ========================= 填充 =========================
@@ -827,12 +931,14 @@ function fillDown() {
   // 对每一列，用该列第一行的值填充到下面所有行
   for (let c = sel.c1; c <= sel.c2; c++) {
     if (sel.r1 >= people.length) break;
-    const srcEntries = getCellEntries(people[sel.r1].id, fmtFull(dates[c]));
     const dateStr = fmtFull(dates[c]);
+    if (getTimeOff(people[sel.r1].id, dateStr)) continue;
+    const srcEntries = getCellEntries(people[sel.r1].id, dateStr);
 
     for (let r = sel.r1 + 1; r <= sel.r2; r++) {
       if (r >= people.length) break;
       const personId = people[r].id;
+      if (getTimeOff(personId, dateStr)) continue;
       const oldEntries = getCellEntries(personId, dateStr);
       if (JSON.stringify(oldEntries) !== JSON.stringify(srcEntries)) {
         setCellEntries(personId, dateStr, srcEntries);
@@ -924,9 +1030,11 @@ function endFillDrag() {
       if (srcR > maxR || srcC > 6) continue;
 
       const srcEntries = getCellEntries(people[srcR].id, fmtFull(dates[srcC]));
+      if (getTimeOff(people[srcR].id, fmtFull(dates[srcC]))) continue;
 
       const personId = people[r].id;
       const dateStr = fmtFull(dates[c]);
+      if (getTimeOff(personId, dateStr)) continue;
       const oldEntries = getCellEntries(personId, dateStr);
 
       if (JSON.stringify(oldEntries) !== JSON.stringify(srcEntries)) {
@@ -1022,26 +1130,32 @@ function renderEditTable() {
       dates.forEach((date, c) => {
         const ds = fmtFull(date);
         const entries = getCellEntries(person.id, ds);
+        const timeOff = getTimeOff(person.id, ds);
         const selClass = isSelected(r, c) ? ' selected' : '';
         const activeClass = (activeCell && activeCell.r === r && activeCell.c === c) ? ' active-cell' : '';
         const isEdit = editing && editing.personId === person.id && editing.dateStr === ds;
         const editClass = isEdit ? ' editing' : '';
-        const emptyClass = (entries.length === 0 && !isEdit) ? ' cell-empty' : '';
-        html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}"
+        const emptyClass = (entries.length === 0 && !timeOff && !isEdit) ? ' cell-empty' : '';
+        const timeOffClass = timeOff ? ' timeoff-cell' : '';
+        html += `<td><div class="cell${selClass}${activeClass}${editClass}${emptyClass}${timeOffClass}"
           data-r="${r}" data-c="${c}" data-pid="${person.id}" data-date="${ds}"
           style="position:relative;">`;
-        if (isEdit) {
+        if (timeOff) {
+          html += timeOffCellHTML(person.id, ds);
+        } else if (isEdit && editing.idx >= 0) {
           html += `<textarea placeholder="输入任务" id="editInput"></textarea>`;
-        } else if (entries.length === 0) {
-          html += '-';
         } else {
-          entries.forEach((e, idx) => {
-            const condColor = getConditionColor(e.note);
-            const style = condColor
-              ? `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:600;`
-              : `color:${color};background:${hexToRgba(color,0.12)};border-left:3px solid ${color};`;
-            html += `<div class="et-block" style="${style}" data-idx="${idx}">${esc(e.note.replace(/\r/g, '').replace(/^\n+|\n+$/g, '')).replace(/\n/g, '<br>')}</div>`;
-          });
+          if (entries.length === 0 && !isEdit) html += '-';
+          else {
+            entries.forEach((e, idx) => {
+              const condColor = getConditionColor(e.note);
+              const style = condColor
+                ? `color:#222;background:${hexToRgba(condColor,0.30)};font-weight:600;`
+                : `color:${color};background:${hexToRgba(color,0.12)};border-left:3px solid ${color};`;
+              html += `<div class="et-block" style="${style}" data-idx="${idx}">${esc(e.note.replace(/\r/g, '').replace(/^\n+|\n+$/g, '')).replace(/\n/g, '<br>')}</div>`;
+            });
+            if (isEdit) html += `<div class="et-block et-new-block"><textarea placeholder="输入新的排班" id="editInput"></textarea></div>`;
+          }
         }
         html += '</div></td>';
       });
@@ -1393,8 +1507,22 @@ document.addEventListener('mouseup', function(e) {
     const targetEl = findCellAtPoint(e.clientX, e.clientY);
     let selectedAfterDrop = sourceSnapshot;
     if (targetEl && targetEl !== cellDrag.sourceEl) {
+      if (getTimeOff(cellDrag.personId, cellDrag.dateStr)) {
+        toast('原单元格已休假，排班仍安全保留');
+        cleanupDrag();
+        mouseDownCell = null;
+        renderEditTable();
+        return;
+      }
       const tPid = targetEl.dataset.pid;
       const tDate = targetEl.dataset.date;
+      if (getTimeOff(tPid, tDate)) {
+        toast('目标人员当天已休假，不能移入排班');
+        cleanupDrag();
+        mouseDownCell = null;
+        renderEditTable();
+        return;
+      }
       const srcEntries = getEntries(cellDrag.gid, cellDrag.personId, cellDrag.dateStr);
       const moved = (srcEntries[cellDrag.idx] && srcEntries[cellDrag.idx].note) || cellDrag.note;
       const tgtEntries = getEntries(cellDrag.gid, tPid, tDate);
@@ -1530,6 +1658,10 @@ document.addEventListener('dblclick', function(e) {
   if (!lastClickCell) return;
   if (!requireScheduleWeekEdit()) return;
   const { personId, dateStr, r, c } = lastClickCell;
+  if (getTimeOff(personId, dateStr)) {
+    toast('该人员当天已休假，请先右键取消休假');
+    return;
+  }
 
   // 总览表双击编辑
   if (activeGroupId === '__overview__') {
@@ -1569,6 +1701,10 @@ document.addEventListener('dblclick', function(e) {
 // ========================= 编辑 =========================
 function startEditDOM(cellEl, personId, dateStr, idx) {
   if (!requireScheduleWeekEdit()) return;
+  if (idx < 0 && getTimeOff(personId, dateStr)) {
+    toast('该人员当天已休假，请先右键取消休假');
+    return;
+  }
   if (editing) commitEdit();
 
   editing = { personId, dateStr, idx, el: cellEl };
@@ -1615,6 +1751,13 @@ function commitEdit() {
   if (!requireScheduleWeekEdit()) { cancelEdit(); return; }
 
   const { personId, dateStr, idx } = editing;
+  if (getTimeOff(personId, dateStr)) {
+    editing = null;
+    presenceStopEditing();
+    renderEditTable();
+    toast('该人员当天已休假，本次排班未保存');
+    return;
+  }
   const ta = document.getElementById('editInput');
   const newVal = ta ? ta.value.trim() : '';
 
@@ -1730,7 +1873,9 @@ document.addEventListener('keydown', function(e) {
       // 汇总表：清除选中格中「所有小组」的全部块
       const cells = getOverviewSelectedCells();
       const changes = [];
+      let blockedByTimeOff = 0;
       cells.forEach(({ person, dateStr }) => {
+        if (getTimeOff(person.id, dateStr)) { blockedByTimeOff += 1; return; }
         weekGroups().forEach(g => {
           const oldEntries = getEntries(g.id, person.id, dateStr);
           if (oldEntries.length) {
@@ -1740,12 +1885,15 @@ document.addEventListener('keydown', function(e) {
         });
       });
       if (changes.length > 0) { pushUndo(changes); saveData(); renderAll(); }
+      if (blockedByTimeOff) toast('休假格不会清除隐藏的原排班，请先右键取消休假');
       return;
     }
     // 小组表：清除选中格内容（整格 entries）
     const cells = getSelectedCells();
     const changes = [];
+    let blockedByTimeOff = 0;
     cells.forEach(({ person, dateStr }) => {
+      if (getTimeOff(person.id, dateStr)) { blockedByTimeOff += 1; return; }
       const oldEntries = getCellEntries(person.id, dateStr);
       if (oldEntries.length) {
         setCellEntries(person.id, dateStr, []);
@@ -1757,6 +1905,7 @@ document.addEventListener('keydown', function(e) {
       saveData();
       renderEditTable();
     }
+    if (blockedByTimeOff) toast('休假格不会清除隐藏的原排班，请先右键取消休假');
     return;
   }
 
@@ -1878,7 +2027,7 @@ function renderOverview() {
   `;
 
   // 历史周隐藏统计栏
-  const scheduleMonday = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const scheduleMonday = scheduleWeekKey();
   document.getElementById('statsRow').style.display = (ws < scheduleMonday) ? 'none' : '';
 
   const colorsRow = weekGroups().map((g,i) =>
@@ -1905,11 +2054,11 @@ function renderOverview() {
   // 总览提示（先清理旧的再插入）
   const oldHint = document.getElementById('ovHint');
   if (oldHint) oldHint.remove();
-  const scheduleWeek = fmtFull(getMonday(new Date(Date.now() + 7*86400000)));
+  const scheduleWeek = scheduleWeekKey();
   const isScheduleWeek = wsKey() === scheduleWeek;
   document.getElementById('overviewPanel').insertAdjacentHTML('afterbegin',
     `<div class="hint-bar" id="ovHint" style="margin-bottom:12px;">
-      ${isScheduleWeek ? '双击格子编辑内容 · 拖动小组块可移动到其他格 · 此表为最终导出源' : '双击格子录入/编辑内容 · 拖动小组块可移动到其他格'}
+      ${isScheduleWeek ? '双击已有块可编辑 · 右键可新增排班、休假或查看历史 · 拖动小组块可移动 · 此表为最终导出源' : '双击已有块可编辑 · 右键可新增排班、休假或查看历史 · 拖动小组块可移动'}
       <span class="hint-spacer"></span>
     </div>`);
 
@@ -1928,7 +2077,10 @@ function renderOverview() {
       dates.forEach((d, c) => {
         const ds = fmtFull(d);
         const blocks = getScheduleInfo(p.id, ds);
-        if (blocks.length === 0) {
+        const timeOff = getTimeOff(p.id, ds);
+        if (timeOff) {
+          html += `<td><div class="cell ov-cell timeoff-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}">${timeOffCellHTML(p.id, ds)}</div></td>`;
+        } else if (blocks.length === 0) {
           // 空单元格：双击可在第一个小组新增（仅作便捷入口，主入口仍在各小组表）
           const defaultGid = weekGroups().length > 0 ? weekGroups()[0].id : '';
           html += `<td><div class="cell cell-empty ov-cell" data-r="${r}" data-c="${c}" data-pid="${p.id}" data-date="${ds}" data-gid="${defaultGid}">-</div></td>`;
@@ -1973,12 +2125,29 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   const entries = getEntries(groupId, personId, dateStr);
   const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
   const isNew = !(idx >= 0 && entries[idx]);
+  if (isNew && getTimeOff(personId, dateStr)) {
+    toast('该人员当天已休假，请先右键取消休假');
+    return;
+  }
 
-  editing = { mode:'overview', personId, dateStr, groupId, idx, isNew, el:cellEl, oldVal };
+  const editorHost = isNew ? document.createElement('div') : cellEl;
+  if (isNew) {
+    if (cellEl.classList.contains('cell-empty')) {
+      cellEl.textContent = '';
+      cellEl.classList.remove('cell-empty');
+    }
+    editorHost.className = 'ov-block ov-new-block';
+    editorHost.dataset.gid = groupId;
+    editorHost.dataset.idx = '-1';
+    editorHost.dataset.pid = personId;
+    editorHost.dataset.date = dateStr;
+    cellEl.appendChild(editorHost);
+  }
+  editing = { mode:'overview', personId, dateStr, groupId, idx, isNew, el:editorHost, oldVal };
   if (typeof presenceClearCell === 'function') presenceClearCell();
-  cellEl.classList.add('editing');
-  cellEl.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:none;overflow:hidden;word-break:break-word;white-space:pre-wrap;" placeholder="输入任务"></textarea>`;
-  const ta = cellEl.querySelector('textarea');
+  editorHost.classList.add('editing');
+  editorHost.innerHTML = `<textarea style="width:100%;min-height:56px;border:none;background:transparent;text-align:center;font-size:13px;font-weight:500;font-family:inherit;outline:none;color:var(--text);resize:none;overflow:hidden;word-break:break-word;white-space:pre-wrap;" placeholder="输入新的排班"></textarea>`;
+  const ta = editorHost.querySelector('textarea');
   ta.value = oldVal;
   ta.focus();
   ta.selectionStart = ta.value.length;
@@ -1988,6 +2157,13 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   function commit() {
     if (!editing) return;
     const cur = editing;
+    if (getTimeOff(cur.personId, cur.dateStr)) {
+      editing = null;
+      presenceStopEditing();
+      requestAnimationFrame(() => renderOverview());
+      toast('该人员当天已休假，本次排班未保存');
+      return;
+    }
     const newVal = ta.value.trim();
     const curEntries = getEntries(cur.groupId, cur.personId, cur.dateStr);
     let next;
@@ -2049,6 +2225,8 @@ function cleanupOvDrag() {
 // 即使目标已存在同一小组的块，也作为「另一个独立块」追加，不会覆盖。
 function moveBlock(groupId, srcPid, srcDate, srcIdx, tPid, tDate) {
   if (!requireScheduleWeekEdit()) return;
+  if (getTimeOff(srcPid, srcDate)) { toast('原单元格已休假，排班仍安全保留'); return; }
+  if (getTimeOff(tPid, tDate)) { toast('目标人员当天已休假，不能移入排班'); return; }
   if (srcPid === tPid && srcDate === tDate) return; // 同一格不处理
   const srcEntries = getEntries(groupId, srcPid, srcDate);
   if (srcIdx < 0 || srcIdx >= srcEntries.length) return;

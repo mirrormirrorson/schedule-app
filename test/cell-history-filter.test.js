@@ -29,6 +29,7 @@ test('week-only people are displayed in stable category order', () => {
 function historySandbox() {
   const sandbox = {
     document: { addEventListener() {} },
+    window: { addEventListener() {} },
     fmtFull(date) {
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     },
@@ -37,6 +38,37 @@ function historySandbox() {
   vm.runInContext(read('public/js/identity-history.js'), sandbox);
   return sandbox;
 }
+
+function changeHistorySandbox() {
+  const source = read('public/js/identity-history.js');
+  const start = source.indexOf('function summarizeEntries');
+  const end = source.indexOf('\nfunction logPersonAction', start);
+  assert.ok(start >= 0 && end > start);
+  const captured = [];
+  const sandbox = {
+    wsKey: () => '2026-09-21',
+    userName: () => '测试用户',
+    resolveGroupName: () => '臣妾组',
+    resolvePersonName: () => '阿文',
+    appendHistory: entries => captured.push(...entries),
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(source.slice(start, end), sandbox);
+  sandbox.captured = captured;
+  return sandbox;
+}
+
+test('appending one independent block is recorded as a new schedule entry', () => {
+  const sandbox = changeHistorySandbox();
+  vm.runInContext(`logChanges([{
+    personId:'p1', dateStr:'2026-09-21', groupId:'g1',
+    oldVal:[{note:'第一块'}], newVal:[{note:'第一块'},{note:'第二块'}]
+  }], 'op_add_block')`, sandbox);
+  assert.equal(sandbox.captured.length, 1);
+  assert.equal(sandbox.captured[0].action, 'add');
+  assert.equal(sandbox.captured[0].content, '第二块');
+  assert.deepEqual({ ...sandbox.captured[0].detail }, { old:'', new:'第二块' });
+});
 
 test('cell history matches direct changes and both ends of moves', () => {
   const sandbox = historySandbox();
@@ -71,4 +103,22 @@ test('cell history follows task content back through moves to its original add',
     `historyEntriesForCell(${JSON.stringify(entries)}, ${JSON.stringify(context)}).map(entry => entry.id)`, sandbox
   );
   assert.deepEqual(Array.from(ids), ['move2', 'move1', 'add']);
+});
+
+test('global leave history is visible from the same person and date in every group', () => {
+  const sandbox = historySandbox();
+  const entries = [
+    { id:'leave-set', ts:'2026-09-14T01:01:00.000Z', week:'2026-09-21', group:'休假', groupId:'__timeoff__', person:'阿文', personId:'p1', date:'2026-09-22', action:'leaveSet', content:'休假' },
+    { id:'leave-clear', ts:'2026-09-14T01:02:00.000Z', week:'2026-09-21', group:'休假', groupId:'__timeoff__', person:'阿文', personId:'p1', date:'2026-09-22', action:'leaveClear', content:'休假' },
+    { id:'other-person', ts:'2026-09-14T01:03:00.000Z', week:'2026-09-21', group:'休假', groupId:'__timeoff__', person:'顺斌', personId:'p2', date:'2026-09-22', action:'leaveSet', content:'休假' },
+  ];
+  const context = {
+    week:'2026-09-21', groupId:'g1', group:'臣妾组', overview:false,
+    personId:'p1', person:'阿文', date:'2026-09-22', weekday:'周二',
+    blocks:[{groupId:'g1',group:'臣妾组',note:'正在保留的排班'}],
+  };
+  const ids = vm.runInContext(
+    `historyEntriesForCell(${JSON.stringify(entries)}, ${JSON.stringify(context)}).map(entry => entry.id)`, sandbox
+  );
+  assert.deepEqual(Array.from(ids), ['leave-set', 'leave-clear']);
 });

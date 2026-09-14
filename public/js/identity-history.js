@@ -43,6 +43,10 @@ function summarizeEntries(entries) {
   }).filter(Boolean).join(' / ');
 }
 
+function entryNotes(entries) {
+  return (entries || []).map(entry => String((entry && entry.note) || ''));
+}
+
 function weekdayName(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
@@ -79,8 +83,29 @@ function logChanges(changes, opId, opMeta) {
       const oldV = ch.oldVal || [], newV = ch.newVal || [];
       const had = oldV.length > 0, has = newV.length > 0;
       let action = 'modify';
+      let content = summarizeEntries(newV);
+      let detail = { old: summarizeEntries(oldV), new: summarizeEntries(newV) };
       if (!had && has) action = 'add';
       else if (had && !has) action = 'delete';
+      else {
+        const oldNotes = entryNotes(oldV);
+        const newNotes = entryNotes(newV);
+        const appendedOne = newNotes.length === oldNotes.length + 1
+          && oldNotes.every((note, index) => note === newNotes[index]);
+        const firstDifference = oldNotes.findIndex((note, index) => note !== newNotes[index]);
+        const removedIndex = firstDifference < 0 ? oldNotes.length - 1 : firstDifference;
+        const removedOne = oldNotes.length === newNotes.length + 1
+          && newNotes.every((note, index) => note === oldNotes[index < removedIndex ? index : index + 1]);
+        if (appendedOne) {
+          action = 'add';
+          content = newNotes.at(-1);
+          detail = { old: '', new: content };
+        } else if (removedOne) {
+          action = 'delete';
+          content = oldNotes[removedIndex];
+          detail = { old: content, new: '' };
+        }
+      }
       const gid = ch.groupId || activeGroupId;
       const dateStr = ch.dateStr || '';
       return {
@@ -94,8 +119,8 @@ function logChanges(changes, opId, opMeta) {
         date: dateStr,
         weekday: weekdayName(dateStr),
         action,
-        content: (action === 'delete') ? summarizeEntries(oldV) : summarizeEntries(newV),
-        detail: { old: summarizeEntries(oldV), new: summarizeEntries(newV) },
+        content: action === 'delete' && had && !has ? summarizeEntries(oldV) : content,
+        detail: action === 'delete' && had && !has ? { old: summarizeEntries(oldV), new: '' } : detail,
         opId
       };
     });
@@ -211,7 +236,7 @@ async function initIdentity() {
 }
 
 // ---- 修改记录抽屉 ----
-const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
+const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', leaveSet: '设置休假', leaveClear: '取消休假', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
 const PERSON_ACTIONS = new Set(['addPerson', 'renamePerson', 'removePerson', 'removeFromWeek']);
 let historyOpenContext = null;
 let historyCellContext = null;
@@ -298,7 +323,9 @@ function openHistoryDrawer() {
 
 function openCellHistoryDrawer(context) {
   historyCellContext = context;
-  historyOpenContext = { week: context.week, group: context.group || '' };
+  // 单元格上下文已经精确限定周、组、人员和日期；不再套用普通抽屉的小组筛选，
+  // 否则“休假”这类跨组事件会被当前小组过滤掉。
+  historyOpenContext = null;
   const search = document.getElementById('historySearch');
   const groupFilter = document.getElementById('historyGroupFilter');
   const weekFilter = document.getElementById('historyWeekFilter');
@@ -320,13 +347,13 @@ function closeHistoryDrawer() {
 function weekLabelOf(wk) {
   if (!wk) return '—';
   const thisWeekKey = fmtFull(getMonday(new Date()));
-  const scheduleWeekKey = fmtFull(getMonday(new Date(Date.now() + 7 * 86400000)));
+  const scheduleWeek = scheduleWeekKey();
   const start = new Date(wk + 'T00:00:00');
   const end = new Date(start.getTime() + 6 * 86400000);
   const range = `${fmtDate(start)}~${fmtDate(end)}`;
-  if (wk === thisWeekKey && wk === scheduleWeekKey) return '本周/排班周 ' + range;
+  if (wk === thisWeekKey && wk === scheduleWeek) return '本周/排班周 ' + range;
   if (wk === thisWeekKey) return '本周 ' + range;
-  if (wk === scheduleWeekKey) return '排班周 ' + range;
+  if (wk === scheduleWeek) return '排班周 ' + range;
   return range;
 }
 
@@ -410,10 +437,10 @@ function buildWeekFilter() {
   if (!sel) return;
   const selected = sel.value;
   const thisWeekKey = fmtFull(getMonday(new Date()));
-  const scheduleWeekKey = fmtFull(getMonday(new Date(Date.now() + 7 * 86400000)));
+  const scheduleWeek = scheduleWeekKey();
   const weeks = new Set();
   weeks.add(thisWeekKey);
-  weeks.add(scheduleWeekKey);
+  weeks.add(scheduleWeek);
   (allHistory || []).forEach(h => { if (h.week) weeks.add(h.week); });
   const opts = ['<option value="">全部周</option>'];
   [...weeks].sort().forEach(wk => {
@@ -426,6 +453,10 @@ function buildWeekFilter() {
 function historyEntryTouchesCell(entry, context) {
   if (!entry || !context || isPersonHistory(entry)) return false;
   if ((entry.week || '') !== context.week) return false;
+  if (entry.action === 'leaveSet' || entry.action === 'leaveClear') {
+    const samePerson = entry.personId ? entry.personId === context.personId : entry.person === context.person;
+    return samePerson && (entry.date || '') === context.date;
+  }
   if (!context.overview) {
     const sameGroup = entry.groupId && context.groupId
       ? entry.groupId === context.groupId
@@ -499,6 +530,9 @@ function historyEntriesForCell(entries, context) {
   const blocks = Array.isArray(context && context.blocks) ? context.blocks : [];
   if (!blocks.length) return source.filter(entry => historyEntryTouchesCell(entry, context));
   const matched = new Set();
+  source
+    .filter(entry => historyEntryTouchesCell(entry, context))
+    .forEach(entry => matched.add(entry.id || entry));
   blocks.forEach(block => {
     let note = normalizeHistoryText(block.note);
     let location = {
@@ -545,6 +579,48 @@ function historyEntriesForCell(entries, context) {
   return source.filter(entry => matched.has(entry.id || entry));
 }
 
+let cellContextState = null;
+
+function closeCellContextMenu() {
+  const menu = document.getElementById('cellContextMenu');
+  if (menu) menu.classList.remove('open');
+  cellContextState = null;
+}
+
+function runCellContextAdd() {
+  const context = cellContextState;
+  closeCellContextMenu();
+  if (context) beginNewScheduleFromContext(context);
+}
+
+function runCellContextTimeOff() {
+  const context = cellContextState;
+  closeCellContextMenu();
+  if (context) toggleTimeOffFromContext(context);
+}
+
+function runCellContextHistory() {
+  const context = cellContextState;
+  closeCellContextMenu();
+  if (context) openCellHistoryDrawer(context);
+}
+
+function openCellContextMenu(event, context) {
+  const menu = document.getElementById('cellContextMenu');
+  if (!menu) return;
+  const tooltip = document.getElementById('cellTooltip');
+  if (tooltip) tooltip.style.display = 'none';
+  cellContextState = context;
+  const leaveButton = document.getElementById('cellContextTimeOff');
+  if (leaveButton) leaveButton.innerHTML = getTimeOff(context.personId, context.date, context.week) ? '<span>↩</span>取消休假' : '<span>☁</span>休假';
+  menu.classList.add('open');
+  menu.style.left = `${event.clientX}px`;
+  menu.style.top = `${event.clientY}px`;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`;
+}
+
 document.addEventListener('contextmenu', event => {
   if (event.target.closest('textarea, input, select')) return;
   const cell = event.target.closest('#editTable .cell, #overviewTable .ov-cell');
@@ -554,12 +630,12 @@ document.addEventListener('contextmenu', event => {
   if (!person || !date) return;
   event.preventDefault();
   const overview = Boolean(cell.closest('#overviewTable'));
+  const clickedBlock = overview ? event.target.closest('.ov-block') : null;
   const blocks = overview
     ? getScheduleInfo(person.id, date).map(block => ({ groupId: block.groupId, group: block.groupName, note: block.note }))
     : getEntries(activeGroupId, person.id, date).map(entry => ({ groupId: activeGroupId, group: resolveGroupName(activeGroupId), note: entry.note }));
-  openCellHistoryDrawer({
+  openCellContextMenu(event, {
     week: wsKey(),
-    groupId: overview ? '' : activeGroupId,
     group: overview ? '' : resolveGroupName(activeGroupId),
     overview,
     personId: person.id,
@@ -567,8 +643,16 @@ document.addEventListener('contextmenu', event => {
     date,
     weekday: weekdayName(date),
     blocks,
+    groupId: overview && clickedBlock ? clickedBlock.dataset.gid : (overview ? '' : activeGroupId),
   });
 });
+
+document.addEventListener('mousedown', event => {
+  if (!event.target.closest('#cellContextMenu')) closeCellContextMenu();
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeCellContextMenu(); });
+window.addEventListener('resize', closeCellContextMenu);
+window.addEventListener('scroll', closeCellContextMenu, true);
 
 function renderHistoryList() {
   const list = document.getElementById('historyList');
@@ -596,7 +680,7 @@ function renderHistoryList() {
       ? weekSelect.options[weekSelect.selectedIndex].textContent
       : '全部周';
     summary.textContent = historyCellContext
-      ? `该单元格内容自新增起共 ${h.length} 条修改记录（全部 ${allHistory.length} 条）`
+      ? `该单元格共 ${h.length} 条修改记录（全部 ${allHistory.length} 条）`
       : `${weekLabel} · ${groupLabel} · 显示 ${h.length} 条（全部 ${allHistory.length} 条）`;
   }
   if (!h.length) {

@@ -55,6 +55,7 @@ function defaultData() {
     ],
     conditionRules: [],
     schedules: {},
+    timeOff: {},
   };
 }
 
@@ -311,7 +312,7 @@ const EDITABLE_ROOTS = [
   'internalPeople', 'externalPeople', 'groups', 'conditionRules',
   'personRadarFields', 'personRadarScores',
   'weekPeople', 'weekPeopleLocked', 'weekGroups', 'weekGroupLocked',
-  'groupColors', 'schedules', 'resolutions'
+  'groupColors', 'schedules', 'timeOff', 'resolutions'
 ];
 
 function cloneValue(value) {
@@ -500,13 +501,15 @@ async function drainSyncQueue() {
         lastServerData = cloneValue(serverState);
         serverRevision = Number((payload.state && payload.state._revision) || serverRevision);
         serverUpdated = Number((payload.state && payload.state._updated) || serverUpdated || Date.now());
-        if (!data.schedules || typeof data.schedules !== 'object') data.schedules = {};
-        deniedWeeks.forEach(week => {
-          if (serverState.schedules && Object.prototype.hasOwnProperty.call(serverState.schedules, week)) {
-            data.schedules[week] = cloneValue(serverState.schedules[week]);
-          } else {
-            delete data.schedules[week];
-          }
+        ['schedules', 'timeOff'].forEach(root => {
+          if (!data[root] || typeof data[root] !== 'object') data[root] = {};
+          deniedWeeks.forEach(week => {
+            if (serverState[root] && Object.prototype.hasOwnProperty.call(serverState[root], week)) {
+              data[root][week] = cloneValue(serverState[root][week]);
+            } else {
+              delete data[root][week];
+            }
+          });
         });
         if (typeof currentUser !== 'undefined' && currentUser && payload.user) {
           currentUser = payload.user;
@@ -514,7 +517,7 @@ async function drainSyncQueue() {
         }
         saveLocal();
         if (!editing) renderAll();
-        toast('还未进入排班时间');
+        toast('还未进入排班时间，请于周一上午 9:00 后再填写');
         syncRequested = pendingHistoryEntries.length > 0
           || (lastServerData && buildPatches(lastServerData, data).length > 0);
         if (!syncRequested) {
