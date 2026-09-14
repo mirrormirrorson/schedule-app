@@ -124,4 +124,5 @@ DATABASE_URL='postgresql://...' pnpm import:snapshot -- path/to/state.json
   限制。前端全部入口和服务端补丁根均校验 `schedules` 与 `timeOff`。
 - 跨组冲突提示放大为 14px，并将“如解决不了，填入后等待排班负责人协调”标红。
 - 本地隔离文件为 `tmp-calendar-leave-preview/db.json`，测试数据未连接 Neon。54/54 自动测试和
-  浏览器验收通过；当前只在本地分支 `agent/context-menu-leave-9am`，尚未部署。
+  浏览器验收通过；功能提交 `1404e9f` 已发布到 GitHub `main` 并由 Render 读回。发布前后生产
+  revision 1855、人员/组/周/任务/历史数量及 history ETag 不变，隔离样例未进入生产。
