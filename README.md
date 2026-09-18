@@ -126,3 +126,11 @@ DATABASE_URL='postgresql://...' pnpm import:snapshot -- path/to/state.json
 - 本地隔离文件为 `tmp-calendar-leave-preview/db.json`，测试数据未连接 Neon。54/54 自动测试和
   浏览器验收通过；功能提交 `1404e9f` 已发布到 GitHub `main` 并由 Render 读回。发布前后生产
   revision 1855、人员/组/周/任务/历史数量及 history ETag 不变，隔离样例未进入生产。
+
+## 2026-09-18 导出图片显示休假
+
+- “复制图片”和“导出图片”共用的导出表格现在会先读取全局 `timeOff`。人员当天休假时，图片
+  显示灰底“休假”，并继续隐藏数据库中安全保留的原排班；取消休假后才重新导出原排班。
+- 修复只涉及前端图片渲染，不改变 `timeOff`、`schedules` 或数据库结构，也不新增生产写入。
+- 新增三项导出回归检查，并与全套测试共同通过（57/57）；浏览器隔离数据生成的导出表格中
+  已实际出现“休假”。

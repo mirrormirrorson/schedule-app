@@ -122,6 +122,15 @@ async function copyImageToClipboard() {
   document.body.removeChild(container);
 }
 
+function getExportCellView(personId, dateStr) {
+  const timeOff = Boolean(getTimeOff(personId, dateStr));
+  return {
+    timeOff,
+    // 休假会隐藏但不会删除原排班；导出结果必须和网页当前看到的状态一致。
+    blocks: timeOff ? [] : getScheduleInfo(personId, dateStr),
+  };
+}
+
 async function buildExportCanvas() {
   // 构建干净的导出表格
   const container = document.createElement('div');
@@ -181,10 +190,18 @@ async function buildExportCanvas() {
     tr.appendChild(tdName);
     dates.forEach(d => {
       const td = document.createElement('td');
-      const blocks = getScheduleInfo(p.id, fmtFull(d));
+      const cellView = getExportCellView(p.id, fmtFull(d));
+      const blocks = cellView.blocks;
       const minH = Math.max(70, blocks.length * 35);
       td.style.cssText = `border:1px solid #ccc;padding:0;text-align:center;vertical-align:top;font-size:10px;word-break:break-word;position:relative;height:${minH}px;`;
-      if (blocks.length > 0) {
+      if (cellView.timeOff) {
+        td.style.background = '#e5e7eb';
+        td.style.color = '#6b7280';
+        const leave = document.createElement('div');
+        leave.textContent = '休假';
+        leave.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;min-height:70px;box-sizing:border-box;font-size:12px;font-weight:700;letter-spacing:2px;';
+        td.appendChild(leave);
+      } else if (blocks.length > 0) {
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;justify-content:center;height:100%;box-sizing:border-box;';
         blocks.forEach(b => {
