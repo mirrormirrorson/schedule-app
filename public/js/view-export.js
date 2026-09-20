@@ -126,7 +126,7 @@ function getExportCellView(personId, dateStr) {
   const timeOff = Boolean(getTimeOff(personId, dateStr));
   return {
     timeOff,
-    // 休假会隐藏但不会删除原排班；导出结果必须和网页当前看到的状态一致。
+    // 请假会隐藏但不会删除原排班；导出结果必须和网页当前看到的状态一致。
     blocks: timeOff ? [] : getScheduleInfo(personId, dateStr),
   };
 }
@@ -198,7 +198,7 @@ async function buildExportCanvas() {
         td.style.background = '#e5e7eb';
         td.style.color = '#6b7280';
         const leave = document.createElement('div');
-        leave.textContent = '休假';
+        leave.textContent = '请假';
         leave.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;min-height:70px;box-sizing:border-box;font-size:12px;font-weight:700;letter-spacing:2px;';
         td.appendChild(leave);
       } else if (blocks.length > 0) {

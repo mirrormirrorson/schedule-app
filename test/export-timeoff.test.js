@@ -39,8 +39,8 @@ test('image export keeps schedule blocks for a normal cell', () => {
   assert.equal(result.blocks[0].note, '正常排班');
 });
 
-test('image export renders an explicit grey leave marker', () => {
-  assert.match(source, /leave\.textContent = '休假'/);
+test('image export renders an explicit grey 请假 marker', () => {
+  assert.match(source, /leave\.textContent = '请假'/);
   assert.match(source, /td\.style\.background = '#e5e7eb'/);
   assert.match(source, /cellView\.timeOff/);
 });

@@ -236,7 +236,7 @@ async function initIdentity() {
 }
 
 // ---- 修改记录抽屉 ----
-const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', leaveSet: '设置休假', leaveClear: '取消休假', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
+const ACTION_LABEL = { add: '新增', modify: '修改', delete: '删除', move: '移动', leaveSet: '设置请假', leaveClear: '取消请假', addPerson: '新增人员', renamePerson: '改名', removePerson: '删除人员', removeFromWeek: '移除本周' };
 const PERSON_ACTIONS = new Set(['addPerson', 'renamePerson', 'removePerson', 'removeFromWeek']);
 let historyOpenContext = null;
 let historyCellContext = null;
@@ -262,10 +262,18 @@ function historyAreaKey(entry) {
 }
 
 function historyAreaLabel(entry) {
+  if (entry && (entry.action === 'leaveSet' || entry.action === 'leaveClear')) return '请假';
   const scope = personHistoryScope(entry);
   if (scope === 'week') return '本周人员名单';
   if (scope === 'template') return '常用人员模板';
   return (entry && entry.group) || '未分组';
+}
+
+function historyDisplayText(value, entry) {
+  const text = String(value || '');
+  return entry && (entry.action === 'leaveSet' || entry.action === 'leaveClear')
+    ? text.replace(/休假/g, '请假')
+    : text;
 }
 
 function personCategoryLabel(entry) {
@@ -612,7 +620,7 @@ function openCellContextMenu(event, context) {
   if (tooltip) tooltip.style.display = 'none';
   cellContextState = context;
   const leaveButton = document.getElementById('cellContextTimeOff');
-  if (leaveButton) leaveButton.innerHTML = getTimeOff(context.personId, context.date, context.week) ? '<span>↩</span>取消休假' : '<span>☁</span>休假';
+  if (leaveButton) leaveButton.innerHTML = getTimeOff(context.personId, context.date, context.week) ? '<span>↩</span>取消请假' : '<span>☁</span>请假';
   menu.classList.add('open');
   menu.style.left = `${event.clientX}px`;
   menu.style.top = `${event.clientY}px`;
@@ -666,7 +674,7 @@ function renderHistoryList() {
   if (g) h = h.filter(x => historyAreaKey(x) === g);
   if (wk) h = h.filter(x => (x.week || '') === wk);
   if (q) h = h.filter(x => (
-    (x.user || '') + (x.person || '') + (x.content || '') + (x.week || '')
+    (x.user || '') + (x.person || '') + historyDisplayText(x.content, x) + (x.week || '')
     + historyAreaLabel(x) + personCategoryLabel(x)
   ).toLowerCase().includes(q));
   h = h.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
@@ -719,15 +727,15 @@ function renderHistoryList() {
     let contentHtml = '';
     let positionHtml = '';
     if (e.action === 'move') {
-      contentHtml = `<div class="hd-content-box">${esc(e.content || '未填写内容')}</div>`;
+      contentHtml = `<div class="hd-content-box">${esc(historyDisplayText(e.content, e) || '未填写内容')}</div>`;
       positionHtml = `<div class="hd-route" aria-label="从原位置移动到新位置">
         <div class="hd-route-point old" aria-label="原位置"><strong>${esc(e.fromLabel || '—')}</strong></div>
         <span class="hd-route-arrow" aria-hidden="true">→</span>
         <div class="hd-route-point new" aria-label="新位置"><strong>${esc(e.toLabel || '—')}</strong></div>
       </div>`;
     } else if (e.action === 'modify') {
-      const old = (e.detail && e.detail.old) || '';
-      const nw = (e.detail && e.detail.new) || '';
+      const old = historyDisplayText((e.detail && e.detail.old) || '', e);
+      const nw = historyDisplayText((e.detail && e.detail.new) || '', e);
       contentHtml = `<div class="hd-route">
         <div class="hd-route-point old"><span>修改前</span><strong>${esc(old || '（空）')}</strong></div>
         <span class="hd-route-arrow" aria-hidden="true">→</span>
@@ -735,10 +743,10 @@ function renderHistoryList() {
       </div>`;
       positionHtml = `<div class="hd-place-box">${placement}</div>`;
     } else if (e.action === 'delete') {
-      contentHtml = `<div class="hd-content-box old">${esc(e.content || '（空内容）')}</div>`;
+      contentHtml = `<div class="hd-content-box old">${esc(historyDisplayText(e.content, e) || '（空内容）')}</div>`;
       positionHtml = `<div class="hd-place-box">${placement}</div>`;
     } else {
-      contentHtml = `<div class="hd-content-box">${esc(e.content || '未填写补充内容')}</div>`;
+      contentHtml = `<div class="hd-content-box">${esc(historyDisplayText(e.content, e) || '未填写补充内容')}</div>`;
       positionHtml = `<div class="hd-place-box">${placement}</div>`;
     }
 
@@ -769,7 +777,7 @@ function renderHistoryList() {
          ${categoryLabel ? `<i aria-hidden="true">·</i><span>${esc(categoryLabel)}</span>` : ''}`
       : `<strong>${esc(weekLabelOf(e.week))}</strong>
          <i aria-hidden="true">·</i>
-         <strong>${esc(e.group || '未分组')}</strong>`;
+         <strong>${esc(areaLabel || '未分组')}</strong>`;
 
     html.push(`<article class="hd-item${personAction ? ' hd-item-person' : ''}">
       <div class="hd-item-head">

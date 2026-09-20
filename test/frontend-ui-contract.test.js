@@ -233,7 +233,7 @@ test('temporary internal people stay in the existing internal section', () => {
   assert.match(management, /const wp = rawWeekPeople\(\)/);
 });
 
-test('right-clicking a schedule cell opens add, leave and history actions', () => {
+test('right-clicking a schedule cell opens add, time-off and history actions with 请假 wording', () => {
   const html = read('public/index.html');
   const history = read('public/js/identity-history.js');
   const schedule = read('public/js/schedule-core.js');
@@ -242,7 +242,8 @@ test('right-clicking a schedule cell opens add, leave and history actions', () =
   assert.ok(menu);
   assert.equal((menu[0].match(/role="menuitem"/g) || []).length, 3);
   assert.match(menu[0], /新增排班/);
-  assert.match(menu[0], /休假/);
+  assert.match(menu[0], /请假/);
+  assert.doesNotMatch(menu[0], />休假</);
   assert.match(menu[0], /查看历史记录/);
   assert.match(html, /id="historyCellFilter"/);
   assert.match(history, /document\.addEventListener\('contextmenu'/);
@@ -260,7 +261,10 @@ test('right-clicking a schedule cell opens add, leave and history actions', () =
   assert.match(schedule, /function toggleTimeOffFromContext\(context\)/);
   assert.match(schedule, /function beginNewScheduleFromContext\(context\)/);
   assert.match(schedule, /原有排班只隐藏、不删除/);
-  assert.match(schedule, /目标人员当天已休假，不能移入排班/);
+  assert.match(schedule, /目标人员当天已请假，不能移入排班/);
+  assert.match(history, /leaveSet: '设置请假'/);
+  assert.match(history, /leaveClear: '取消请假'/);
+  assert.match(history, /text\.replace\(\/休假\/g, '请假'\)/);
   assert.match(css, /\.hd-cell-filter\s*\{/);
 });
 

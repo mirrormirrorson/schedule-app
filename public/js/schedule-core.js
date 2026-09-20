@@ -266,7 +266,7 @@ async function undo() {
   if (undoStack.length === 0) { toast('没有可撤销的操作'); return; }
   if (!requireScheduleWeekEdit(undoStack[undoStack.length - 1].week)) return;
   if (undoActionWritesIntoTimeOff(undoStack[undoStack.length - 1], 'oldVal')) {
-    toast('休假格不能恢复排班，请先右键取消休假');
+    toast('请假格不能恢复排班，请先右键取消请假');
     return;
   }
   const action = undoStack.pop();
@@ -313,7 +313,7 @@ async function redo() {
   if (redoStack.length === 0) { toast('没有可重做的操作'); return; }
   if (!requireScheduleWeekEdit(redoStack[redoStack.length - 1].week)) return;
   if (undoActionWritesIntoTimeOff(redoStack[redoStack.length - 1], 'newVal')) {
-    toast('休假格不能恢复排班，请先右键取消休假');
+    toast('请假格不能恢复排班，请先右键取消请假');
     return;
   }
   const action = redoStack.pop();
@@ -377,7 +377,7 @@ function normalizeRadarScore(value) {
   return Math.max(0, Math.min(10, Math.round(number)));
 }
 
-// 休假是“人员 × 日期”的单一状态，各小组与总览共读；原有排班只隐藏、不删除。
+// 请假是“人员 × 日期”的单一状态，各小组与总览共读；原有排班只隐藏、不删除。
 function getTimeOff(personId, dateStr, weekKey = wsKey()) {
   const week = data.timeOff && data.timeOff[weekKey];
   return Boolean(week && week[skey(personId, dateStr)]);
@@ -385,8 +385,8 @@ function getTimeOff(personId, dateStr, weekKey = wsKey()) {
 
 function timeOffCellHTML(personId, dateStr) {
   const hiddenCount = getScheduleInfo(personId, dateStr).length;
-  const suffix = hiddenCount ? `；原有 ${hiddenCount} 项排班已保留，取消休假后恢复` : '';
-  return `<div class="timeoff-chip" title="已标记休假${suffix}"><span>休假</span>${hiddenCount ? `<small>原排班已保留</small>` : ''}</div>`;
+  const suffix = hiddenCount ? `；原有 ${hiddenCount} 项排班已保留，取消请假后恢复` : '';
+  return `<div class="timeoff-chip" title="已标记请假${suffix}"><span>请假</span>${hiddenCount ? `<small>原排班已保留</small>` : ''}</div>`;
 }
 
 function appendTimeOffHistory(action, context) {
@@ -420,15 +420,15 @@ function toggleTimeOffFromContext(context) {
   renderAll();
   const hiddenCount = getScheduleInfo(context.personId, context.date).length;
   toast(isCancel
-    ? '已取消休假，原有排班已恢复显示'
-    : (hiddenCount ? `已标记休假，原有 ${hiddenCount} 项排班已安全保留` : '已标记休假，所有小组已同步'));
+    ? '已取消请假，原有排班已恢复显示'
+    : (hiddenCount ? `已标记请假，原有 ${hiddenCount} 项排班已安全保留` : '已标记请假，所有小组已同步'));
 }
 
 function beginNewScheduleFromContext(context) {
   if (!context || !context.personId || !context.date) return;
   if (!requireScheduleWeekEdit(context.week || wsKey())) return;
   if (getTimeOff(context.personId, context.date, context.week || wsKey())) {
-    toast('该人员当天已休假，请先右键取消休假');
+    toast('该人员当天已请假，请先右键取消请假');
     return;
   }
   if (context.overview) {
@@ -915,7 +915,7 @@ async function pasteToSelection() {
   if (isOv) { renderAll(); highlightOverviewSelection(); }
   else renderEditTable();
   toast(blockedByTimeOff
-    ? `已粘贴 ${changes.length} 个单元格，跳过 ${blockedByTimeOff} 个休假格`
+    ? `已粘贴 ${changes.length} 个单元格，跳过 ${blockedByTimeOff} 个请假格`
     : `已粘贴 ${changes.length} 个单元格`);
 }
 
@@ -1508,7 +1508,7 @@ document.addEventListener('mouseup', function(e) {
     let selectedAfterDrop = sourceSnapshot;
     if (targetEl && targetEl !== cellDrag.sourceEl) {
       if (getTimeOff(cellDrag.personId, cellDrag.dateStr)) {
-        toast('原单元格已休假，排班仍安全保留');
+        toast('原单元格已请假，排班仍安全保留');
         cleanupDrag();
         mouseDownCell = null;
         renderEditTable();
@@ -1517,7 +1517,7 @@ document.addEventListener('mouseup', function(e) {
       const tPid = targetEl.dataset.pid;
       const tDate = targetEl.dataset.date;
       if (getTimeOff(tPid, tDate)) {
-        toast('目标人员当天已休假，不能移入排班');
+        toast('目标人员当天已请假，不能移入排班');
         cleanupDrag();
         mouseDownCell = null;
         renderEditTable();
@@ -1659,7 +1659,7 @@ document.addEventListener('dblclick', function(e) {
   if (!requireScheduleWeekEdit()) return;
   const { personId, dateStr, r, c } = lastClickCell;
   if (getTimeOff(personId, dateStr)) {
-    toast('该人员当天已休假，请先右键取消休假');
+    toast('该人员当天已请假，请先右键取消请假');
     return;
   }
 
@@ -1702,7 +1702,7 @@ document.addEventListener('dblclick', function(e) {
 function startEditDOM(cellEl, personId, dateStr, idx) {
   if (!requireScheduleWeekEdit()) return;
   if (idx < 0 && getTimeOff(personId, dateStr)) {
-    toast('该人员当天已休假，请先右键取消休假');
+    toast('该人员当天已请假，请先右键取消请假');
     return;
   }
   if (editing) commitEdit();
@@ -1755,7 +1755,7 @@ function commitEdit() {
     editing = null;
     presenceStopEditing();
     renderEditTable();
-    toast('该人员当天已休假，本次排班未保存');
+    toast('该人员当天已请假，本次排班未保存');
     return;
   }
   const ta = document.getElementById('editInput');
@@ -1885,7 +1885,7 @@ document.addEventListener('keydown', function(e) {
         });
       });
       if (changes.length > 0) { pushUndo(changes); saveData(); renderAll(); }
-      if (blockedByTimeOff) toast('休假格不会清除隐藏的原排班，请先右键取消休假');
+      if (blockedByTimeOff) toast('请假格不会清除隐藏的原排班，请先右键取消请假');
       return;
     }
     // 小组表：清除选中格内容（整格 entries）
@@ -1905,7 +1905,7 @@ document.addEventListener('keydown', function(e) {
       saveData();
       renderEditTable();
     }
-    if (blockedByTimeOff) toast('休假格不会清除隐藏的原排班，请先右键取消休假');
+    if (blockedByTimeOff) toast('请假格不会清除隐藏的原排班，请先右键取消请假');
     return;
   }
 
@@ -2058,7 +2058,7 @@ function renderOverview() {
   const isScheduleWeek = wsKey() === scheduleWeek;
   document.getElementById('overviewPanel').insertAdjacentHTML('afterbegin',
     `<div class="hint-bar" id="ovHint" style="margin-bottom:12px;">
-      ${isScheduleWeek ? '双击已有块可编辑 · 右键可新增排班、休假或查看历史 · 拖动小组块可移动 · 此表为最终导出源' : '双击已有块可编辑 · 右键可新增排班、休假或查看历史 · 拖动小组块可移动'}
+      ${isScheduleWeek ? '双击已有块可编辑 · 右键可新增排班、请假或查看历史 · 拖动小组块可移动 · 此表为最终导出源' : '双击已有块可编辑 · 右键可新增排班、请假或查看历史 · 拖动小组块可移动'}
       <span class="hint-spacer"></span>
     </div>`);
 
@@ -2126,7 +2126,7 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
   const oldVal = (idx >= 0 && entries[idx]) ? entries[idx].note : '';
   const isNew = !(idx >= 0 && entries[idx]);
   if (isNew && getTimeOff(personId, dateStr)) {
-    toast('该人员当天已休假，请先右键取消休假');
+    toast('该人员当天已请假，请先右键取消请假');
     return;
   }
 
@@ -2161,7 +2161,7 @@ function ovEntryEdit(cellEl, personId, dateStr, groupId, idx) {
       editing = null;
       presenceStopEditing();
       requestAnimationFrame(() => renderOverview());
-      toast('该人员当天已休假，本次排班未保存');
+      toast('该人员当天已请假，本次排班未保存');
       return;
     }
     const newVal = ta.value.trim();
@@ -2225,8 +2225,8 @@ function cleanupOvDrag() {
 // 即使目标已存在同一小组的块，也作为「另一个独立块」追加，不会覆盖。
 function moveBlock(groupId, srcPid, srcDate, srcIdx, tPid, tDate) {
   if (!requireScheduleWeekEdit()) return;
-  if (getTimeOff(srcPid, srcDate)) { toast('原单元格已休假，排班仍安全保留'); return; }
-  if (getTimeOff(tPid, tDate)) { toast('目标人员当天已休假，不能移入排班'); return; }
+  if (getTimeOff(srcPid, srcDate)) { toast('原单元格已请假，排班仍安全保留'); return; }
+  if (getTimeOff(tPid, tDate)) { toast('目标人员当天已请假，不能移入排班'); return; }
   if (srcPid === tPid && srcDate === tDate) return; // 同一格不处理
   const srcEntries = getEntries(groupId, srcPid, srcDate);
   if (srcIdx < 0 || srcIdx >= srcEntries.length) return;

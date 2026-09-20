@@ -122,3 +122,19 @@ test('global leave history is visible from the same person and date in every gro
   );
   assert.deepEqual(Array.from(ids), ['leave-set', 'leave-clear']);
 });
+
+test('legacy leave history displays as 请假 without rewriting stored records', () => {
+  const sandbox = historySandbox();
+  const displayed = vm.runInContext(`({
+    area: historyAreaLabel({ action:'leaveSet', group:'休假' }),
+    content: historyDisplayText('休假', { action:'leaveSet' }),
+    setLabel: ACTION_LABEL.leaveSet,
+    clearLabel: ACTION_LABEL.leaveClear,
+  })`, sandbox);
+  assert.deepEqual({ ...displayed }, {
+    area: '请假',
+    content: '请假',
+    setLabel: '设置请假',
+    clearLabel: '取消请假',
+  });
+});
