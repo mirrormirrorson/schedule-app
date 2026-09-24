@@ -212,7 +212,10 @@ test('future scheduling cycles are editable only by protected admins', () => {
   assert.match(schedule, /function scheduleWeekKey\(now = new Date\(\)\)/);
   assert.match(schedule, /function canEditScheduleWeek\(weekKey = wsKey\(\)\)/);
   assert.match(schedule, /typeof isPermissionAdmin === 'function' && isPermissionAdmin\(\)/);
-  assert.match(schedule, /还未进入排班时间，请于周一上午 9:00 后再填写/);
+  assert.match(schedule, /SCHEDULE_OPEN_HOUR_SHANGHAI = 14/);
+  assert.match(schedule, /还未进入排班时间，请于周一下午 2:00 后再填写/);
+  assert.match(sync, /还未进入排班时间，请于周一下午 2:00 后再填写/);
+  assert.match(server, /SCHEDULE_OPEN_HOUR_SHANGHAI = 14/);
   assert.match(schedule, /document\.addEventListener\('dblclick',[\s\S]*?requireScheduleWeekEdit\(\)/);
   assert.match(schedule, /async function pasteToSelection\(\) \{\s*if \(!requireScheduleWeekEdit\(\)\) return;/);
   assert.match(schedule, /function ovEntryEdit\([\s\S]*?if \(!requireScheduleWeekEdit\(\)\) return;/);

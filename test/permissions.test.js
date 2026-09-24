@@ -12,12 +12,12 @@ const { app, store, scheduleWeekKeyForShanghai, futureScheduleWeeksFromChanges }
 
 test.after(() => fs.rmSync(testDir, { recursive: true, force: true }));
 
-test('schedule week boundary opens at Monday 09:00 Shanghai time and flags only later cycles', () => {
+test('schedule week boundary opens at Monday 14:00 Shanghai time and flags only later cycles', () => {
   assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-11T04:00:00Z')), '2026-08-17');
   assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-16T04:00:00Z')), '2026-08-17');
-  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T00:59:59Z')), '2026-09-14');
-  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T01:00:00Z')), '2026-09-21');
-  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-17T04:00:00Z')), '2026-08-24');
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T05:59:59Z')), '2026-09-14');
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T06:00:00Z')), '2026-09-21');
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-17T06:00:00Z')), '2026-08-24');
   const changes = [
     { path: ['schedules', '2026-08-17', 'g1', 'p1_2026-08-17'], after: { exists: true, value: [{ note: '排班周' }] } },
     { path: ['schedules', '2026-08-24', 'g1', 'p1_2026-08-24'], after: { exists: true, value: [{ note: '未来周' }] } },

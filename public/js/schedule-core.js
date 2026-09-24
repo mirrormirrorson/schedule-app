@@ -27,11 +27,12 @@ function calendarHeaderHTML(date, dayIndex) {
   const adjusted = info.adjusted ? ' calendar-day-adjusted' : '';
   return `<th class="calendar-day calendar-day-${info.kind}${adjusted}"${title}>${fmtDate(date)}<br><small>${DAY_NAMES[dayIndex]} <span class="calendar-mark">${info.mark}</span></small></th>`;
 }
+const SCHEDULE_OPEN_HOUR_SHANGHAI = 14;
 function scheduleWeekKey(now = new Date()) {
-  // 以北京时间计算：周一 09:00 前，下一周仍未开放；09:00 起才切换到下一排班周。
+  // 以北京时间计算：周一 14:00 前，下一周仍未开放；14:00 起才切换到下一排班周。
   const shifted = new Date(new Date(now).getTime() + 8 * 60 * 60 * 1000);
   const day = shifted.getUTCDay();
-  const beforeMondayOpen = day === 1 && shifted.getUTCHours() < 9;
+  const beforeMondayOpen = day === 1 && shifted.getUTCHours() < SCHEDULE_OPEN_HOUR_SHANGHAI;
   const daysToBoundary = beforeMondayOpen ? 0 : (day === 0 ? 1 : (day === 1 ? 7 : 8 - day));
   shifted.setUTCDate(shifted.getUTCDate() + daysToBoundary);
   return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2,'0')}-${String(shifted.getUTCDate()).padStart(2,'0')}`;
@@ -43,7 +44,7 @@ function canEditScheduleWeek(weekKey = wsKey()) {
 }
 function requireScheduleWeekEdit(weekKey = wsKey(), notify = true) {
   const allowed = canEditScheduleWeek(weekKey);
-  if (!allowed && notify) toast('还未进入排班时间，请于周一上午 9:00 后再填写');
+  if (!allowed && notify) toast('还未进入排班时间，请于周一下午 2:00 后再填写');
   return allowed;
 }
 function autoResizeTextarea(ta) {

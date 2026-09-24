@@ -517,7 +517,7 @@ async function drainSyncQueue() {
         }
         saveLocal();
         if (!editing) renderAll();
-        toast('还未进入排班时间，请于周一上午 9:00 后再填写');
+        toast('还未进入排班时间，请于周一下午 2:00 后再填写');
         syncRequested = pendingHistoryEntries.length > 0
           || (lastServerData && buildPatches(lastServerData, data).length > 0);
         if (!syncRequested) {

@@ -74,6 +74,8 @@ function isPermissionAdminName(name) {
   return PERMISSION_ADMIN_NAMES.has(String(name || '').trim());
 }
 
+const SCHEDULE_OPEN_HOUR_SHANGHAI = 14;
+
 function scheduleWeekKeyForShanghai(now = new Date()) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
@@ -83,8 +85,8 @@ function scheduleWeekKeyForShanghai(now = new Date()) {
   );
   const localDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
   const day = localDate.getUTCDay();
-  // 普通账号的下一排班周在北京时间周一 09:00 开放；周一 09:00 前仍以本周为边界。
-  const beforeMondayOpen = day === 1 && Number(parts.hour) < 9;
+  // 普通账号的下一排班周在北京时间周一 14:00 开放；此前仍以本周为边界。
+  const beforeMondayOpen = day === 1 && Number(parts.hour) < SCHEDULE_OPEN_HOUR_SHANGHAI;
   const daysToBoundary = beforeMondayOpen ? 0 : (day === 0 ? 1 : (day === 1 ? 7 : 8 - day));
   localDate.setUTCDate(localDate.getUTCDate() + daysToBoundary);
   return `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
