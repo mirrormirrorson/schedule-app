@@ -29,18 +29,24 @@ function calendarHeaderHTML(date, dayIndex) {
 }
 const SCHEDULE_OPEN_HOUR_SHANGHAI = 14;
 function scheduleWeekKey(now = new Date()) {
-  // 以北京时间计算：周一 14:00 前，下一周仍未开放；14:00 起才切换到下一排班周。
+  // 排班周始终是下一周；开放时间只控制能否填写，不能改变“排班周”指向。
   const shifted = new Date(new Date(now).getTime() + 8 * 60 * 60 * 1000);
   const day = shifted.getUTCDay();
-  const beforeMondayOpen = day === 1 && shifted.getUTCHours() < SCHEDULE_OPEN_HOUR_SHANGHAI;
-  const daysToBoundary = beforeMondayOpen ? 0 : (day === 0 ? 1 : (day === 1 ? 7 : 8 - day));
-  shifted.setUTCDate(shifted.getUTCDate() + daysToBoundary);
+  const daysToNextMonday = day === 0 ? 1 : 8 - day;
+  shifted.setUTCDate(shifted.getUTCDate() + daysToNextMonday);
   return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2,'0')}-${String(shifted.getUTCDate()).padStart(2,'0')}`;
 }
+function isScheduleWeekOpen(now = new Date()) {
+  const shifted = new Date(new Date(now).getTime() + 8 * 60 * 60 * 1000);
+  return shifted.getUTCDay() !== 1 || shifted.getUTCHours() >= SCHEDULE_OPEN_HOUR_SHANGHAI;
+}
 function isFutureScheduleWeek(weekKey = wsKey()) { return String(weekKey || '') > scheduleWeekKey(); }
-function canEditScheduleWeek(weekKey = wsKey()) {
-  if (!isFutureScheduleWeek(weekKey)) return true;
-  return typeof isPermissionAdmin === 'function' && isPermissionAdmin();
+function canEditScheduleWeek(weekKey = wsKey(), now = new Date()) {
+  const isAdmin = typeof isPermissionAdmin === 'function' && isPermissionAdmin();
+  const targetWeek = scheduleWeekKey(now);
+  if (String(weekKey || '') > targetWeek) return isAdmin;
+  if (String(weekKey || '') === targetWeek && !isScheduleWeekOpen(now)) return isAdmin;
+  return true;
 }
 function requireScheduleWeekEdit(weekKey = wsKey(), notify = true) {
   const allowed = canEditScheduleWeek(weekKey);

@@ -76,23 +76,38 @@ function isPermissionAdminName(name) {
 
 const SCHEDULE_OPEN_HOUR_SHANGHAI = 14;
 
-function scheduleWeekKeyForShanghai(now = new Date()) {
-  const parts = Object.fromEntries(
+function shanghaiDateParts(now = new Date()) {
+  return Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', hourCycle: 'h23',
     }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]),
   );
+}
+
+function scheduleWeekKeyForShanghai(now = new Date()) {
+  const parts = shanghaiDateParts(now);
   const localDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
   const day = localDate.getUTCDay();
-  // 普通账号的下一排班周在北京时间周一 14:00 开放；此前仍以本周为边界。
-  const beforeMondayOpen = day === 1 && Number(parts.hour) < SCHEDULE_OPEN_HOUR_SHANGHAI;
-  const daysToBoundary = beforeMondayOpen ? 0 : (day === 0 ? 1 : (day === 1 ? 7 : 8 - day));
-  localDate.setUTCDate(localDate.getUTCDate() + daysToBoundary);
+  // 排班周始终指向下一周，不随周一开放时刻变化。
+  const daysToNextMonday = day === 0 ? 1 : 8 - day;
+  localDate.setUTCDate(localDate.getUTCDate() + daysToNextMonday);
   return `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
 }
 
-function futureScheduleWeeksFromChanges(changes, boundary = scheduleWeekKeyForShanghai()) {
+function isScheduleWeekOpenForShanghai(now = new Date()) {
+  const parts = shanghaiDateParts(now);
+  const day = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day))).getUTCDay();
+  return day !== 1 || Number(parts.hour) >= SCHEDULE_OPEN_HOUR_SHANGHAI;
+}
+
+function scheduleWriteBoundaryForShanghai(now = new Date()) {
+  const scheduleWeek = new Date(`${scheduleWeekKeyForShanghai(now)}T00:00:00Z`);
+  if (!isScheduleWeekOpenForShanghai(now)) scheduleWeek.setUTCDate(scheduleWeek.getUTCDate() - 7);
+  return scheduleWeek.toISOString().slice(0, 10);
+}
+
+function futureScheduleWeeksFromChanges(changes, boundary = scheduleWriteBoundaryForShanghai()) {
   const weeks = new Set();
   for (const change of changes || []) {
     if (!change || !Array.isArray(change.path) || !['schedules', 'timeOff'].includes(change.path[0])) continue;
@@ -1220,6 +1235,8 @@ module.exports = {
   presenceSessions,
   isPermissionAdminName,
   scheduleWeekKeyForShanghai,
+  isScheduleWeekOpenForShanghai,
+  scheduleWriteBoundaryForShanghai,
   futureScheduleWeeksFromChanges,
   normalizeAccountPermissions,
   FileStore,

@@ -210,7 +210,10 @@ test('future scheduling cycles are editable only by protected admins', () => {
   const sync = read('public/js/state-sync.js');
   const server = read('server.js');
   assert.match(schedule, /function scheduleWeekKey\(now = new Date\(\)\)/);
-  assert.match(schedule, /function canEditScheduleWeek\(weekKey = wsKey\(\)\)/);
+  assert.match(schedule, /const daysToNextMonday = day === 0 \? 1 : 8 - day/);
+  assert.match(schedule, /function isScheduleWeekOpen\(now = new Date\(\)\)/);
+  assert.match(schedule, /targetWeek && !isScheduleWeekOpen\(now\)/);
+  assert.match(schedule, /function canEditScheduleWeek\(weekKey = wsKey\(\), now = new Date\(\)\)/);
   assert.match(schedule, /typeof isPermissionAdmin === 'function' && isPermissionAdmin\(\)/);
   assert.match(schedule, /SCHEDULE_OPEN_HOUR_SHANGHAI = 14/);
   assert.match(schedule, /还未进入排班时间，请于周一下午 2:00 后再填写/);

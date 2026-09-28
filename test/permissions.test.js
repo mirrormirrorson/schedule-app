@@ -8,16 +8,23 @@ const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'schedule-permissions-'));
 process.env.DB_PATH = path.join(testDir, 'db.json');
 delete process.env.DATABASE_URL;
 
-const { app, store, scheduleWeekKeyForShanghai, futureScheduleWeeksFromChanges } = require('../server');
+const {
+  app, store, scheduleWeekKeyForShanghai, isScheduleWeekOpenForShanghai,
+  scheduleWriteBoundaryForShanghai, futureScheduleWeeksFromChanges,
+} = require('../server');
 
 test.after(() => fs.rmSync(testDir, { recursive: true, force: true }));
 
-test('schedule week boundary opens at Monday 14:00 Shanghai time and flags only later cycles', () => {
+test('schedule week always means next week while Monday 14:00 only controls write access', () => {
   assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-11T04:00:00Z')), '2026-08-17');
   assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-16T04:00:00Z')), '2026-08-17');
-  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T05:59:59Z')), '2026-09-14');
+  assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T05:59:59Z')), '2026-09-21');
   assert.equal(scheduleWeekKeyForShanghai(new Date('2026-09-14T06:00:00Z')), '2026-09-21');
   assert.equal(scheduleWeekKeyForShanghai(new Date('2026-08-17T06:00:00Z')), '2026-08-24');
+  assert.equal(isScheduleWeekOpenForShanghai(new Date('2026-09-14T05:59:59Z')), false);
+  assert.equal(isScheduleWeekOpenForShanghai(new Date('2026-09-14T06:00:00Z')), true);
+  assert.equal(scheduleWriteBoundaryForShanghai(new Date('2026-09-14T05:59:59Z')), '2026-09-14');
+  assert.equal(scheduleWriteBoundaryForShanghai(new Date('2026-09-14T06:00:00Z')), '2026-09-21');
   const changes = [
     { path: ['schedules', '2026-08-17', 'g1', 'p1_2026-08-17'], after: { exists: true, value: [{ note: '排班周' }] } },
     { path: ['schedules', '2026-08-24', 'g1', 'p1_2026-08-24'], after: { exists: true, value: [{ note: '未来周' }] } },
@@ -155,7 +162,7 @@ test('server rejects radar patches without the matching account capability', asy
   assert.equal(allowedField.payload.state.personRadarFields.at(-1).name, '权限测试');
 });
 
-test('only protected admins can write schedules after the scheduling week', async t => {
+test('only protected admins can write schedules after the currently open boundary', async t => {
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -165,7 +172,7 @@ test('only protected admins can write schedules after the scheduling week', asyn
   })).payload.user;
   const admin = await identify('林俊凯');
   const regular = await identify('排班测试用户');
-  const boundary = scheduleWeekKeyForShanghai();
+  const boundary = scheduleWriteBoundaryForShanghai();
   const future = new Date(boundary + 'T00:00:00Z');
   future.setUTCDate(future.getUTCDate() + 7);
   const futureWeek = future.toISOString().slice(0, 10);
