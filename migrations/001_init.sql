@@ -50,3 +50,32 @@ CREATE TABLE IF NOT EXISTS mutations (
 
 CREATE INDEX IF NOT EXISTS mutations_created_at_idx
   ON mutations (created_at);
+
+CREATE TABLE IF NOT EXISTS dingtalk_bindings (
+  person_id TEXT PRIMARY KEY,
+  person_name TEXT NOT NULL,
+  dingtalk_user_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS notification_outbox (
+  id TEXT PRIMARY KEY,
+  mutation_id TEXT NOT NULL,
+  person_id TEXT NOT NULL,
+  person_name TEXT NOT NULL,
+  actor_name TEXT,
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  available_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS notification_outbox_mutation_person_idx
+  ON notification_outbox (mutation_id, person_id);
+CREATE INDEX IF NOT EXISTS notification_outbox_pending_idx
+  ON notification_outbox (status, available_at);

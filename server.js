@@ -4,6 +4,11 @@ const path = require('path');
 const crypto = require('crypto');
 const { isDeepStrictEqual } = require('util');
 const { Pool } = require('pg');
+const {
+  extractNotificationBatches,
+  DingTalkClient,
+  NotificationDispatcher,
+} = require('./lib/dingtalk-notifier');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3456);
@@ -20,6 +25,11 @@ const USER_LAST_SEEN_WRITE_INTERVAL_MS = Math.max(
 const PRESENCE_TTL_MS = 15_000;
 const MAX_PRESENCE_SESSIONS = 200;
 const PERMISSION_ADMIN_NAMES = new Set(['张雅镜', '林俊凯', '简慧仪']);
+const DINGTALK_NOTIFY_ENABLED = /^(1|true|yes)$/i.test(process.env.DINGTALK_NOTIFY_ENABLED || '');
+const DINGTALK_NOTIFY_AGGREGATE_MS = Math.min(
+  5 * 60 * 1000,
+  Math.max(30 * 1000, Number(process.env.DINGTALK_NOTIFY_AGGREGATE_MS || 60 * 1000)),
+);
 const EDITABLE_ROOTS = new Set([
   'internalPeople',
   'externalPeople',
@@ -378,6 +388,8 @@ class FileStore {
     this.revision = Number(seed._revision || 1);
     this.updatedAt = new Date(seed._updated || Date.now()).toISOString();
     this.mutations = new Map();
+    this.dingtalkBindings = new Map();
+    this.notificationOutbox = new Map();
     this.historyVersion = historyVersionOf(this.history);
     this.queue = Promise.resolve();
   }
@@ -413,7 +425,7 @@ class FileStore {
     return { _revision: this.revision, _updated: this.updatedAt };
   }
 
-  async applyPatch({ mutationId, changes, historyEntries }) {
+  async applyPatch({ mutationId, changes, historyEntries, notificationBatches = [] }) {
     return this.withLock(async () => {
       if (this.mutations.has(mutationId)) {
         return { duplicate: true, state: await this.getState(), conflicts: [] };
@@ -429,6 +441,7 @@ class FileStore {
       this.revision += 1;
       this.updatedAt = nowIso();
       this.mutations.set(mutationId, this.revision);
+      await this.enqueueNotificationBatches(notificationBatches);
       if (this.mutations.size > 5000) this.mutations.delete(this.mutations.keys().next().value);
       await this.persist();
       return { duplicate: false, state: await this.getState(), conflicts: [] };
@@ -541,6 +554,88 @@ class FileStore {
 
   getHistoryVersion() {
     return this.historyVersion;
+  }
+
+  async listDingTalkBindings() {
+    return [...this.dingtalkBindings.values()].map(cloneJson);
+  }
+
+  async getDingTalkBinding(personId) {
+    return cloneJson(this.dingtalkBindings.get(personId) || null);
+  }
+
+  async upsertDingTalkBinding(binding) {
+    const saved = { ...cloneJson(binding), updatedAt: nowIso() };
+    this.dingtalkBindings.set(saved.personId, saved);
+    return cloneJson(saved);
+  }
+
+  async deleteDingTalkBinding(personId) {
+    return this.dingtalkBindings.delete(personId);
+  }
+
+  async enqueueNotificationBatches(batches) {
+    const availableAt = new Date(Date.now() + DINGTALK_NOTIFY_AGGREGATE_MS).toISOString();
+    for (const batch of batches || []) {
+      if (!this.notificationOutbox.has(batch.id)) {
+        this.notificationOutbox.set(batch.id, {
+          ...cloneJson(batch), status: 'pending', availableAt, attempts: 0,
+          lastError: '', createdAt: nowIso(), sentAt: null,
+        });
+      }
+      for (const item of this.notificationOutbox.values()) {
+        if (item.personId === batch.personId && item.status === 'pending') item.availableAt = availableAt;
+      }
+    }
+  }
+
+  async requeueStaleNotifications() {
+    const now = Date.now();
+    for (const item of this.notificationOutbox.values()) {
+      if (item.status === 'processing' && new Date(item.availableAt).getTime() <= now) item.status = 'pending';
+    }
+  }
+
+  async nextNotificationAt() {
+    const pending = [...this.notificationOutbox.values()].filter(item => item.status === 'pending');
+    if (!pending.length) return null;
+    return pending.sort((a, b) => new Date(a.availableAt) - new Date(b.availableAt))[0].availableAt;
+  }
+
+  async claimDueNotifications(limit) {
+    const now = Date.now();
+    const retentionCutoff = now - 90 * 24 * 60 * 60 * 1000;
+    for (const [id, item] of this.notificationOutbox) {
+      if (item.status !== 'pending' && item.status !== 'processing' && new Date(item.createdAt).getTime() < retentionCutoff) {
+        this.notificationOutbox.delete(id);
+      }
+    }
+    const rows = [...this.notificationOutbox.values()]
+      .filter(item => item.status === 'pending' && new Date(item.availableAt).getTime() <= now)
+      .sort((a, b) => new Date(a.availableAt) - new Date(b.availableAt))
+      .slice(0, limit);
+    rows.forEach(item => {
+      item.status = 'processing';
+      item.availableAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    });
+    return rows.map(cloneJson);
+  }
+
+  async finishNotification(id, result) {
+    const item = this.notificationOutbox.get(id);
+    if (!item) return;
+    item.status = result.status;
+    item.lastError = result.error || '';
+    if (result.error) item.attempts += 1;
+    if (result.retryAt) item.availableAt = result.retryAt;
+    if (result.status === 'sent') item.sentAt = nowIso();
+  }
+
+  async listNotificationLogs(limit = 50) {
+    return [...this.notificationOutbox.values()]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, limit)
+      .map(cloneJson);
   }
 
   async close() {}
@@ -667,11 +762,11 @@ class PostgresStore {
     return { ...this.meta };
   }
 
-  async applyPatch({ mutationId, changes, historyEntries }) {
-    return this.withWriteLock(() => this.applyPatchLocked({ mutationId, changes, historyEntries }));
+  async applyPatch({ mutationId, changes, historyEntries, notificationBatches = [] }) {
+    return this.withWriteLock(() => this.applyPatchLocked({ mutationId, changes, historyEntries, notificationBatches }));
   }
 
-  async applyPatchLocked({ mutationId, changes, historyEntries }) {
+  async applyPatchLocked({ mutationId, changes, historyEntries, notificationBatches }) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -703,6 +798,7 @@ class PostgresStore {
       const revision = Number(updated.rows[0].revision);
 
       await insertHistoryEntries(client, historyEntries);
+      await this.enqueueNotificationBatches(notificationBatches, client);
       if (historyEntries.length) {
         await client.query(
           `DELETE FROM history_entries
@@ -931,6 +1027,165 @@ class PostgresStore {
     await this.pool.end();
   }
 
+  async listDingTalkBindings() {
+    const result = await this.pool.query(
+      `SELECT person_id, person_name, dingtalk_user_id, enabled, updated_by, updated_at
+       FROM dingtalk_bindings ORDER BY person_name ASC`,
+    );
+    return result.rows.map(row => ({
+      personId: row.person_id,
+      personName: row.person_name,
+      dingtalkUserId: row.dingtalk_user_id,
+      enabled: row.enabled,
+      updatedBy: row.updated_by,
+      updatedAt: new Date(row.updated_at).toISOString(),
+    }));
+  }
+
+  async getDingTalkBinding(personId) {
+    const result = await this.pool.query(
+      `SELECT person_id, person_name, dingtalk_user_id, enabled, updated_by, updated_at
+       FROM dingtalk_bindings WHERE person_id = $1`,
+      [personId],
+    );
+    const row = result.rows[0];
+    return row ? {
+      personId: row.person_id,
+      personName: row.person_name,
+      dingtalkUserId: row.dingtalk_user_id,
+      enabled: row.enabled,
+      updatedBy: row.updated_by,
+      updatedAt: new Date(row.updated_at).toISOString(),
+    } : null;
+  }
+
+  async upsertDingTalkBinding(binding) {
+    const result = await this.pool.query(
+      `INSERT INTO dingtalk_bindings
+         (person_id, person_name, dingtalk_user_id, enabled, updated_by, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (person_id) DO UPDATE SET
+         person_name = EXCLUDED.person_name,
+         dingtalk_user_id = EXCLUDED.dingtalk_user_id,
+         enabled = EXCLUDED.enabled,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()
+       RETURNING person_id, person_name, dingtalk_user_id, enabled, updated_by, updated_at`,
+      [binding.personId, binding.personName, binding.dingtalkUserId, binding.enabled, binding.updatedBy],
+    );
+    const row = result.rows[0];
+    return {
+      personId: row.person_id, personName: row.person_name, dingtalkUserId: row.dingtalk_user_id,
+      enabled: row.enabled, updatedBy: row.updated_by, updatedAt: new Date(row.updated_at).toISOString(),
+    };
+  }
+
+  async deleteDingTalkBinding(personId) {
+    const result = await this.pool.query('DELETE FROM dingtalk_bindings WHERE person_id = $1', [personId]);
+    return result.rowCount > 0;
+  }
+
+  async enqueueNotificationBatches(batches, client = this.pool) {
+    if (!batches || !batches.length) return;
+    const rows = batches.map(batch => ({ ...batch, availableAt: new Date(Date.now() + DINGTALK_NOTIFY_AGGREGATE_MS).toISOString() }));
+    await client.query(
+      `WITH incoming AS (
+         SELECT item.id, item.mutation_id, item.person_id, item.person_name,
+                item.actor_name, item.payload, item.available_at::timestamptz AS available_at
+         FROM jsonb_to_recordset($1::jsonb) AS item(
+           id text, mutation_id text, person_id text, person_name text,
+           actor_name text, payload jsonb, available_at text
+         )
+       ), inserted AS (
+         INSERT INTO notification_outbox
+           (id, mutation_id, person_id, person_name, actor_name, payload, available_at)
+         SELECT id, mutation_id, person_id, person_name, actor_name, payload, available_at
+         FROM incoming
+         ON CONFLICT (mutation_id, person_id) DO NOTHING
+         RETURNING person_id
+       )
+       UPDATE notification_outbox AS queued
+       SET available_at = GREATEST(queued.available_at, incoming.available_at)
+       FROM incoming
+       WHERE queued.person_id = incoming.person_id AND queued.status = 'pending'`,
+      [JSON.stringify(rows.map(row => ({
+        id: row.id, mutation_id: row.mutationId, person_id: row.personId,
+        person_name: row.personName, actor_name: row.actorName,
+        payload: { events: row.events }, available_at: row.availableAt,
+      })))],
+    );
+  }
+
+  async requeueStaleNotifications() {
+    await this.pool.query(
+      `UPDATE notification_outbox SET status = 'pending'
+       WHERE status = 'processing' AND available_at <= NOW()`,
+    );
+  }
+
+  async nextNotificationAt() {
+    const result = await this.pool.query(
+      `SELECT MIN(available_at) AS next_at FROM notification_outbox WHERE status = 'pending'`,
+    );
+    return result.rows[0] && result.rows[0].next_at;
+  }
+
+  async claimDueNotifications(limit) {
+    const result = await this.pool.query(
+      `WITH cleanup AS (
+         DELETE FROM notification_outbox
+         WHERE status IN ('sent', 'skipped', 'failed')
+           AND created_at < NOW() - INTERVAL '90 days'
+         RETURNING id
+       ), due AS (
+         SELECT id FROM notification_outbox
+         WHERE status = 'pending' AND available_at <= NOW()
+         ORDER BY available_at ASC LIMIT $1
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE notification_outbox AS item
+       SET status = 'processing', available_at = NOW() + INTERVAL '10 minutes'
+       FROM due WHERE item.id = due.id
+       RETURNING item.id, item.mutation_id, item.person_id, item.person_name,
+                 item.actor_name, item.payload, item.attempts, item.created_at`,
+      [limit],
+    );
+    return result.rows.map(row => ({
+      id: row.id, mutationId: row.mutation_id, personId: row.person_id,
+      personName: row.person_name, actorName: row.actor_name,
+      events: (row.payload && row.payload.events) || [], attempts: row.attempts,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
+  async finishNotification(id, result) {
+    await this.pool.query(
+      `UPDATE notification_outbox
+       SET status = $2,
+           attempts = attempts + CASE WHEN $3::text IS NULL THEN 0 ELSE 1 END,
+           last_error = $3,
+           available_at = COALESCE($4::timestamptz, available_at),
+           sent_at = CASE WHEN $2 = 'sent' THEN NOW() ELSE sent_at END
+       WHERE id = $1`,
+      [id, result.status, result.error || null, result.retryAt || null],
+    );
+  }
+
+  async listNotificationLogs(limit = 50) {
+    const result = await this.pool.query(
+      `SELECT id, person_id, person_name, actor_name, status, attempts,
+              last_error, created_at, sent_at
+       FROM notification_outbox ORDER BY created_at DESC LIMIT $1`,
+      [limit],
+    );
+    return result.rows.map(row => ({
+      id: row.id, personId: row.person_id, personName: row.person_name,
+      actorName: row.actor_name, status: row.status, attempts: row.attempts,
+      lastError: row.last_error || '', createdAt: new Date(row.created_at).toISOString(),
+      sentAt: row.sent_at ? new Date(row.sent_at).toISOString() : null,
+    }));
+  }
+
   getHistoryVersion() {
     return this.historyVersion;
   }
@@ -938,6 +1193,17 @@ class PostgresStore {
 
 const seed = loadSeed();
 const store = DATABASE_URL ? new PostgresStore(DATABASE_URL, seed) : new FileStore(seed);
+const dingtalkClient = new DingTalkClient({
+  clientId: process.env.DINGTALK_CLIENT_ID,
+  clientSecret: process.env.DINGTALK_CLIENT_SECRET,
+  robotCode: process.env.DINGTALK_ROBOT_CODE,
+});
+const notificationDispatcher = new NotificationDispatcher({
+  store,
+  client: dingtalkClient,
+  enabled: DINGTALK_NOTIFY_ENABLED,
+  appUrl: process.env.PUBLIC_APP_URL,
+});
 
 async function authorizedAccount(actor) {
   const id = String(actor && actor.id || '').trim();
@@ -1030,7 +1296,18 @@ app.post('/api/state/patch', async (req, res, next) => {
     if (!changes.length && !historyEntries.length) {
       return res.json({ ok: true, state: await store.getState(), duplicate: false });
     }
-    const result = await store.applyPatch({ mutationId, changes, historyEntries });
+    if (notificationDispatcher.enabled && historyEntries.length) {
+      actor = actor || await authorizedAccount(req.body && req.body.actor);
+    }
+    const notificationBatches = notificationDispatcher.enabled
+      ? extractNotificationBatches({
+        mutationId,
+        historyEntries,
+        actorName: actor && actor.name,
+        notifySelf: /^(1|true|yes)$/i.test(process.env.DINGTALK_NOTIFY_SELF || ''),
+      })
+      : [];
+    const result = await store.applyPatch({ mutationId, changes, historyEntries, notificationBatches });
     if (result.conflicts.length) {
       return res.status(409).json({
         ok: false,
@@ -1038,6 +1315,9 @@ app.post('/api/state/patch', async (req, res, next) => {
         conflicts: result.conflicts,
         state: result.state,
       });
+    }
+    if (!result.duplicate && notificationBatches.length) {
+      notificationDispatcher.wake(DINGTALK_NOTIFY_AGGREGATE_MS);
     }
     return res.json({ ok: true, state: result.state, duplicate: result.duplicate });
   } catch (error) {
@@ -1106,6 +1386,64 @@ app.delete('/api/admin/users/:id', async (req, res, next) => {
     if (!result) return res.status(404).json({ ok: false, error: 'user not found' });
     if (result.protected) return res.status(409).json({ ok: false, error: 'protected permission admin' });
     return res.json({ ok: true, user: result.user });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get('/api/admin/dingtalk-notifications', async (req, res, next) => {
+  try {
+    const actor = await permissionAdminAccount({ id: req.query.actorId, name: req.query.actorName });
+    if (!actor) return res.status(403).json({ ok: false, error: 'permission admin required' });
+    const [bindings, recent] = await Promise.all([
+      store.listDingTalkBindings(),
+      store.listNotificationLogs(30),
+    ]);
+    return res.json({
+      ok: true,
+      enabled: notificationDispatcher.enabled,
+      configured: dingtalkClient.configured,
+      aggregateSeconds: Math.round(DINGTALK_NOTIFY_AGGREGATE_MS / 1000),
+      bindings,
+      recent,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.put('/api/admin/dingtalk-notifications/bindings/:personId', async (req, res, next) => {
+  try {
+    const actor = await permissionAdminAccount(req.body && req.body.actor);
+    if (!actor) return res.status(403).json({ ok: false, error: 'permission admin required' });
+    const personId = String(req.params.personId || '').trim();
+    const personName = String(req.body && req.body.personName || '').trim();
+    const dingtalkUserId = String(req.body && req.body.dingtalkUserId || '').trim();
+    if (!personId || personId.length > 200 || !personName || personName.length > 100) {
+      return res.status(400).json({ ok: false, error: 'invalid person' });
+    }
+    if (!/^[^\s\u0000-\u001f]{1,128}$/.test(dingtalkUserId)) {
+      return res.status(400).json({ ok: false, error: 'invalid dingtalk user id' });
+    }
+    const binding = await store.upsertDingTalkBinding({
+      personId,
+      personName,
+      dingtalkUserId,
+      enabled: req.body.enabled !== false,
+      updatedBy: actor.name,
+    });
+    return res.json({ ok: true, binding });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.delete('/api/admin/dingtalk-notifications/bindings/:personId', async (req, res, next) => {
+  try {
+    const actor = await permissionAdminAccount(req.body && req.body.actor);
+    if (!actor) return res.status(403).json({ ok: false, error: 'permission admin required' });
+    await store.deleteDingTalkBinding(String(req.params.personId || ''));
+    return res.json({ ok: true });
   } catch (error) {
     return next(error);
   }
@@ -1200,6 +1538,7 @@ app.use((error, req, res, next) => {
 let server;
 async function start() {
   await store.init();
+  await notificationDispatcher.start();
   server = app.listen(PORT, () => {
     console.log(`[startup] schedule-app listening on ${PORT}; storage=${DATABASE_URL ? 'postgres' : 'file'}`);
   });
@@ -1207,6 +1546,7 @@ async function start() {
 
 async function shutdown(signal) {
   console.log(`[shutdown] ${signal}`);
+  notificationDispatcher.close();
   if (server) await new Promise(resolve => server.close(resolve));
   await store.close();
   process.exit(0);
@@ -1242,4 +1582,6 @@ module.exports = {
   FileStore,
   PostgresStore,
   USER_LAST_SEEN_WRITE_INTERVAL_MS,
+  DINGTALK_NOTIFY_AGGREGATE_MS,
+  notificationDispatcher,
 };

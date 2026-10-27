@@ -65,6 +65,34 @@ test('protected admins manage account permissions while regular users cannot', a
   assert.equal(allowedList.response.status, 200);
   assert.equal(allowedList.payload.users.length, 2);
 
+  const notificationDenied = await jsonRequest(
+    `${base}/api/admin/dingtalk-notifications?actorId=${encodeURIComponent(regular.id)}&actorName=${encodeURIComponent(regular.name)}`,
+  );
+  assert.equal(notificationDenied.response.status, 403);
+
+  const notificationBinding = await jsonRequest(`${base}/api/admin/dingtalk-notifications/bindings/person-test`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      actor: { id: admin.id, name: admin.name },
+      personName: '测试剪辑老师', dingtalkUserId: 'ding-user-001', enabled: true,
+    }),
+  });
+  assert.equal(notificationBinding.response.status, 200);
+  assert.equal(notificationBinding.payload.binding.dingtalkUserId, 'ding-user-001');
+
+  const notificationSettings = await jsonRequest(
+    `${base}/api/admin/dingtalk-notifications?actorId=${encodeURIComponent(admin.id)}&actorName=${encodeURIComponent(admin.name)}`,
+  );
+  assert.equal(notificationSettings.response.status, 200);
+  assert.equal(notificationSettings.payload.enabled, false);
+  assert.equal(notificationSettings.payload.bindings.length, 1);
+
+  const notificationDelete = await jsonRequest(`${base}/api/admin/dingtalk-notifications/bindings/person-test`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor: { id: admin.id, name: admin.name } }),
+  });
+  assert.equal(notificationDelete.response.status, 200);
+
   const updated = await jsonRequest(`${base}/api/admin/users/${regular.id}/permissions`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

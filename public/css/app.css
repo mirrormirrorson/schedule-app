@@ -987,6 +987,36 @@ body {
 .permission-delete { grid-column: 2; grid-row: 1; color: var(--danger); font-size: 11px; }
 .permission-delete:disabled { cursor: not-allowed; opacity: .45; }
 .permission-panel-note { margin: 12px 0 0; color: var(--text2); font-size: 10px; line-height: 1.6; }
+.notification-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;
+}
+.notification-panel-head h4, .notification-log-section h4 { margin: 0; color: var(--text); font-size: 14px; }
+.notification-panel-head p, .notification-log-section p { margin: 3px 0 0; color: var(--text2); font-size: 10px; }
+.notification-panel-head > div:last-child { display: flex; align-items: center; gap: 7px; }
+.notification-config-badge { padding: 4px 8px; border-radius: 999px; background: var(--cell-hover-bg); color: var(--text2); font-size: 10px; font-weight: 700; }
+.notification-config-badge.enabled { background: rgba(34,197,94,.13); color: #15803d; }
+.notification-config-badge.waiting { background: rgba(245,158,11,.13); color: #b45309; }
+.notification-help { margin-bottom: 11px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; color: var(--text2); background: color-mix(in srgb, var(--bg) 72%, var(--card)); font-size: 11px; line-height: 1.55; }
+.notification-binding-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.notification-binding-card { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 11px; background: color-mix(in srgb, var(--card) 94%, var(--bg)); }
+.notification-person { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.notification-person strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-person span { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; color: var(--text2); background: var(--cell-hover-bg); font-size: 9px; }
+.notification-person span.is-bound { color: #15803d; background: rgba(34,197,94,.13); }
+.notification-user-id { grid-column: 1 / -1; width: 100%; padding: 8px 9px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--card); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.notification-enable { display: flex; align-items: center; gap: 6px; color: var(--text2); font-size: 11px; }
+.notification-enable input { accent-color: var(--primary); }
+.notification-binding-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.notification-binding-actions .btn { padding: 5px 8px; font-size: 10px; }
+.notification-log-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.notification-log-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.notification-log-item { padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--card); }
+.notification-log-item > div { display: flex; justify-content: space-between; gap: 8px; color: var(--text); font-size: 11px; }
+.notification-log-item span { color: var(--text2); font-size: 10px; }
+.notification-log-item small { display: block; margin-top: 3px; color: var(--text2); font-size: 9px; }
+.notification-log-item p { margin: 5px 0 0; color: var(--danger); font-size: 9px; word-break: break-word; }
+.notification-log-item.status-sent { border-color: rgba(34,197,94,.35); }
+.notification-log-item.status-failed { border-color: rgba(239,68,68,.4); }
 @media (max-width: 680px) {
   .person-radar-tooltip { width: calc(100vw - 16px); max-height: calc(100vh - 16px); padding: 13px 12px 11px; }
   .person-radar-tooltip-chart { min-height: 245px; margin-bottom: -4px; }
@@ -999,6 +1029,8 @@ body {
   .person-radar-modal-foot > div { justify-content: flex-end; }
   .permission-panel-head { align-items: flex-start; flex-direction: column; }
   .permission-user-list { grid-template-columns: 1fr; }
+  .notification-panel-head { align-items: flex-start; flex-direction: column; }
+  .notification-binding-list, .notification-log-list { grid-template-columns: 1fr; }
 }
 .manage-footer {
   display: flex;

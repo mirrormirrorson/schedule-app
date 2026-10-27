@@ -13,7 +13,7 @@ function closeManageModal() {
 }
 
 function switchManageTab(tab) {
-  if (tab === 'permissions' && !isPermissionAdmin()) return;
+  if ((tab === 'permissions' || tab === 'dingtalk') && !isPermissionAdmin()) return;
   manageActiveTab = tab;
   document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.mtab[onclick="switchManageTab('${tab}')"]`).classList.add('active');
@@ -23,9 +23,12 @@ function switchManageTab(tab) {
     tab === 'groups' ? '编辑排班小组。' :
     tab === 'conditions' ? '用关键词和颜色快速标记重要排班内容。' :
     tab === 'permissions' ? '账号权限只对张雅镜、林俊凯和简慧仪开放。' : '选择配色主题与字体样式。';
+  const resolvedHint = tab === 'dingtalk'
+    ? '绑定人员对应的钉钉 userId；排班保存成功后才会异步私发，不影响排班保存。'
+    : hint;
   const hintEl = document.getElementById('manageHint');
-  hintEl.textContent = hint;
-  hintEl.style.display = hint ? '' : 'none';
+  hintEl.textContent = resolvedHint;
+  hintEl.style.display = resolvedHint ? '' : 'none';
   renderManageTab();
 }
 
@@ -168,6 +171,9 @@ function renderManageTab() {
   } else if (manageActiveTab === 'permissions') {
     renderPermissionsPanel();
     loadPermissionUsers();
+  } else if (manageActiveTab === 'dingtalk') {
+    renderDingTalkNotificationPanel();
+    loadDingTalkNotificationSettings();
   }
 }
 

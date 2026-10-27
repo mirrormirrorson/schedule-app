@@ -34,7 +34,9 @@ function permissionActor() {
 function updatePermissionTabVisibility() {
   const tab = document.getElementById('permissionManageTab');
   if (tab) tab.style.display = isPermissionAdmin() ? '' : 'none';
-  if (!isPermissionAdmin() && manageActiveTab === 'permissions') switchManageTab('people');
+  const dingtalkTab = document.getElementById('dingtalkManageTab');
+  if (dingtalkTab) dingtalkTab.style.display = isPermissionAdmin() ? '' : 'none';
+  if (!isPermissionAdmin() && (manageActiveTab === 'permissions' || manageActiveTab === 'dingtalk')) switchManageTab('people');
 }
 
 function permissionUserCard(user) {

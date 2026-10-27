@@ -18,6 +18,7 @@ test('all browser scripts parse as JavaScript', () => {
     '/js/view-export.js',
     '/js/identity-history.js',
     '/js/permissions.js',
+    '/js/dingtalk-notifications.js',
     '/js/presence.js',
     '/js/bootstrap.js',
     '/js/background.js',

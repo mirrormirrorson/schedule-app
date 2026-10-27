@@ -152,3 +152,22 @@ DATABASE_URL='postgresql://...' pnpm import:snapshot -- path/to/state.json
 - 排班周始终是下一周；“去排班”、周标签、历史筛选和导出判断不再因周一 14:00 前后而改变目标周。
 - 周一 14:00 只控制普通账号能否填写下一周：此前显示下一周但禁止填写，14:00 起开放；管理员仍可提前填写。
 - 服务端使用独立写入边界校验，避免只修显示却让普通账号在开放前通过接口写入。
+
+## 2026-10-27 本地待验收：钉钉私信通知
+
+- 使用钉钉企业内部应用机器人，通过单聊接口私发给排班行对应的剪辑老师；不使用群机器人 Webhook。
+- 排班先在 PostgreSQL 事务中保存，通知事件再进入独立 `notification_outbox`。钉钉失败不会回滚、覆盖或伪装排班保存结果。
+- 同一老师 60 秒内的新增、修改、删除、移动、请假与取消请假会合并；`mutationId + personId` 唯一索引避免浏览器重试造成重复私信。
+- 通知进程不持续轮询 Neon：只在服务启动、排班刚保存和下一条通知到期时读取 outbox，继续遵守低流量策略。
+- 管理员可在“管理 → 钉钉通知”绑定人员与钉钉 `userId`，查看已发送、失败、未绑定等状态。未绑定人员不影响排班保存。
+- 人员钉钉绑定会进入现有可读 JSON 备份并可随新库恢复；应用密钥始终不进入备份。临时 outbox 发送队列不备份，避免恢复旧库后误发过期通知。
+- 本地代码默认关闭真实发送。本功能尚未部署；启用时只在 Render 服务的 **Environment** 中配置以下变量，真实值不得写入源码、README 或数据库：
+
+  - `DINGTALK_CLIENT_ID`：企业内部应用的 Client ID（AppKey）
+  - `DINGTALK_CLIENT_SECRET`：企业内部应用的 Client Secret（AppSecret）
+  - `DINGTALK_ROBOT_CODE`：应用内机器人的 Robot Code
+  - `DINGTALK_NOTIFY_ENABLED=true`
+  - `PUBLIC_APP_URL=https://schedule-app-4njk.onrender.com`
+  - 可选：`DINGTALK_NOTIFY_AGGREGATE_MS=60000`、`DINGTALK_NOTIFY_SELF=false`
+
+钉钉开放平台中还需要给应用开通“企业内机器人发送消息”权限并发布到当前组织。配置完成后先只绑定测试账号验收私信，再逐步绑定正式人员。

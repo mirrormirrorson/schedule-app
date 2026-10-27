@@ -44,6 +44,10 @@ async function readConsistentBackup(pool, databaseUrl) {
        WHERE created_at >= NOW() - INTERVAL '30 days'
        ORDER BY created_at ASC`,
     );
+    const dingtalkBindings = await client.query(
+      `SELECT person_id, person_name, dingtalk_user_id, enabled, updated_by, updated_at
+       FROM dingtalk_bindings ORDER BY person_name ASC`,
+    );
     await client.query('COMMIT');
     const parsed = new URL(databaseUrl);
     const createdAt = new Date().toISOString();
@@ -52,6 +56,7 @@ async function readConsistentBackup(pool, databaseUrl) {
       appUsers: users.rows,
       historyEntries: history.rows,
       mutations: mutations.rows,
+      dingtalkBindings: dingtalkBindings.rows,
     };
     return {
       format: 'schedule-app-logical-backup-v1',
@@ -65,6 +70,7 @@ async function readConsistentBackup(pool, databaseUrl) {
         appUsers: tables.appUsers.length,
         historyEntries: tables.historyEntries.length,
         mutations: tables.mutations.length,
+        dingtalkBindings: tables.dingtalkBindings.length,
       },
       tables,
     };

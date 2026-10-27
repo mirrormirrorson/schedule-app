@@ -59,16 +59,19 @@ async function main() {
       `SELECT
          (SELECT COUNT(*)::int FROM app_state) AS state_count,
          (SELECT COUNT(*)::int FROM app_users) AS user_count,
-         (SELECT COUNT(*)::int FROM history_entries) AS history_count`,
+         (SELECT COUNT(*)::int FROM history_entries) AS history_count,
+         (SELECT COUNT(*)::int FROM dingtalk_bindings) AS dingtalk_binding_count`,
     );
     const counts = existing.rows[0];
-    const nonEmpty = counts.state_count || counts.user_count || counts.history_count;
+    const nonEmpty = counts.state_count || counts.user_count || counts.history_count || counts.dingtalk_binding_count;
     if (nonEmpty && process.env.RESTORE_ALLOW_NONEMPTY !== 'yes') {
       throw new Error('Target is not empty; set RESTORE_ALLOW_NONEMPTY=yes only after a separate safety backup.');
     }
 
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
     await client.query('DELETE FROM mutations');
+    await client.query('DELETE FROM notification_outbox');
+    await client.query('DELETE FROM dingtalk_bindings');
     await client.query('DELETE FROM history_entries');
     await client.query('DELETE FROM app_users');
     await client.query('DELETE FROM app_state');
@@ -100,6 +103,15 @@ async function main() {
       await client.query(
         'INSERT INTO mutations (id, revision, created_at) VALUES ($1, $2, $3)',
         [mutation.id, Number(mutation.revision), mutation.created_at],
+      );
+    }
+    for (const binding of payload.tables.dingtalkBindings || []) {
+      await client.query(
+        `INSERT INTO dingtalk_bindings
+           (person_id, person_name, dingtalk_user_id, enabled, updated_by, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [binding.person_id, binding.person_name, binding.dingtalk_user_id,
+          binding.enabled, binding.updated_by, binding.updated_at],
       );
     }
     await client.query('COMMIT');

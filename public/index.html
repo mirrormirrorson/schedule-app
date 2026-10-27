@@ -111,6 +111,7 @@
       <button class="mtab" onclick="switchManageTab('conditions')">🎨 条件</button>
       <button class="mtab" onclick="switchManageTab('theme')">🖌 主题</button>
       <button class="mtab" id="permissionManageTab" style="display:none" onclick="switchManageTab('permissions')">🔐 权限</button>
+      <button class="mtab" id="dingtalkManageTab" style="display:none" onclick="switchManageTab('dingtalk')">🔔 钉钉通知</button>
     </div>
     <p style="font-size:11px;color:var(--text2);margin-bottom:12px;" id="manageHint">常用人员模板，新周初始化用；不影响已有各周。</p>
 
@@ -216,6 +217,19 @@
       <p class="permission-panel-note">删除账号不会删除人员名单、排班或修改历史；张雅镜、林俊凯、简慧仪为受保护的权限管理员。</p>
     </div>
 
+    <div class="manage-panel" id="panelDingtalk" style="display:none">
+      <div class="notification-panel-head">
+        <div><h4>钉钉私信通知</h4><p>排班保存成功后，私发给该行对应的剪辑老师</p></div>
+        <div><span class="notification-config-badge" id="dingtalkConfigBadge">正在读取…</span><button class="btn" onclick="loadDingTalkNotificationSettings(true)">刷新</button></div>
+      </div>
+      <div class="notification-help" id="dingtalkConfigHelp">企业内部应用的密钥只配置在 Render 环境变量，不会显示在网页里。</div>
+      <div class="notification-binding-list" id="dingtalkBindingList"><div class="manage-empty">正在读取人员绑定…</div></div>
+      <div class="notification-log-section">
+        <div class="manage-section-head"><div><h4>最近通知</h4><p>仅展示发送状态，不展示应用密钥</p></div></div>
+        <div class="notification-log-list" id="dingtalkNotificationLogs"><div class="manage-empty">暂无通知记录</div></div>
+      </div>
+    </div>
+
     <div class="manage-footer">
       <span>所有修改都会显示在顶部保存状态中</span>
       <button class="btn btn-p" onclick="closeManageModal()">完成</button>
@@ -231,6 +245,7 @@
 <script src="/js/view-export.js" defer></script>
 <script src="/js/identity-history.js" defer></script>
 <script src="/js/permissions.js" defer></script>
+<script src="/js/dingtalk-notifications.js" defer></script>
 <script src="/js/presence.js" defer></script>
 <script src="/js/bootstrap.js" defer></script>
 <div id="historyOverlay" class="hd-overlay" onclick="if(event.target===this)closeHistoryDrawer()"></div>
