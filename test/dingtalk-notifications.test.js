@@ -80,6 +80,24 @@ test('private message contains teacher, change details, actor and site link', ()
   assert.match(message, /新增排班/);
   assert.match(message, /操作人：张雅镜/);
   assert.match(message, /https:\/\/schedule\.example\.com/);
+  assert.match(message, /【变更 1】\n日期：2026-11-03（周二）\n小组：未来组\n类型：新增排班\n内容：\n淘金币-剪1/);
+});
+
+test('private message preserves line breaks inside schedule content', () => {
+  const batches = extractNotificationBatches({
+    mutationId: 'mutation-multiline-content',
+    actorName: '张雅镜',
+    targetWeek: '2026-10-26',
+    historyEntries: [{
+      action: 'add', personId: 'p1', person: '顺斌（曾顺斌）', user: '张雅镜',
+      week: '2026-10-26', date: '2026-10-31', weekday: '周六', group: '未来组',
+      content: '这是一条测试排班\n对接：镜子',
+    }],
+  });
+  const message = formatPrivateMessage(batches[0], 'https://schedule.example.com');
+  assert.match(message, /顺斌（曾顺斌）老师，您的本周排班有临时变更/);
+  assert.match(message, /内容：\n这是一条测试排班\n对接：镜子/);
+  assert.match(message, /\n\n操作人：张雅镜\n查看排班：/);
 });
 
 test('DingTalk client gets an app token and uses the private robot endpoint', async () => {
