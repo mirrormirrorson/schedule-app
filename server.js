@@ -105,6 +105,14 @@ function scheduleWeekKeyForShanghai(now = new Date()) {
   return `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
 }
 
+function currentWeekKeyForShanghai(now = new Date()) {
+  const parts = shanghaiDateParts(now);
+  const localDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  const daysSinceMonday = (localDate.getUTCDay() + 6) % 7;
+  localDate.setUTCDate(localDate.getUTCDate() - daysSinceMonday);
+  return `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
+}
+
 function isScheduleWeekOpenForShanghai(now = new Date()) {
   const parts = shanghaiDateParts(now);
   const day = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day))).getUTCDay();
@@ -1305,6 +1313,7 @@ app.post('/api/state/patch', async (req, res, next) => {
         historyEntries,
         actorName: actor && actor.name,
         notifySelf: /^(1|true|yes)$/i.test(process.env.DINGTALK_NOTIFY_SELF || ''),
+        targetWeek: currentWeekKeyForShanghai(),
       })
       : [];
     const result = await store.applyPatch({ mutationId, changes, historyEntries, notificationBatches });
@@ -1575,6 +1584,7 @@ module.exports = {
   presenceSessions,
   isPermissionAdminName,
   scheduleWeekKeyForShanghai,
+  currentWeekKeyForShanghai,
   isScheduleWeekOpenForShanghai,
   scheduleWriteBoundaryForShanghai,
   futureScheduleWeeksFromChanges,

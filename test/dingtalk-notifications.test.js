@@ -12,6 +12,7 @@ test('schedule history becomes one private notification batch per affected perso
   const batches = extractNotificationBatches({
     mutationId: 'mutation-001',
     actorName: '张雅镜',
+    targetWeek: '2026-11-02',
     historyEntries: [
       {
         action: 'add', personId: 'p1', person: '阿文', user: '张雅镜',
@@ -37,14 +38,37 @@ test('moving across people notifies both source and destination rows', () => {
     mutationId: 'mutation-002',
     actorName: '简慧仪',
     notifySelf: true,
+    targetWeek: '2026-11-02',
     historyEntries: [{
       action: 'move', user: '简慧仪', group: '臣妾组', content: '蓝花火-剪1',
+      week: '2026-11-02',
       fromPersonId: 'p1', fromLabel: '阿文·周一', fromDate: '2026-11-02',
       toPersonId: 'p2', toLabel: '顺斌·周二', toDate: '2026-11-03',
     }],
   });
   assert.deepEqual(batches.map(item => item.personName).sort(), ['阿文', '顺斌']);
   assert.ok(batches.every(item => item.events[0].action === 'move'));
+});
+
+test('only current-week history becomes a private notification', () => {
+  const batches = extractNotificationBatches({
+    mutationId: 'mutation-current-week-only',
+    actorName: '张雅镜',
+    targetWeek: '2026-10-26',
+    historyEntries: [
+      {
+        action: 'modify', personId: 'p1', person: '阿文', user: '张雅镜',
+        week: '2026-10-26', date: '2026-10-28', weekday: '周三', group: '未来组', content: '本周临时修改',
+      },
+      {
+        action: 'modify', personId: 'p1', person: '阿文', user: '张雅镜',
+        week: '2026-11-02', date: '2026-11-03', weekday: '周二', group: '未来组', content: '排班周正常调整',
+      },
+    ],
+  });
+
+  assert.equal(batches.length, 1);
+  assert.deepEqual(batches[0].events.map(event => event.content), ['本周临时修改']);
 });
 
 test('private message contains teacher, change details, actor and site link', () => {

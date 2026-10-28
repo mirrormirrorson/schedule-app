@@ -9,7 +9,7 @@ process.env.DB_PATH = path.join(testDir, 'db.json');
 delete process.env.DATABASE_URL;
 
 const {
-  app, store, scheduleWeekKeyForShanghai, isScheduleWeekOpenForShanghai,
+  app, store, scheduleWeekKeyForShanghai, currentWeekKeyForShanghai, isScheduleWeekOpenForShanghai,
   scheduleWriteBoundaryForShanghai, futureScheduleWeeksFromChanges,
 } = require('../server');
 
@@ -31,6 +31,12 @@ test('schedule week always means next week while Monday 14:00 only controls writ
     { path: ['timeOff', '2026-08-24', 'p1_2026-08-24'], after: { exists: true, value: { updatedBy: '普通用户' } } },
   ];
   assert.deepEqual(futureScheduleWeeksFromChanges(changes, '2026-08-17'), ['2026-08-24']);
+});
+
+test('current notification week is the Shanghai calendar week Monday', () => {
+  assert.equal(currentWeekKeyForShanghai(new Date('2026-10-26T01:00:00Z')), '2026-10-26');
+  assert.equal(currentWeekKeyForShanghai(new Date('2026-10-31T16:30:00Z')), '2026-10-26');
+  assert.equal(currentWeekKeyForShanghai(new Date('2026-11-01T16:00:00Z')), '2026-11-02');
 });
 
 async function jsonRequest(url, options) {
