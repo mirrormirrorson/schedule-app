@@ -1412,6 +1412,7 @@ app.get('/api/admin/dingtalk-notifications', async (req, res, next) => {
       ok: true,
       enabled: notificationDispatcher.enabled,
       configured: dingtalkClient.configured,
+      scope: 'current-week',
       aggregateSeconds: Math.round(DINGTALK_NOTIFY_AGGREGATE_MS / 1000),
       bindings,
       recent,

@@ -303,3 +303,9 @@ test('leave state is one global person-date value and renders as a protected gre
   assert.match(css, /background: #e5e7eb !important/);
   assert.match(tooltip, /<strong>如解决不了，填入后等待排班负责人协调<\/strong>/);
 });
+
+test('DingTalk notification panel explains the current-week-only scope', () => {
+  const notificationUi = read('public/js/dingtalk-notifications.js');
+  assert.match(notificationUi, /settings\.scope === 'current-week'/);
+  assert.match(notificationUi, /仅本周（周一至周日）的临时排班修改会通知/);
+});

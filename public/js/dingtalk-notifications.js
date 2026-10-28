@@ -36,8 +36,9 @@ function renderDingTalkNotificationPanel() {
   const settings = dingtalkNotificationSettings || { bindings: [], recent: [] };
   if (settings.enabled) {
     badge.className = 'notification-config-badge enabled';
-    badge.textContent = `已开启 · ${settings.aggregateSeconds || 60} 秒合并`;
-    help.textContent = '排班先保存到数据库，再异步私发；同一人员短时间内的连续修改会合并为一条消息。';
+    const scopeLabel = settings.scope === 'current-week' ? '仅本周 · ' : '';
+    badge.textContent = `已开启 · ${scopeLabel}${settings.aggregateSeconds || 60} 秒合并`;
+    help.textContent = '仅本周（周一至周日）的临时排班修改会通知；下一周排班过程不通知。同一人员短时间内的连续修改会合并为一条消息。';
   } else if (settings.configured) {
     badge.className = 'notification-config-badge waiting';
     badge.textContent = '密钥已配置 · 尚未开启';
