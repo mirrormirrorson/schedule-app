@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Wake schedule app and enqueue today's vacancy summary
         env:
-          CRON_SECRET: ${{ secrets.GROUP_NOTIFY_CRON_SECRET }}
+          CRON_SECRET: ${{ secrets.GROUP_NOTIFY_CRON_SECRET_V2 }}
         run: |
           test -n "$CRON_SECRET"
           curl --fail-with-body --silent --show-error \
