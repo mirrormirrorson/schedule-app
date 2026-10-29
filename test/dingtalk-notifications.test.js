@@ -125,6 +125,31 @@ test('DingTalk client gets an app token and uses the private robot endpoint', as
   assert.deepEqual(JSON.parse(calls[1].body.msgParam), { content: '测试私信' });
 });
 
+test('DingTalk client sends Markdown through the enterprise group robot endpoint', async () => {
+  const calls = [];
+  const client = new DingTalkClient({
+    clientId: 'app-key', clientSecret: 'app-secret', robotCode: 'robot-code',
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options, body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => url.includes('accessToken') ? { accessToken: 'token-1', expireIn: 7200 } : { processQueryKey: 'query-2' },
+      };
+    },
+  });
+
+  await client.sendGroupMarkdown('cid-123', '空余排期提醒', '## 空余排期提醒\n\n- 周一：阿文');
+  assert.equal(calls[1].url, 'https://api.dingtalk.com/v1.0/robot/groupMessages/send');
+  assert.equal(calls[1].body.openConversationId, 'cid-123');
+  assert.equal(calls[1].body.robotCode, 'robot-code');
+  assert.equal(calls[1].body.msgKey, 'sampleMarkdown');
+  assert.deepEqual(JSON.parse(calls[1].body.msgParam), {
+    title: '空余排期提醒',
+    text: '## 空余排期提醒\n\n- 周一：阿文',
+  });
+});
+
 test('dispatcher merges due changes for the same teacher into one private message', async () => {
   const finished = [];
   const sent = [];

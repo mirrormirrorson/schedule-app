@@ -9,6 +9,14 @@ const {
   DingTalkClient,
   NotificationDispatcher,
 } = require('./lib/dingtalk-notifier');
+const {
+  shanghaiParts,
+  buildDailyVacancyPayload,
+  releaseCandidatesFromHistory,
+  releaseNotificationFromCandidate,
+  isCellVacant,
+  GroupNotificationDispatcher,
+} = require('./lib/group-schedule-notifier');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3456);
@@ -30,6 +38,13 @@ const DINGTALK_NOTIFY_AGGREGATE_MS = Math.min(
   5 * 60 * 1000,
   Math.max(30 * 1000, Number(process.env.DINGTALK_NOTIFY_AGGREGATE_MS || 60 * 1000)),
 );
+const DINGTALK_GROUP_NOTIFY_ENABLED = /^(1|true|yes)$/i.test(process.env.DINGTALK_GROUP_NOTIFY_ENABLED || '');
+const DINGTALK_GROUP_OPEN_CONVERSATION_ID = String(process.env.DINGTALK_GROUP_OPEN_CONVERSATION_ID || '').trim();
+const DINGTALK_GROUP_RELEASE_DELAY_MS = Math.min(
+  10 * 60 * 1000,
+  Math.max(30 * 1000, Number(process.env.DINGTALK_GROUP_RELEASE_DELAY_MS || 2 * 60 * 1000)),
+);
+const GROUP_NOTIFY_CRON_SECRET = String(process.env.GROUP_NOTIFY_CRON_SECRET || '').trim();
 const EDITABLE_ROOTS = new Set([
   'internalPeople',
   'externalPeople',
@@ -398,6 +413,7 @@ class FileStore {
     this.mutations = new Map();
     this.dingtalkBindings = new Map();
     this.notificationOutbox = new Map();
+    this.groupNotificationOutbox = new Map();
     this.historyVersion = historyVersionOf(this.history);
     this.queue = Promise.resolve();
   }
@@ -433,14 +449,14 @@ class FileStore {
     return { _revision: this.revision, _updated: this.updatedAt };
   }
 
-  async applyPatch({ mutationId, changes, historyEntries, notificationBatches = [] }) {
+  async applyPatch({ mutationId, changes, historyEntries, notificationBatches = [], releaseCandidates = [] }) {
     return this.withLock(async () => {
       if (this.mutations.has(mutationId)) {
-        return { duplicate: true, state: await this.getState(), conflicts: [] };
+        return { duplicate: true, state: await this.getState(), conflicts: [], groupNotificationWake: false };
       }
       const result = applyChanges(this.document, changes);
       if (result.conflicts.length) {
-        return { duplicate: false, state: await this.getState(), conflicts: result.conflicts };
+        return { duplicate: false, state: await this.getState(), conflicts: result.conflicts, groupNotificationWake: false };
       }
       this.document = result.nextData;
       this.history.push(...historyEntries);
@@ -450,9 +466,10 @@ class FileStore {
       this.updatedAt = nowIso();
       this.mutations.set(mutationId, this.revision);
       await this.enqueueNotificationBatches(notificationBatches);
+      const groupNotificationWake = await this.reconcileReleaseWatches(releaseCandidates, this.document, mutationId);
       if (this.mutations.size > 5000) this.mutations.delete(this.mutations.keys().next().value);
       await this.persist();
-      return { duplicate: false, state: await this.getState(), conflicts: [] };
+      return { duplicate: false, state: await this.getState(), conflicts: [], groupNotificationWake };
     });
   }
 
@@ -646,6 +663,86 @@ class FileStore {
       .map(cloneJson);
   }
 
+  async reconcileReleaseWatches(candidates, state, mutationId) {
+    let enqueued = false;
+    const byCell = new Map();
+    for (const candidate of candidates || []) {
+      const key = `${candidate.week}\0${candidate.personId}\0${candidate.date}`;
+      if (!byCell.has(key)) byCell.set(key, []);
+      byCell.get(key).push(candidate);
+    }
+    for (const group of byCell.values()) {
+      const candidate = group.find(item => item.trigger === 'release') || group[0];
+      for (const item of this.groupNotificationOutbox.values()) {
+        const payload = item.payload || {};
+        if (item.kind === 'released-slot' && item.status === 'pending'
+          && payload.week === candidate.week && payload.personId === candidate.personId && payload.date === candidate.date) {
+          item.status = 'cancelled';
+          item.lastError = '排期发生后续变更';
+        }
+      }
+      if (!group.some(item => item.trigger === 'release')
+        || !isCellVacant(state, candidate.week, candidate.personId, candidate.date)) continue;
+      const notification = releaseNotificationFromCandidate(candidate, mutationId);
+      if (this.groupNotificationOutbox.has(notification.id)) continue;
+      this.groupNotificationOutbox.set(notification.id, {
+        ...notification, status: 'pending', attempts: 0, lastError: '', createdAt: nowIso(), sentAt: null,
+        availableAt: new Date(Date.now() + DINGTALK_GROUP_RELEASE_DELAY_MS).toISOString(),
+      });
+      enqueued = true;
+    }
+    return enqueued;
+  }
+
+  async enqueueDailyGroupNotification(payload) {
+    const id = `gn_daily_${payload.runDate}`;
+    if (this.groupNotificationOutbox.has(id)) return { inserted: false, empty: !(payload.items || []).length };
+    const empty = !(payload.items || []).length;
+    this.groupNotificationOutbox.set(id, {
+      id, dedupeKey: `daily:${payload.runDate}`, kind: 'daily-vacancy', payload: cloneJson(payload),
+      status: empty ? 'skipped' : 'pending', attempts: 0, lastError: empty ? '没有空余排期' : '',
+      createdAt: nowIso(), sentAt: null, availableAt: nowIso(),
+    });
+    return { inserted: true, empty };
+  }
+
+  async requeueStaleGroupNotifications() {
+    for (const item of this.groupNotificationOutbox.values()) {
+      // 服务启动时已不存在上一个活跃 worker，因此所有 processing 均应回队。
+      // 否则在 10 分钟可见性超时内重启，这条消息会永久卡住。
+      if (item.status === 'processing') item.status = 'pending';
+    }
+  }
+
+  async nextGroupNotificationAt() {
+    const pending = [...this.groupNotificationOutbox.values()].filter(item => item.status === 'pending');
+    if (!pending.length) return null;
+    return pending.sort((a, b) => new Date(a.availableAt) - new Date(b.availableAt))[0].availableAt;
+  }
+
+  async claimDueGroupNotifications(limit) {
+    const now = Date.now();
+    const rows = [...this.groupNotificationOutbox.values()]
+      .filter(item => item.status === 'pending' && new Date(item.availableAt).getTime() <= now)
+      .sort((a, b) => new Date(a.availableAt) - new Date(b.availableAt))
+      .slice(0, limit);
+    rows.forEach(item => {
+      item.status = 'processing';
+      item.availableAt = new Date(now + 10 * 60 * 1000).toISOString();
+    });
+    return rows.map(cloneJson);
+  }
+
+  async finishGroupNotification(id, result) {
+    const item = this.groupNotificationOutbox.get(id);
+    if (!item) return;
+    item.status = result.status;
+    item.lastError = result.error || '';
+    if (result.error && result.status !== 'skipped') item.attempts += 1;
+    if (result.retryAt) item.availableAt = result.retryAt;
+    if (result.status === 'sent') item.sentAt = nowIso();
+  }
+
   async close() {}
 }
 
@@ -770,11 +867,13 @@ class PostgresStore {
     return { ...this.meta };
   }
 
-  async applyPatch({ mutationId, changes, historyEntries, notificationBatches = [] }) {
-    return this.withWriteLock(() => this.applyPatchLocked({ mutationId, changes, historyEntries, notificationBatches }));
+  async applyPatch({ mutationId, changes, historyEntries, notificationBatches = [], releaseCandidates = [] }) {
+    return this.withWriteLock(() => this.applyPatchLocked({
+      mutationId, changes, historyEntries, notificationBatches, releaseCandidates,
+    }));
   }
 
-  async applyPatchLocked({ mutationId, changes, historyEntries, notificationBatches }) {
+  async applyPatchLocked({ mutationId, changes, historyEntries, notificationBatches, releaseCandidates }) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -788,12 +887,12 @@ class PostgresStore {
       const existingAfterLock = await client.query('SELECT revision FROM mutations WHERE id = $1', [mutationId]);
       if (existingAfterLock.rowCount) {
         await client.query('COMMIT');
-        return { duplicate: true, state: cloneJson(currentState), conflicts: [] };
+        return { duplicate: true, state: cloneJson(currentState), conflicts: [], groupNotificationWake: false };
       }
       const result = applyChanges(editableState(currentState), changes);
       if (result.conflicts.length) {
         await client.query('ROLLBACK');
-        return { duplicate: false, state: cloneJson(currentState), conflicts: result.conflicts };
+        return { duplicate: false, state: cloneJson(currentState), conflicts: result.conflicts, groupNotificationWake: false };
       }
 
       const updated = await client.query(
@@ -807,6 +906,9 @@ class PostgresStore {
 
       await insertHistoryEntries(client, historyEntries);
       await this.enqueueNotificationBatches(notificationBatches, client);
+      const groupNotificationWake = await this.reconcileReleaseWatches(
+        releaseCandidates, result.nextData, mutationId, client,
+      );
       if (historyEntries.length) {
         await client.query(
           `DELETE FROM history_entries
@@ -833,6 +935,7 @@ class PostgresStore {
         duplicate: false,
         state,
         conflicts: [],
+        groupNotificationWake,
       };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
@@ -1194,6 +1297,110 @@ class PostgresStore {
     }));
   }
 
+  async reconcileReleaseWatches(candidates, state, mutationId, client = this.pool) {
+    let enqueued = false;
+    const byCell = new Map();
+    for (const candidate of candidates || []) {
+      const key = `${candidate.week}\0${candidate.personId}\0${candidate.date}`;
+      if (!byCell.has(key)) byCell.set(key, []);
+      byCell.get(key).push(candidate);
+    }
+    for (const group of byCell.values()) {
+      const candidate = group.find(item => item.trigger === 'release') || group[0];
+      await client.query(
+        `UPDATE group_notification_outbox
+         SET status = 'cancelled', last_error = '排期发生后续变更'
+         WHERE kind = 'released-slot' AND status = 'pending'
+           AND payload->>'week' = $1 AND payload->>'personId' = $2 AND payload->>'date' = $3`,
+        [candidate.week, candidate.personId, candidate.date],
+      );
+      if (!group.some(item => item.trigger === 'release')
+        || !isCellVacant(state, candidate.week, candidate.personId, candidate.date)) continue;
+      const notification = releaseNotificationFromCandidate(candidate, mutationId);
+      const result = await client.query(
+        `INSERT INTO group_notification_outbox
+           (id, dedupe_key, kind, payload, status, available_at)
+         VALUES ($1, $2, $3, $4::jsonb, 'pending', NOW() + ($5::bigint * INTERVAL '1 millisecond'))
+         ON CONFLICT (dedupe_key) DO NOTHING
+         RETURNING id`,
+        [notification.id, notification.dedupeKey, notification.kind, JSON.stringify(notification.payload), DINGTALK_GROUP_RELEASE_DELAY_MS],
+      );
+      if (result.rowCount) enqueued = true;
+    }
+    return enqueued;
+  }
+
+  async enqueueDailyGroupNotification(payload) {
+    const empty = !(payload.items || []).length;
+    const result = await this.pool.query(
+      `INSERT INTO group_notification_outbox
+         (id, dedupe_key, kind, payload, status, available_at, last_error)
+       VALUES ($1, $2, 'daily-vacancy', $3::jsonb, $4, NOW(), $5)
+       ON CONFLICT (dedupe_key) DO NOTHING
+       RETURNING id`,
+      [
+        `gn_daily_${payload.runDate}`,
+        `daily:${payload.runDate}`,
+        JSON.stringify(payload),
+        empty ? 'skipped' : 'pending',
+        empty ? '没有空余排期' : null,
+      ],
+    );
+    return { inserted: result.rowCount > 0, empty };
+  }
+
+  async requeueStaleGroupNotifications() {
+    await this.pool.query(
+      `UPDATE group_notification_outbox SET status = 'pending'
+       WHERE status = 'processing'`,
+    );
+  }
+
+  async nextGroupNotificationAt() {
+    const result = await this.pool.query(
+      `SELECT MIN(available_at) AS next_at FROM group_notification_outbox WHERE status = 'pending'`,
+    );
+    return result.rows[0] && result.rows[0].next_at;
+  }
+
+  async claimDueGroupNotifications(limit) {
+    const result = await this.pool.query(
+      `WITH cleanup AS (
+         DELETE FROM group_notification_outbox
+         WHERE status IN ('sent', 'skipped', 'failed', 'cancelled')
+           AND created_at < NOW() - INTERVAL '90 days'
+         RETURNING id
+       ), due AS (
+         SELECT id FROM group_notification_outbox
+         WHERE status = 'pending' AND available_at <= NOW()
+         ORDER BY available_at ASC LIMIT $1
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE group_notification_outbox AS item
+       SET status = 'processing', available_at = NOW() + INTERVAL '10 minutes'
+       FROM due WHERE item.id = due.id
+       RETURNING item.id, item.kind, item.payload, item.attempts, item.created_at`,
+      [limit],
+    );
+    return result.rows.map(row => ({
+      id: row.id, kind: row.kind, payload: row.payload, attempts: row.attempts,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
+  async finishGroupNotification(id, result) {
+    await this.pool.query(
+      `UPDATE group_notification_outbox
+       SET status = $2,
+           attempts = attempts + CASE WHEN $3::text IS NULL OR $2 = 'skipped' THEN 0 ELSE 1 END,
+           last_error = $3,
+           available_at = COALESCE($4::timestamptz, available_at),
+           sent_at = CASE WHEN $2 = 'sent' THEN NOW() ELSE sent_at END
+       WHERE id = $1`,
+      [id, result.status, result.error || null, result.retryAt || null],
+    );
+  }
+
   getHistoryVersion() {
     return this.historyVersion;
   }
@@ -1212,6 +1419,20 @@ const notificationDispatcher = new NotificationDispatcher({
   enabled: DINGTALK_NOTIFY_ENABLED,
   appUrl: process.env.PUBLIC_APP_URL,
 });
+const groupNotificationDispatcher = new GroupNotificationDispatcher({
+  store,
+  client: dingtalkClient,
+  enabled: DINGTALK_GROUP_NOTIFY_ENABLED,
+  conversationId: DINGTALK_GROUP_OPEN_CONVERSATION_ID,
+  appUrl: process.env.PUBLIC_APP_URL,
+  currentWeek: currentWeekKeyForShanghai,
+});
+
+function validCronSecret(value) {
+  const incoming = Buffer.from(String(value || ''));
+  const expected = Buffer.from(GROUP_NOTIFY_CRON_SECRET);
+  return expected.length > 0 && incoming.length === expected.length && crypto.timingSafeEqual(incoming, expected);
+}
 
 async function authorizedAccount(actor) {
   const id = String(actor && actor.id || '').trim();
@@ -1316,7 +1537,12 @@ app.post('/api/state/patch', async (req, res, next) => {
         targetWeek: currentWeekKeyForShanghai(),
       })
       : [];
-    const result = await store.applyPatch({ mutationId, changes, historyEntries, notificationBatches });
+    const releaseCandidates = groupNotificationDispatcher.enabled
+      ? releaseCandidatesFromHistory(historyEntries, currentWeekKeyForShanghai())
+      : [];
+    const result = await store.applyPatch({
+      mutationId, changes, historyEntries, notificationBatches, releaseCandidates,
+    });
     if (result.conflicts.length) {
       return res.status(409).json({
         ok: false,
@@ -1327,6 +1553,9 @@ app.post('/api/state/patch', async (req, res, next) => {
     }
     if (!result.duplicate && notificationBatches.length) {
       notificationDispatcher.wake(DINGTALK_NOTIFY_AGGREGATE_MS);
+    }
+    if (!result.duplicate && result.groupNotificationWake) {
+      groupNotificationDispatcher.wake(DINGTALK_GROUP_RELEASE_DELAY_MS);
     }
     return res.json({ ok: true, state: result.state, duplicate: result.duplicate });
   } catch (error) {
@@ -1459,6 +1688,36 @@ app.delete('/api/admin/dingtalk-notifications/bindings/:personId', async (req, r
   }
 });
 
+app.post('/api/internal/group-notifications/daily', async (req, res, next) => {
+  try {
+    if (!groupNotificationDispatcher.enabled || !GROUP_NOTIFY_CRON_SECRET) {
+      return res.status(503).json({ ok: false, error: 'group notification scheduler is not configured' });
+    }
+    const auth = String(req.get('authorization') || '');
+    const suppliedSecret = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!validCronSecret(suppliedSecret)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+
+    const now = new Date();
+    const parts = shanghaiParts(now);
+    if (Number(parts.hour) < 9) {
+      return res.status(409).json({ ok: false, error: 'daily notification is only available after 09:00 Asia/Shanghai' });
+    }
+    const payload = buildDailyVacancyPayload(await store.getState(), now);
+    const result = await store.enqueueDailyGroupNotification(payload);
+    if (result.inserted && !result.empty) groupNotificationDispatcher.wake(0);
+    return res.json({
+      ok: true,
+      inserted: result.inserted,
+      empty: result.empty,
+      runDate: payload.runDate,
+      dates: payload.items.length,
+      vacancies: payload.items.reduce((sum, item) => sum + item.people.length, 0),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.post('/api/history/append', async (req, res, next) => {
   try {
     const entries = normalizeHistoryEntries(Array.isArray(req.body) ? req.body : [req.body]);
@@ -1549,6 +1808,7 @@ let server;
 async function start() {
   await store.init();
   await notificationDispatcher.start();
+  await groupNotificationDispatcher.start();
   server = app.listen(PORT, () => {
     console.log(`[startup] schedule-app listening on ${PORT}; storage=${DATABASE_URL ? 'postgres' : 'file'}`);
   });
@@ -1557,6 +1817,7 @@ async function start() {
 async function shutdown(signal) {
   console.log(`[shutdown] ${signal}`);
   notificationDispatcher.close();
+  groupNotificationDispatcher.close();
   if (server) await new Promise(resolve => server.close(resolve));
   await store.close();
   process.exit(0);
@@ -1595,4 +1856,6 @@ module.exports = {
   USER_LAST_SEEN_WRITE_INTERVAL_MS,
   DINGTALK_NOTIFY_AGGREGATE_MS,
   notificationDispatcher,
+  DINGTALK_GROUP_RELEASE_DELAY_MS,
+  groupNotificationDispatcher,
 };

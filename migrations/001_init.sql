@@ -79,3 +79,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS notification_outbox_mutation_person_idx
   ON notification_outbox (mutation_id, person_id);
 CREATE INDEX IF NOT EXISTS notification_outbox_pending_idx
   ON notification_outbox (status, available_at);
+
+CREATE TABLE IF NOT EXISTS group_notification_outbox (
+  id TEXT PRIMARY KEY,
+  dedupe_key TEXT UNIQUE NOT NULL,
+  kind TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  available_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS group_notification_outbox_pending_idx
+  ON group_notification_outbox (status, available_at);

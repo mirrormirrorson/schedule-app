@@ -1,6 +1,10 @@
 // 2026 年中国大陆工作日/休息日规则。
 // 普通日期按周一至周五为工作日、周六周日为休息日；国务院调休安排覆盖普通规则。
-(function initWorkCalendar(global) {
+(function initWorkCalendar(root, factory) {
+  const calendar = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = calendar;
+  else root.WorkCalendar = calendar;
+})(typeof window !== 'undefined' ? window : globalThis, function createWorkCalendar() {
   const OFFICIAL_2026 = {
     '2026-01-01': ['rest', '元旦'], '2026-01-02': ['rest', '元旦'], '2026-01-03': ['rest', '元旦'],
     '2026-01-04': ['work', '元旦调休'],
@@ -39,5 +43,5 @@
     return { date: key, kind: weekend ? 'rest' : 'work', mark: weekend ? '休' : '班', name: '', adjusted: false, official: false };
   }
 
-  global.WorkCalendar = { getDayInfo, OFFICIAL_2026 };
-})(window);
+  return { getDayInfo, OFFICIAL_2026 };
+});
