@@ -1,0 +1,26 @@
+name: Daily vacancy notification
+
+on:
+  schedule:
+    # Asia/Shanghai 09:00，并在 09:10 再触发一次；服务端按日期去重，第二次仅作补偿。
+    - cron: '0,10 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake schedule app and enqueue today's vacancy summary
+        env:
+          CRON_SECRET: ${{ secrets.GROUP_NOTIFY_CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --max-time 90 \
+            -X POST 'https://schedule-app-4njk.onrender.com/api/internal/group-notifications/daily' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H 'Content-Type: application/json'
