@@ -31,6 +31,8 @@ test('health and ping use metadata without reading the full state', async t => {
   assert.equal(healthPayload.ok, true);
   assert.equal(healthPayload.storage, 'file');
   assert.equal(Number.isFinite(healthPayload.revision), true);
+  assert.equal(healthPayload.groupNotifications.enabled, false);
+  assert.equal(healthPayload.groupNotifications.dailyScheduler, false);
 
   const ping = await fetch(`http://127.0.0.1:${port}/api/ping`);
   const pingPayload = await ping.json();

@@ -1463,6 +1463,11 @@ app.get('/api/health', async (req, res, next) => {
       storage: DATABASE_URL ? 'postgres' : 'file',
       revision: state._revision,
       updated: state._updated,
+      release: String(process.env.RENDER_GIT_COMMIT || '').slice(0, 12) || null,
+      groupNotifications: {
+        enabled: groupNotificationDispatcher.enabled,
+        dailyScheduler: dailyVacancyScheduler.enabled,
+      },
     });
   } catch (error) {
     next(error);
