@@ -1467,6 +1467,7 @@ app.get('/api/health', async (req, res, next) => {
       groupNotifications: {
         enabled: groupNotificationDispatcher.enabled,
         dailyScheduler: dailyVacancyScheduler.enabled,
+        dailyRunDate: dailyVacancyScheduler.lastSuccessDate || null,
       },
     });
   } catch (error) {
