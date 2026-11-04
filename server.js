@@ -16,6 +16,7 @@ const {
   releaseNotificationFromCandidate,
   isCellVacant,
   GroupNotificationDispatcher,
+  DailyVacancyScheduler,
 } = require('./lib/group-schedule-notifier');
 
 const app = express();
@@ -1427,6 +1428,11 @@ const groupNotificationDispatcher = new GroupNotificationDispatcher({
   appUrl: process.env.PUBLIC_APP_URL,
   currentWeek: currentWeekKeyForShanghai,
 });
+const dailyVacancyScheduler = new DailyVacancyScheduler({
+  store,
+  dispatcher: groupNotificationDispatcher,
+  enabled: DINGTALK_GROUP_NOTIFY_ENABLED,
+});
 
 function validCronSecret(value) {
   const incoming = Buffer.from(String(value || ''));
@@ -1809,6 +1815,7 @@ async function start() {
   await store.init();
   await notificationDispatcher.start();
   await groupNotificationDispatcher.start();
+  await dailyVacancyScheduler.start();
   server = app.listen(PORT, () => {
     console.log(`[startup] schedule-app listening on ${PORT}; storage=${DATABASE_URL ? 'postgres' : 'file'}`);
   });
@@ -1818,6 +1825,7 @@ async function shutdown(signal) {
   console.log(`[shutdown] ${signal}`);
   notificationDispatcher.close();
   groupNotificationDispatcher.close();
+  dailyVacancyScheduler.close();
   if (server) await new Promise(resolve => server.close(resolve));
   await store.close();
   process.exit(0);
@@ -1858,4 +1866,5 @@ module.exports = {
   notificationDispatcher,
   DINGTALK_GROUP_RELEASE_DELAY_MS,
   groupNotificationDispatcher,
+  dailyVacancyScheduler,
 };

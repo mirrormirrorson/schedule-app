@@ -7,6 +7,8 @@ const {
   releaseCandidatesFromHistory,
   formatReleasedSlotMessage,
   GroupNotificationDispatcher,
+  DailyVacancyScheduler,
+  nextShanghaiNine,
 } = require('../lib/group-schedule-notifier');
 
 function sampleState() {
@@ -113,4 +115,66 @@ test('release dispatcher rechecks the cell before sending', async () => {
   await dispatcher.flush();
   assert.equal(sent.length, 0);
   assert.equal(finished[0].status, 'skipped');
+});
+
+test('daily scheduler enqueues once after 09:00 and schedules the next Shanghai morning', async () => {
+  const enqueued = [];
+  const wakeCalls = [];
+  const timers = [];
+  const now = new Date('2026-10-29T01:05:00Z');
+  const store = {
+    getState: async () => sampleState(),
+    enqueueDailyGroupNotification: async payload => {
+      enqueued.push(payload);
+      return { inserted: true, empty: false };
+    },
+  };
+  const dispatcher = { enabled: true, wake: delay => wakeCalls.push(delay) };
+  const scheduler = new DailyVacancyScheduler({
+    store,
+    dispatcher,
+    enabled: true,
+    now: () => now,
+    setTimeoutFn: (fn, delay) => {
+      timers.push({ fn, delay });
+      return { unref() {} };
+    },
+    clearTimeoutFn: () => {},
+  });
+
+  await scheduler.start();
+  assert.equal(enqueued.length, 1);
+  assert.equal(enqueued[0].runDate, '2026-10-29');
+  assert.deepEqual(wakeCalls, [0]);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 23 * 60 * 60 * 1000 + 55 * 60 * 1000);
+
+  await scheduler.tick();
+  assert.equal(enqueued.length, 1);
+  scheduler.close();
+});
+
+test('daily scheduler waits until 09:00 Shanghai when started early', async () => {
+  const timers = [];
+  const now = new Date('2026-10-29T00:30:00Z');
+  const scheduler = new DailyVacancyScheduler({
+    store: {
+      getState: async () => assert.fail('must not read state before 09:00'),
+      enqueueDailyGroupNotification: async () => assert.fail('must not enqueue before 09:00'),
+    },
+    dispatcher: { enabled: true, wake() {} },
+    enabled: true,
+    now: () => now,
+    setTimeoutFn: (fn, delay) => {
+      timers.push({ fn, delay });
+      return { unref() {} };
+    },
+    clearTimeoutFn: () => {},
+  });
+
+  await scheduler.start();
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 30 * 60 * 1000);
+  assert.equal(nextShanghaiNine(now).toISOString(), '2026-10-29T01:00:00.000Z');
+  scheduler.close();
 });
