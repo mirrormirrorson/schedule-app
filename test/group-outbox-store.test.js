@@ -70,3 +70,20 @@ test('startup requeues an interrupted group notification immediately', async () 
   await store.requeueStaleGroupNotifications();
   assert.equal(store.groupNotificationOutbox.get('gn-processing').status, 'pending');
 });
+
+test('daily vacancy lookup only matches cells from a successfully sent summary', async () => {
+  const store = new FileStore({});
+  store.groupNotificationOutbox.set('gn_daily_2026-10-29', {
+    id: 'gn_daily_2026-10-29',
+    kind: 'daily-vacancy',
+    status: 'sent',
+    payload: {
+      runDate: '2026-10-29',
+      items: [{ date: '2026-10-30', people: [{ personId: 'p1', personName: '阿文' }] }],
+    },
+  });
+
+  assert.equal(await store.wasDailyVacancyAnnounced('2026-10-29', 'p1', '2026-10-30'), true);
+  assert.equal(await store.wasDailyVacancyAnnounced('2026-10-29', 'p2', '2026-10-30'), false);
+  assert.equal(await store.wasDailyVacancyAnnounced('2026-10-30', 'p1', '2026-10-30'), false);
+});

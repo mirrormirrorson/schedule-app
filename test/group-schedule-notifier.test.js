@@ -79,7 +79,7 @@ test('released slot message names the teacher and date', () => {
   }, 'https://schedule.example.com');
   assert.match(message.text, /顺斌/);
   assert.match(message.text, /10月31日 周六/);
-  assert.match(message.text, /2 分钟内仍未重新排上/);
+  assert.match(message.text, /5 分钟内仍未重新排上/);
   assert.match(message.text, /操作人：张雅镜/);
 });
 
@@ -96,6 +96,7 @@ test('release dispatcher rechecks the cell before sending', async () => {
       payload: { week: '2026-10-26', personId: 'p1', personName: '阿文', date: '2026-10-29', actorName: '张雅镜' },
     }],
     getState: async () => state,
+    wasDailyVacancyAnnounced: async () => false,
     finishGroupNotification: async (id, result) => finished.push({ id, ...result }),
   };
   const client = {
@@ -103,7 +104,8 @@ test('release dispatcher rechecks the cell before sending', async () => {
     sendGroupMarkdown: async (...args) => sent.push(args),
   };
   const dispatcher = new GroupNotificationDispatcher({
-    store, client, enabled: true, conversationId: 'cid-1', appUrl: '', currentWeek: () => '2026-10-26',
+    store, client, enabled: true, conversationId: 'cid-1', appUrl: '',
+    currentWeek: () => '2026-10-26', today: () => '2026-10-29',
   });
   await dispatcher.flush();
   assert.equal(sent.length, 1);
@@ -115,6 +117,48 @@ test('release dispatcher rechecks the cell before sending', async () => {
   await dispatcher.flush();
   assert.equal(sent.length, 0);
   assert.equal(finished[0].status, 'skipped');
+});
+
+test('release dispatcher suppresses past dates and cells already announced in the daily summary', async () => {
+  const sent = [];
+  const finished = [];
+  const state = sampleState();
+  delete state.schedules['2026-10-26'].g1['p1_2026-10-29'];
+  const items = [
+    {
+      id: 'gn-past', kind: 'released-slot', attempts: 0,
+      payload: { week: '2026-10-26', personId: 'p1', personName: '阿文', date: '2026-10-27' },
+    },
+    {
+      id: 'gn-already-daily', kind: 'released-slot', attempts: 0,
+      payload: { week: '2026-10-26', personId: 'p1', personName: '阿文', date: '2026-10-29' },
+    },
+  ];
+  const store = {
+    nextGroupNotificationAt: async () => null,
+    claimDueGroupNotifications: async () => items,
+    getState: async () => state,
+    wasDailyVacancyAnnounced: async (runDate, personId, date) => (
+      runDate === '2026-10-29' && personId === 'p1' && date === '2026-10-29'
+    ),
+    finishGroupNotification: async (id, result) => finished.push({ id, ...result }),
+  };
+  const dispatcher = new GroupNotificationDispatcher({
+    store,
+    client: { configured: true, sendGroupMarkdown: async (...args) => sent.push(args) },
+    enabled: true,
+    conversationId: 'cid-1',
+    currentWeek: () => '2026-10-26',
+    today: () => '2026-10-29',
+  });
+
+  await dispatcher.flush();
+
+  assert.equal(sent.length, 0);
+  assert.deepEqual(finished, [
+    { id: 'gn-past', status: 'skipped', error: '日期已过去' },
+    { id: 'gn-already-daily', status: 'skipped', error: '当天已在空余汇总中通知' },
+  ]);
 });
 
 test('group dispatcher logs delivery failures with notification identity and retry state', async () => {

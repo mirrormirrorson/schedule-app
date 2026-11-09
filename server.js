@@ -43,7 +43,7 @@ const DINGTALK_GROUP_NOTIFY_ENABLED = /^(1|true|yes)$/i.test(process.env.DINGTAL
 const DINGTALK_GROUP_OPEN_CONVERSATION_ID = String(process.env.DINGTALK_GROUP_OPEN_CONVERSATION_ID || '').trim();
 const DINGTALK_GROUP_RELEASE_DELAY_MS = Math.min(
   10 * 60 * 1000,
-  Math.max(30 * 1000, Number(process.env.DINGTALK_GROUP_RELEASE_DELAY_MS || 2 * 60 * 1000)),
+  Math.max(30 * 1000, Number(process.env.DINGTALK_GROUP_RELEASE_DELAY_MS || 5 * 60 * 1000)),
 );
 const GROUP_NOTIFY_CRON_SECRET = String(process.env.GROUP_NOTIFY_CRON_SECRET || '').trim();
 const EDITABLE_ROOTS = new Set([
@@ -707,6 +707,14 @@ class FileStore {
     return { inserted: true, empty };
   }
 
+  async wasDailyVacancyAnnounced(runDate, personId, date) {
+    const item = this.groupNotificationOutbox.get(`gn_daily_${runDate}`);
+    if (!item || item.kind !== 'daily-vacancy' || item.status !== 'sent') return false;
+    return (item.payload && item.payload.items || []).some(day => (
+      day.date === date && (day.people || []).some(person => person.personId === personId)
+    ));
+  }
+
   async requeueStaleGroupNotifications() {
     for (const item of this.groupNotificationOutbox.values()) {
       // 服务启动时已不存在上一个活跃 worker，因此所有 processing 均应回队。
@@ -1348,6 +1356,19 @@ class PostgresStore {
       ],
     );
     return { inserted: result.rowCount > 0, empty };
+  }
+
+  async wasDailyVacancyAnnounced(runDate, personId, date) {
+    const result = await this.pool.query(
+      `SELECT payload FROM group_notification_outbox
+       WHERE dedupe_key = $1 AND kind = 'daily-vacancy' AND status = 'sent'
+       LIMIT 1`,
+      [`daily:${runDate}`],
+    );
+    const payload = result.rows[0] && result.rows[0].payload;
+    return Boolean(payload && (payload.items || []).some(day => (
+      day.date === date && (day.people || []).some(person => person.personId === personId)
+    )));
   }
 
   async requeueStaleGroupNotifications() {
