@@ -52,6 +52,7 @@ test('09:00 summary includes remaining workdays only and excludes leave, weekend
   assert.match(message.text, /阿文/);
   assert.doesNotMatch(message.text, /周六/);
   assert.match(message.text, /休息日和已标记请假的老师不计入/);
+  assert.match(message.text, /\[打开视频排班网页\]\(https:\/\/schedule\.example\.com\)/);
 });
 
 test('delete and move-source produce release watches while later fills are cancellation candidates', () => {
@@ -81,6 +82,7 @@ test('released slot message names the teacher and date', () => {
   assert.match(message.text, /10月31日 周六/);
   assert.match(message.text, /5 分钟内仍未重新排上/);
   assert.match(message.text, /操作人：张雅镜/);
+  assert.match(message.text, /\[打开视频排班网页\]\(https:\/\/schedule\.example\.com\)/);
 });
 
 test('release dispatcher rechecks the cell before sending', async () => {
