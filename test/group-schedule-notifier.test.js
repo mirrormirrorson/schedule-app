@@ -117,6 +117,50 @@ test('release dispatcher rechecks the cell before sending', async () => {
   assert.equal(finished[0].status, 'skipped');
 });
 
+test('group dispatcher logs delivery failures with notification identity and retry state', async () => {
+  const finished = [];
+  const errors = [];
+  const store = {
+    requeueStaleGroupNotifications: async () => {},
+    nextGroupNotificationAt: async () => null,
+    claimDueGroupNotifications: async () => [{
+      id: 'gn-failed-daily',
+      kind: 'daily-vacancy',
+      attempts: 0,
+      payload: { runDate: '2026-11-09', items: [] },
+    }],
+    finishGroupNotification: async (id, result) => finished.push({ id, ...result }),
+  };
+  const client = {
+    configured: true,
+    sendGroupMarkdown: async () => { throw new Error('robot does not exist'); },
+  };
+  const logger = { error: (...args) => errors.push(args) };
+  const dispatcher = new GroupNotificationDispatcher({
+    store,
+    client,
+    enabled: true,
+    conversationId: 'cid-1',
+    appUrl: '',
+    logger,
+  });
+
+  await dispatcher.flush();
+
+  assert.equal(finished[0].status, 'pending');
+  assert.equal(finished[0].error, 'robot does not exist');
+  assert.deepEqual(errors, [[
+    '[dingtalk-group-notify]',
+    {
+      id: 'gn-failed-daily',
+      kind: 'daily-vacancy',
+      attempt: 1,
+      terminal: false,
+      error: 'robot does not exist',
+    },
+  ]]);
+});
+
 test('daily scheduler enqueues once after 09:00 and schedules the next Shanghai morning', async () => {
   const enqueued = [];
   const wakeCalls = [];

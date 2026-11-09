@@ -186,3 +186,10 @@ DATABASE_URL='postgresql://...' pnpm import:snapshot -- path/to/state.json
 - 通知采用 PostgreSQL outbox，排班先事务保存，发送失败不回滚排班；最多重试 3 次，启动时会恢复被中断的发送。
 - 09:00 定时任务由 GitHub Actions 在 09:00 和 09:10 触发，服务端按日期去重，只读一次当前缓存状态，不轮询 Neon。
 - 全套 74/74 测试通过，本地通知预览已打开。当前仍未推送生产、未把机器人加入目标群、未写入 Render/GitHub 的群通知配置，也未发送测试群消息。
+
+## 2026-11-09 生产群通知诊断
+
+- 当天 09:00 的每日空余通知已入队，业务函数算出 3 个日期、5 个空余项。
+- 生产 outbox 记录 `gn_daily_2026-11-09` 最终 `failed`，共尝试 3 次；钉钉返回“robot 不存在，请确认 robotCode 是否正确”。
+- 健康接口的 `dailyRunDate` 不能作为送达证明；固定以 outbox `sent_at` 和目标群回读完成验收。
+- 修复时确认 Render 的 Robot Code 与当前应用 Client ID 不一致；改为当前应用编码后，测试消息和正式日汇总均从目标群回读成功。发送失败现在会把通知 ID、类型、重试次数、终态和安全错误摘要写入 Render 日志。
